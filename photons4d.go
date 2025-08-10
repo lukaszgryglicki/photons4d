@@ -32,9 +32,6 @@ const (
 
 type shardLocks struct{ mu [NumShards]sync.Mutex }
 
-func (sl *shardLocks) lock(idx int)   { sl.mu[idx&(NumShards-1)].Lock() }
-func (sl *shardLocks) unlock(idx int) { sl.mu[idx&(NumShards-1)].Unlock() }
-
 // ---------------------------------------------------------
 // Geometry & color
 // ---------------------------------------------------------
@@ -44,16 +41,19 @@ type Point4 struct {
 	X, Y, Z, W float64
 }
 
-// Add lets you translate a Point4 by a Vector4.
-func (p Point4) Add(v Vector4) Point4 {
-	point := Point4{p.X + v.X, p.Y + v.Y, p.Z + v.Z, p.W + v.W}
-	// debugLog("Adding Vector4 to Point4: (%f, %f, %f, %f) + (%f, %f, %f, %f) = (%f, %f, %f, %f)", p.X, p.Y, p.Z, p.W, v.X, v.Y, v.Z, v.W, point.X, point.Y, point.Z, point.W)
-	return point
-}
-
 // Vector4 represents a direction (not a position) in 4D space.
 type Vector4 struct {
 	X, Y, Z, W float64
+}
+
+// 4×4 matrix (row-major)
+type Mat4 struct {
+	M [4][4]float64
+}
+
+// Angles in radians for rotations in coordinate planes.
+type Rot4 struct {
+	XY, XZ, XW, YZ, YW, ZW float64
 }
 
 // RGB stores color components; each should be in [0,1].
@@ -77,6 +77,20 @@ type ConeLight4 struct {
 	cosAngle float64
 }
 
+// Hypercube4: axis-aligned box in local space, then rotated about origin and translated to Center.
+// 'Half' are half-lengths along the local X,Y,Z,W axes.
+type Hypercube4 struct {
+	Center Point4
+	Half   Vector4 // half-sizes: Lx/2, Ly/2, Lz/2, Lw/2
+	R      Mat4    // local->world rotation
+	RT     Mat4    // world->local rotation (R^T, since R is orthonormal)
+	// Material (per-channel):
+	Color   RGB // tint/filter applied to reflected & refracted energy
+	Reflect RGB // fraction reflected per channel (0..1)
+	Refract RGB // fraction refracted per channel (0..1)
+	IOR     RGB // index of refraction inside cube per channel (e.g., {1.5,1.5,1.6})
+}
+
 // ---------------------------------------------------------
 // Scene: 3D cube at fixed W with flat voxel buffer
 // ---------------------------------------------------------
@@ -88,6 +102,7 @@ type Scene3D struct {
 	Width, Height, Depth float64
 	Nx, Ny, Nz           int
 	Buf                  []Real // flat: (((i*Ny)+j)*Nz + k)*3 + c
+	Hypercubes           []*Hypercube4
 }
 
 // ---------- JSON config ----------
@@ -107,14 +122,75 @@ type LightCfg struct {
 }
 
 type Config struct {
-	SceneRes  int        `json:"sceneRes"`           // N (Nx=Ny=Nz=N)
-	ProbeRays int        `json:"probeRays"`          // trials per light for p_hit
-	Spp       int        `json:"spp"`                // samples per voxel target
-	GIFOut    string     `json:"gifOut"`             // output filename
-	GIFDelay  int        `json:"gifDelay,omitempty"` // 100ths of a sec per frame; default 5
-	Gamma     float64    `json:"gamma,omitempty"`    // tone map gamma; default 0.75
-	Scene     SceneCfg   `json:"scene"`
-	Lights    []LightCfg `json:"lights"`
+	SceneRes   int            `json:"sceneRes"`           // N (Nx=Ny=Nz=N)
+	ProbeRays  int            `json:"probeRays"`          // trials per light for p_hit
+	Spp        int            `json:"spp"`                // samples per voxel target
+	GIFOut     string         `json:"gifOut"`             // output filename
+	GIFDelay   int            `json:"gifDelay,omitempty"` // 100ths of a sec per frame; default 5
+	Gamma      float64        `json:"gamma,omitempty"`    // tone map gamma; default 0.75
+	Scene      SceneCfg       `json:"scene"`
+	Lights     []LightCfg     `json:"lights"`
+	Hypercubes []HypercubeCfg `json:"hypercubes,omitempty"`
+}
+
+// Rotation in degrees for JSON (friendlier than radians).
+type Rot4Deg struct {
+	XY float64 `json:"xy"`
+	XZ float64 `json:"xz"`
+	XW float64 `json:"xw"`
+	YZ float64 `json:"yz"`
+	YW float64 `json:"yw"`
+	ZW float64 `json:"zw"`
+}
+
+type HypercubeCfg struct {
+	Center Point4  `json:"center"`
+	Size   Vector4 `json:"size"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`   // required
+	Reflect RGB `json:"reflect"` // required
+	Refract RGB `json:"refract"` // required
+	IOR     RGB `json:"ior"`     // required (per-channel)
+}
+
+// Build validates and constructs the runtime object (no defaults).
+func (hc HypercubeCfg) Build() (*Hypercube4, error) {
+	rad := hc.RotDeg.Radians()
+
+	// Optional sanity check: warn if all angles are ~zero.
+	if math.Abs(rad.XY)+math.Abs(rad.XZ)+math.Abs(rad.XW)+
+		math.Abs(rad.YZ)+math.Abs(rad.YW)+math.Abs(rad.ZW) < 1e-12 {
+		debugLog("Hypercube rotation is ~zero; check JSON 'rotDeg' keys (xy,xz,xw,yz,yw,zw).")
+	}
+
+	return NewHypercube4(
+		hc.Center,
+		hc.Size,
+		rad,
+		hc.Color,
+		hc.Reflect,
+		hc.Refract,
+		hc.IOR,
+	)
+}
+
+func (r Rot4Deg) Radians() Rot4 {
+	const k = math.Pi / 180
+	return Rot4{
+		XY: r.XY * k, XZ: r.XZ * k, XW: r.XW * k,
+		YZ: r.YZ * k, YW: r.YW * k, ZW: r.ZW * k,
+	}
+}
+
+func (sl *shardLocks) lock(idx int)   { sl.mu[idx&(NumShards-1)].Lock() }
+func (sl *shardLocks) unlock(idx int) { sl.mu[idx&(NumShards-1)].Unlock() }
+
+// Add lets you translate a Point4 by a Vector4.
+func (p Point4) Add(v Vector4) Point4 {
+	point := Point4{p.X + v.X, p.Y + v.Y, p.Z + v.Z, p.W + v.W}
+	// debugLog("Adding Vector4 to Point4: (%f, %f, %f, %f) + (%f, %f, %f, %f) = (%f, %f, %f, %f)", p.X, p.Y, p.Z, p.W, v.X, v.Y, v.Z, v.W, point.X, point.Y, point.Z, point.W)
+	return point
 }
 
 // Vector functions
@@ -142,6 +218,185 @@ func (v Vector4) Norm() Vector4 {
 		return v
 	}
 	return Vector4{v.X / l, v.Y / l, v.Z / l, v.W / l}
+}
+
+func I4() Mat4 {
+	return Mat4{M: [4][4]float64{
+		{1, 0, 0, 0},
+		{0, 1, 0, 0},
+		{0, 0, 1, 0},
+		{0, 0, 0, 1},
+	}}
+}
+
+func (A Mat4) Mul(B Mat4) Mat4 {
+	var R Mat4
+	for r := 0; r < 4; r++ {
+		for c := 0; c < 4; c++ {
+			sum := 0.0
+			for k := 0; k < 4; k++ {
+				sum += A.M[r][k] * B.M[k][c]
+			}
+			R.M[r][c] = sum
+		}
+	}
+	return R
+}
+
+func (A Mat4) Transpose() Mat4 {
+	var R Mat4
+	for r := 0; r < 4; r++ {
+		for c := 0; c < 4; c++ {
+			R.M[r][c] = A.M[c][r]
+		}
+	}
+	return R
+}
+
+func (A Mat4) MulVec(v Vector4) Vector4 {
+	return Vector4{
+		A.M[0][0]*v.X + A.M[0][1]*v.Y + A.M[0][2]*v.Z + A.M[0][3]*v.W,
+		A.M[1][0]*v.X + A.M[1][1]*v.Y + A.M[1][2]*v.Z + A.M[1][3]*v.W,
+		A.M[2][0]*v.X + A.M[2][1]*v.Y + A.M[2][2]*v.Z + A.M[2][3]*v.W,
+		A.M[3][0]*v.X + A.M[3][1]*v.Y + A.M[3][2]*v.Z + A.M[3][3]*v.W,
+	}
+}
+
+func rotXY(a float64) Mat4 {
+	c, s := math.Cos(a), math.Sin(a)
+	M := I4()
+	M.M[0][0], M.M[0][1] = c, -s
+	M.M[1][0], M.M[1][1] = s, c
+	return M
+}
+func rotXZ(a float64) Mat4 {
+	c, s := math.Cos(a), math.Sin(a)
+	M := I4()
+	M.M[0][0], M.M[0][2] = c, -s
+	M.M[2][0], M.M[2][2] = s, c
+	return M
+}
+func rotXW(a float64) Mat4 {
+	c, s := math.Cos(a), math.Sin(a)
+	M := I4()
+	M.M[0][0], M.M[0][3] = c, -s
+	M.M[3][0], M.M[3][3] = s, c
+	return M
+}
+func rotYZ(a float64) Mat4 {
+	c, s := math.Cos(a), math.Sin(a)
+	M := I4()
+	M.M[1][1], M.M[1][2] = c, -s
+	M.M[2][1], M.M[2][2] = s, c
+	return M
+}
+func rotYW(a float64) Mat4 {
+	c, s := math.Cos(a), math.Sin(a)
+	M := I4()
+	M.M[1][1], M.M[1][3] = c, -s
+	M.M[3][1], M.M[3][3] = s, c
+	return M
+}
+func rotZW(a float64) Mat4 {
+	c, s := math.Cos(a), math.Sin(a)
+	M := I4()
+	M.M[2][2], M.M[2][3] = c, -s
+	M.M[3][2], M.M[3][3] = s, c
+	return M
+}
+
+// Compose rotation from angles.
+// Order matters; here we apply right-to-left: first XY, then XZ, XW, YZ, YW, ZW.
+func rotFromAngles(r Rot4) Mat4 {
+	R := I4()
+	R = rotZW(r.ZW).Mul(R)
+	R = rotYW(r.YW).Mul(R)
+	R = rotYZ(r.YZ).Mul(R)
+	R = rotXW(r.XW).Mul(R)
+	R = rotXZ(r.XZ).Mul(R)
+	R = rotXY(r.XY).Mul(R)
+	return R
+}
+
+func NewHypercube4Simplest(center Point4, size Vector4, angles Rot4) *Hypercube4 {
+	R := rotFromAngles(angles)
+	return &Hypercube4{
+		Center: center,
+		Half:   Vector4{size.X * 0.5, size.Y * 0.5, size.Z * 0.5, size.W * 0.5},
+		R:      R,
+		RT:     R.Transpose(),
+	}
+}
+
+func NewHypercube4(
+	center Point4,
+	size Vector4, // full edge lengths in world units
+	angles Rot4, // rotation in radians
+	color, reflectivity, refractivity, ior RGB,
+) (*Hypercube4, error) {
+
+	// Size must be positive on all axes
+	if !(size.X > 0 && size.Y > 0 && size.Z > 0 && size.W > 0) {
+		return nil, fmt.Errorf("hypercube size must be >0 on all axes, got %+v", size)
+	}
+
+	// Helper: in [0,1]
+	in01 := func(x float64) bool { return x >= 0 && x <= 1 }
+
+	// Validate [0,1] ranges for reflect/refract; and per-channel sum ≤ 1
+	type ch struct {
+		n    string
+		r, t float64
+	}
+	chk := []ch{
+		{"R", reflectivity.R, refractivity.R},
+		{"G", reflectivity.G, refractivity.G},
+		{"B", reflectivity.B, refractivity.B},
+	}
+	for _, c := range chk {
+		if !in01(c.r) || !in01(c.t) {
+			return nil, fmt.Errorf("reflect/refract must be in [0,1]; channel %s got reflect=%.6g refract=%.6g", c.n, c.r, c.t)
+		}
+		if c.r+c.t > 1+1e-12 {
+			return nil, fmt.Errorf("per-channel reflect+refract must be ≤1; channel %s got %.6g", c.n, c.r+c.t)
+		}
+	}
+
+	// IOR must be strictly positive
+	if !(ior.R > 0 && ior.G > 0 && ior.B > 0) {
+		return nil, fmt.Errorf("IOR must be > 0 per channel; got %+v", ior)
+	}
+
+	// Build rotation
+	R := rotFromAngles(angles)
+
+	hc := Hypercube4{
+		Center: center,
+		Half:   Vector4{size.X * 0.5, size.Y * 0.5, size.Z * 0.5, size.W * 0.5},
+		R:      R,
+		RT:     R.Transpose(),
+
+		Color:   color,
+		Reflect: reflectivity,
+		Refract: refractivity,
+		IOR:     ior,
+	}
+
+	// debugLog("Created Hypercube4: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color.clamp01(), hc.Reflect.clamp01(), hc.Refract.clamp01(), hc.IOR)
+	debugLog("Created Hypercube4: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
+	return &hc, nil
+}
+
+// ContainsPoint: check if world-space point lies inside the rotated box.
+// Steps: translate to origin, rotate into local frame (RT), AABB test vs Half.
+func (h *Hypercube4) ContainsPoint(p Point4) bool {
+	// world -> local
+	v := Vector4{p.X - h.Center.X, p.Y - h.Center.Y, p.Z - h.Center.Z, p.W - h.Center.W}
+	q := h.RT.MulVec(v)
+	return math.Abs(q.X) <= h.Half.X &&
+		math.Abs(q.Y) <= h.Half.Y &&
+		math.Abs(q.Z) <= h.Half.Z &&
+		math.Abs(q.W) <= h.Half.W
 }
 
 // clamp01 clamps each channel to [0,1] (useful for validation).
@@ -343,6 +598,10 @@ func (s *Scene3D) VoxelIndexOf(p Point4) (ok bool, i, j, k int, ux, uy, uz float
 // Flat buffer index helper (c ∈ {ChR,ChG,ChB}).
 func (s *Scene3D) idx(i, j, k, c int) int {
 	return (((i*s.Ny)+j)*s.Nz+k)*3 + c
+}
+
+func (s *Scene3D) AddHypercube(h *Hypercube4) {
+	s.Hypercubes = append(s.Hypercubes, h)
 }
 
 // ---------------------------------------------------------
@@ -820,6 +1079,16 @@ func main() {
 			panic(fmt.Errorf("light[%d] invalid: %w", i, err))
 		}
 		lights = append(lights, L)
+	}
+
+	// Build hypercubes from JSON (if any)
+	for i, hc := range cfg.Hypercubes {
+		h, err := hc.Build()
+		if err != nil {
+			fmt.Printf("cannot add hypercube[%d]: %+v, skipping", i, err)
+			continue
+		}
+		scene.AddHypercube(h)
 	}
 
 	// Rays per light to hit target SPP
