@@ -101,6 +101,7 @@ type Scene3D struct {
 	Center               Point4
 	Width, Height, Depth float64
 	Nx, Ny, Nz           int
+	MaxBounces           int
 	Buf                  []Real // flat: (((i*Ny)+j)*Nz + k)*3 + c
 	Hypercubes           []*Hypercube4
 }
@@ -108,10 +109,11 @@ type Scene3D struct {
 // ---------- JSON config ----------
 
 type SceneCfg struct {
-	Center Point4  `json:"center"` // { "X":0,"Y":0,"Z":0,"W":0 }
-	Width  float64 `json:"width"`  // e.g. 2.0
-	Height float64 `json:"height"` // e.g. 2.0
-	Depth  float64 `json:"depth"`  // e.g. 2.0
+	Center     Point4  `json:"center"` // { "X":0,"Y":0,"Z":0,"W":0 }
+	Width      float64 `json:"width"`  // e.g. 2.0
+	Height     float64 `json:"height"` // e.g. 2.0
+	Depth      float64 `json:"depth"`  // e.g. 2.0
+	MaxBounces int     `json:"maxBounces"`
 }
 
 type LightCfg struct {
@@ -152,6 +154,13 @@ type HypercubeCfg struct {
 	Reflect RGB `json:"reflect"` // required
 	Refract RGB `json:"refract"` // required
 	IOR     RGB `json:"ior"`     // required (per-channel)
+}
+
+type cubeHit struct {
+	t   float64 // param distance along ray
+	Nw  Vector4 // world-space unit normal at hit
+	hc  *Hypercube4
+	inv bool // true if we were inside and are exiting
 }
 
 // Build validates and constructs the runtime object (no defaults).
@@ -462,53 +471,12 @@ func (l *ConeLight4) ContainsPoint(p Point4) bool {
 	return insideAngle // && dist <= maxLength (if you want range limit)
 }
 
-func randNormalGlobal() float64 {
-	// Box–Muller
-	u1 := rand.Float64()
-	u2 := rand.Float64()
-	r := math.Sqrt(-2 * math.Log(math.Max(u1, 1e-12)))
-	r2 := r * math.Cos(2*math.Pi*u2)
-	// LG:skip
-	// debugLog("Generated random normal: u1=%.5f, u2=%.5f, r=%.5f, r2=%.5f", u1, u2, r, r2)
-	return r2
-}
-
 func randNormal(rng *rand.Rand) float64 {
 	// Box–Muller
 	u1 := rng.Float64()
 	u2 := rng.Float64()
 	r := math.Sqrt(-2 * math.Log(math.Max(u1, 1e-12)))
 	return r * math.Cos(2*math.Pi*u2)
-}
-
-// SampleDir returns a unit direction inside the cone around l.Direction with half-angle l.Angle.
-// Notes:
-//   - This picks phi uniformly in [0, Angle]. That’s simple, but not uniform in solid angle.
-//     If you want solid-angle-uniform sampling on S^3’s spherical cap later, we can tweak the phi distribution.
-func (l *ConeLight4) SampleDirGlobal() Vector4 {
-	axis := l.Direction.Norm() // should already be unit, but be safe
-
-	// 1) pick an angle within the cone (simple uniform in [0, Angle])
-	phi := rand.Float64() * l.Angle
-	c, s := math.Cos(phi), math.Sin(phi)
-	// LG:skip
-	// debugLog("SampleDir: angle phi=%.5f (cos=%.5f, sin=%.5f)", phi, c, s)
-
-	// 2) sample a random unit vector orthogonal to axis (lives in the 3D subspace ⟂ to axis)
-	//    Do: draw a random 4D normal vector r, remove its projection onto axis, normalize.
-	for {
-		r := Vector4{randNormalGlobal(), randNormalGlobal(), randNormalGlobal(), randNormalGlobal()}
-		ortho := r.Sub(axis.Mul(r.Dot(axis)))
-		if ortho.Len() > 1e-12 {
-			u := ortho.Norm()
-			// 3) rotate off the axis by phi inside the cone
-			rd := axis.Mul(c).Add(u.Mul(s)).Norm()
-			// LG:skip
-			// debugLog("SampleDir: sampled direction (%.5f, %.5f, %.5f, %.5f)", rd.X, rd.Y, rd.Z, rd.W)
-			return rd
-		}
-		// if degenerate, resample
-	}
 }
 
 func (l *ConeLight4) SampleDir(rng *rand.Rand) Vector4 {
@@ -532,7 +500,7 @@ func (l *ConeLight4) SampleDir(rng *rand.Rand) Vector4 {
 }
 
 // NewScene3D allocates a zero-initialized flat voxel grid for the given size and resolution.
-func NewScene3D(center Point4, width, height, depth float64, nx, ny, nz int) *Scene3D {
+func NewScene3D(center Point4, width, height, depth float64, nx, ny, nz, maxBounces int) *Scene3D {
 	if nx <= 0 || ny <= 0 || nz <= 0 {
 		panic("voxel resolution must be positive")
 	}
@@ -541,9 +509,10 @@ func NewScene3D(center Point4, width, height, depth float64, nx, ny, nz int) *Sc
 		Center: center,
 		Width:  width, Height: height, Depth: depth,
 		Nx: nx, Ny: ny, Nz: nz,
-		Buf: make([]Real, total),
+		Buf:        make([]Real, total),
+		MaxBounces: maxBounces,
 	}
-	debugLog("Created scene center=%+v, size=(%.2f, %.2f, %.2f), resolution=(%d, %d, %d)", center, width, height, depth, nx, ny, nz)
+	debugLog("Created scene center=%+v, size=(%.2f, %.2f, %.2f), resolution=(%d, %d, %d), maxBounces=%d", center, width, height, depth, nx, ny, nz, maxBounces)
 	return s
 }
 
@@ -604,218 +573,141 @@ func (s *Scene3D) AddHypercube(h *Hypercube4) {
 	s.Hypercubes = append(s.Hypercubes, h)
 }
 
-// ---------------------------------------------------------
-// Ray cast: one ray → deposit
-// ---------------------------------------------------------
-
-// castOneRay fires a single ray. If it hits the scene (W-plane + inside XYZ bounds),
-// it accumulates inverse-square intensity into the hit voxel and prints debug info.
-func castOneRay(light *ConeLight4, scene *Scene3D) {
-	// sample direction
-	D := light.SampleDirGlobal() // unit
-	// LG:skip
-	// debugLog("Ray dir: (%.5f, %.5f, %.5f, %.5f)", D.X, D.Y, D.Z, D.W)
-
-	// intersect with hyperplane W = scene.Center.W
-	den := D.W
-	if math.Abs(den) < 1e-12 {
-		// LG:skip
-		// debugLog("MISS: ray parallel to scene hyperplane (W constant).")
-		return
+// castSingleRay traces one photon from `light` through the scene.
+//   - Picks ONE RGB channel (R/G/B) with probability ∝ light.Color.
+//   - Marches the ray, always taking the nearest event: a hypercube hit or the W-plane hit.
+//   - On hypercube, Russian-roulette per channel: absorb / reflect / refract.
+//   - Energy is tinted by cube.Color[ch] on each surface interaction.
+//   - Travel distance is accumulated across all segments; deposit uses 1/(dist^2 + eps).
+//   - If deposit==true, it writes into scene.Buf with shard locks; otherwise it only tests
+//     and returns whether the photon would have deposited.
+//
+// Returns true iff it deposits into any voxel on the plane.
+func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *shardLocks, deposit bool) bool {
+	// Choose the photon channel; if all zero, no photon.
+	ch := pickChannelByColor(light.Color, rng)
+	if ch < 0 {
+		return false
 	}
-	t := (scene.Center.W - light.Origin.W) / den
-	if t <= 0 {
-		// LG:skip
-		// debugLog("MISS: intersection behind origin (t=%.6f)", t)
-		return
-	}
-	P := light.Origin.Add(D.Mul(t))
-	// LG:skip
-	// debugLog("Intersection t=%.6f at P=(%.5f, %.5f, %.5f, %.5f)", t, P.X, P.Y, P.Z, P.W)
 
-	// check inside bounds and map to voxel
-	// _, _, _ => ux, uy, uz
-	if ok, i, j, k, _, _, _ := scene.VoxelIndexOf(P); ok {
-		// inverse-square falloff by traveled distance (since D is unit, distance = t)
-		const eps = 1e-6
-		w := 1.0 / (t*t + eps)
+	// Initial throughput/energy: sum of channels so that E[deposit] = Color[ch]*w
+	throughput := light.Color.R + light.Color.G + light.Color.B
 
-		// deposit (per-channel scale by light color)
-		addR := light.Color.R * w
-		addG := light.Color.G * w
-		addB := light.Color.B * w
-
-		scene.Buf[scene.idx(i, j, k, ChR)] += Real(addR)
-		scene.Buf[scene.idx(i, j, k, ChG)] += Real(addG)
-		scene.Buf[scene.idx(i, j, k, ChB)] += Real(addB)
-
-		// LG:skip
-		// debugLog("HIT: voxel i=%d j=%d k=%d  (u=%.3f v=%.3f w=%.3f)", i, j, k, ux, uy, uz)
-		// debugLog("     added RGB = (%.6g, %.6g, %.6g)", addR, addG, addB)
-	} else {
-		// LG:skip
-		// debugLog("MISS: intersection outside scene XYZ bounds.")
-	}
-}
-
-// Same as castOneRay, but deposits into 'buf' instead of scene.Buf.
-// Safe to call from multiple goroutines with different 'buf's.
-func castOneRayInto(light *ConeLight4, scene *Scene3D, buf []Real, rng *rand.Rand) {
+	// Start at the light with a sampled unit direction.
+	O := light.Origin
 	D := light.SampleDir(rng) // unit
 
-	den := D.W
-	if math.Abs(den) < 1e-12 {
-		return
-	}
-	t := (scene.Center.W - light.Origin.W) / den
-	if t <= 0 {
-		return
-	}
-	P := light.Origin.Add(D.Mul(t))
+	const eps = 1e-6
+	const bump = 1e-6
 
-	if ok, i, j, k, _, _, _ := scene.VoxelIndexOf(P); ok {
-		const eps = 1e-6
-		w := 1.0 / (t*t + eps)
-		addR := light.Color.R * w
-		addG := light.Color.G * w
-		addB := light.Color.B * w
+	totalDist := 0.0
 
-		idxR := scene.idx(i, j, k, ChR)
-		buf[idxR+0] += Real(addR)
-		buf[idxR+1] += Real(addG)
-		buf[idxR+2] += Real(addB)
-	}
-}
+	for bounce := 0; bounce < scene.MaxBounces; bounce++ {
+		// Next plane hit (W == scene.Center.W)
+		tPlane := planeHitT(scene, O, D)
 
-// Write directly into scene.Buf
-func castOneRayShard(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *shardLocks) {
-	D := light.SampleDir(rng)
-	den := D.W
-	if math.Abs(den) < 1e-12 {
-		return
-	}
-	t := (scene.Center.W - light.Origin.W) / den
-	if t <= 0 {
-		return
-	}
-	P := light.Origin.Add(D.Mul(t))
-	if ok, i, j, k, _, _, _ := scene.VoxelIndexOf(P); ok {
-		const eps = 1e-6
-		w := 1.0 / (t*t + eps)
-		base := scene.idx(i, j, k, ChR)
-		locks.lock(base)
-		scene.Buf[base+0] += Real(light.Color.R * w)
-		scene.Buf[base+1] += Real(light.Color.G * w)
-		scene.Buf[base+2] += Real(light.Color.B * w)
-		locks.unlock(base)
-	}
-}
+		// Next hypercube hit
+		hit, okCube := nearestCube(scene, O, D)
 
-// shoot many rays
-func fireRays(light *ConeLight4, scene *Scene3D, n int) {
-	for s := 0; s < n; s++ {
-		castOneRay(light, scene)
-	}
-}
-
-// Uses all CPU cores. Spawns NumCPU workers; each gets its own local buffer.
-// After all workers finish, reduces local buffers into scene.Buf.
-func fireRaysParallel(light *ConeLight4, scene *Scene3D, totalRays int) {
-	workers := runtime.NumCPU()
-	if workers < 1 {
-		workers = 1
-	}
-	raysPer := totalRays / workers
-	rem := totalRays % workers
-
-	debugLogOnce("Launching %d workers (rays: %d each, +1 for first %d workers)", workers, raysPer, rem)
-
-	// local buffers per worker
-	locals := make([][]Real, workers)
-	for w := 0; w < workers; w++ {
-		locals[w] = make([]Real, len(scene.Buf))
-	}
-
-	var counter int64
-	nextPrint := int64(totalRays / 100) // every ~1%
-	if nextPrint < 1 {
-		nextPrint = 1 // at least once
-	}
-	var wg sync.WaitGroup
-	wg.Add(workers)
-	for w := 0; w < workers; w++ {
-		// shards: first 'rem' workers do one extra ray
-		count := raysPer
-		if w < rem {
-			count++
-		}
-
-		// Each worker runs independently and writes only to its local buffer
-		go func(wid, n int) {
-			defer wg.Done()
-			// (Optional) Per-worker RNG for speed:
-			// r := rand.New(rand.NewSource(time.Now().UnixNano() + int64(wid)))
-			// If you switch SampleDir/randNormal to use 'r', contention drops further.
-			local := locals[wid]
-			rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(wid)))
-			for s := 0; s < n; s++ {
-				castOneRayInto(light, scene, local, rng)
-				// update counter atomically
-				fired := atomic.AddInt64(&counter, 1)
-				if fired%nextPrint == 0 {
-					percent := float64(fired) / float64(totalRays) * 100
-					fmt.Printf("[PROGRESS] %.2f%%\n", percent)
-				}
+		// If no cube ahead or plane is closer → try to deposit on the plane.
+		if !okCube || tPlane < hit.t {
+			if !isFinite(tPlane) {
+				return false // parallel to plane and no cube to stop us
 			}
-		}(w, count)
-	}
-	wg.Wait()
 
-	// Reduce locals → global
-	// Single-threaded reduction is often fine; if len is huge, you can parallelize this too.
-	buf := scene.Buf
-	for w := 0; w < workers; w++ {
-		src := locals[w]
-		for i := 0; i < len(buf); i++ {
-			buf[i] += src[i]
-		}
-	}
-}
+			P := O.Add(D.Mul(tPlane))
+			if ok, i, j, k, _, _, _ := scene.VoxelIndexOf(P); ok {
+				totalDist += tPlane
+				w := 1.0 / (totalDist*totalDist + eps)
 
-func fireRaysParallelShard(light *ConeLight4, scene *Scene3D, totalRays int) {
-	workers := runtime.NumCPU()
-	if workers < 1 {
-		workers = 1
-	}
-	raysPer, rem := totalRays/workers, totalRays%workers
-
-	var counter int64
-	nextPrint := int64(1)
-	if totalRays >= 100 {
-		nextPrint = int64(totalRays / 100)
-	}
-
-	locks := &shardLocks{}
-	var wg sync.WaitGroup
-	wg.Add(workers)
-	for w := 0; w < workers; w++ {
-		count := raysPer
-		if w < rem {
-			count++
-		}
-		go func(wid, n int) {
-			defer wg.Done()
-			rng := rand.New(rand.NewSource(time.Now().UnixNano() ^ int64(wid)))
-			for s := 0; s < n; s++ {
-				castOneRayShard(light, scene, rng, locks)
-				fired := atomic.AddInt64(&counter, 1)
-				if fired%nextPrint == 0 {
-					fmt.Printf("[PROGRESS] %.2f%%\n", float64(fired)*100/float64(totalRays))
+				if deposit {
+					base := scene.idx(i, j, k, ChR)
+					if locks != nil {
+						locks.lock(base)
+					}
+					scene.Buf[base+ch] += Real(throughput * w)
+					if locks != nil {
+						locks.unlock(base)
+					}
 				}
+				return true
 			}
-		}(w, count)
+			// Missed the volume bounds on the plane.
+			return false
+		}
+
+		// Otherwise: hypercube is the first event.
+		P := O.Add(D.Mul(hit.t))
+		totalDist += hit.t
+
+		hc := hit.hc
+		// Per-channel probabilities.
+		pRefl := rgbAt(hc.Reflect, ch)
+		pRefr := rgbAt(hc.Refract, ch)
+		pAbs := 1.0 - pRefl - pRefr
+		if pAbs < 0 {
+			pAbs = 0 // numeric clamp
+		}
+
+		// Russian roulette: absorb / reflect / refract.
+		u := rng.Float64()
+		if u < pAbs {
+			return false // absorbed
+		}
+
+		// Tint throughput by the cube color (per channel).
+		throughput *= rgbAt(hc.Color, ch)
+
+		N := hit.Nw // outward normal (unit)
+
+		if u < pAbs+pRefl {
+			// Reflect
+			D = reflect4(D, N)
+			O = Point4{
+				P.X + D.X*bump,
+				P.Y + D.Y*bump,
+				P.Z + D.Z*bump,
+				P.W + D.W*bump,
+			}
+			continue
+		}
+
+		// Refract
+		nOutside := 1.0
+		nInside := rgbAt(hc.IOR, ch)
+		var n1, n2 float64
+		if hit.inv {
+			// We were inside, exiting to outside.
+			n1, n2 = nInside, nOutside
+		} else {
+			// Entering the cube.
+			n1, n2 = nOutside, nInside
+		}
+		eta := n1 / n2
+
+		if T, ok := refract4(D, N, eta); ok {
+			D = T
+			O = Point4{
+				P.X + D.X*bump,
+				P.Y + D.Y*bump,
+				P.Z + D.Z*bump,
+				P.W + D.W*bump,
+			}
+			continue
+		}
+
+		// Total internal reflection fallback.
+		D = reflect4(D, N)
+		O = Point4{
+			P.X + D.X*bump,
+			P.Y + D.Y*bump,
+			P.Z + D.Z*bump,
+			P.W + D.W*bump,
+		}
 	}
-	wg.Wait()
+
+	// Safety bail-out (path didn't terminate sanely).
+	return false
 }
 
 // raysPerLight must match len(lights). This gives you full control (e.g., after measuring p_hit per light).
@@ -872,7 +764,7 @@ func fireRaysFromLights(lights []*ConeLight4, scene *Scene3D, raysPerLight []int
 			for li, L := range lights {
 				n := per[li][wid]
 				for s := 0; s < n; s++ {
-					castOneRayShard(L, scene, rng, locks)
+					_ = castSingleRay(L, scene, rng, locks, true)
 					fired := atomic.AddInt64(&counter, 1)
 					if fired%nextPrint == 0 {
 						fmt.Printf("[PROGRESS] %.2f%%\n", float64(fired)*100/float64(totalRays))
@@ -886,23 +778,226 @@ func fireRaysFromLights(lights []*ConeLight4, scene *Scene3D, raysPerLight []int
 }
 
 func estimateHitProb(light *ConeLight4, scene *Scene3D, trials int) float64 {
-	hits := 0
-	for i := 0; i < trials; i++ {
-		D := light.SampleDirGlobal()
-		den := D.W
-		if math.Abs(den) < 1e-12 {
+	if trials <= 0 {
+		return 0
+	}
+	workers := runtime.NumCPU()
+	if workers < 1 {
+		workers = 1
+	}
+	if workers > trials {
+		workers = trials
+	}
+
+	per, rem := trials/workers, trials%workers
+	var wg sync.WaitGroup
+	hitsCh := make(chan int, workers)
+
+	for w := 0; w < workers; w++ {
+		n := per
+		if w < rem {
+			n++
+		}
+		if n == 0 {
 			continue
 		}
-		t := (scene.Center.W - light.Origin.W) / den
-		if t <= 0 {
-			continue
+		wg.Add(1)
+		go func(wid, n int) {
+			defer wg.Done()
+			// independent RNG per worker
+			seed := time.Now().UnixNano() ^ int64(uint64(wid)*0x9e3779b97f4a7c15)
+			rng := rand.New(rand.NewSource(seed))
+
+			localHits := 0
+			for i := 0; i < n; i++ {
+				if castSingleRay(light, scene, rng, nil, false) {
+					localHits++
+				}
+			}
+			hitsCh <- localHits
+		}(w, n)
+	}
+
+	wg.Wait()
+	close(hitsCh)
+
+	totalHits := 0
+	for h := range hitsCh {
+		totalHits += h
+	}
+	return float64(totalHits) / float64(trials)
+}
+
+func intersectRayHypercube(O Point4, D Vector4, h *Hypercube4) (hit cubeHit, ok bool) {
+	// world -> local
+	Op := Vector4{O.X - h.Center.X, O.Y - h.Center.Y, O.Z - h.Center.Z, O.W - h.Center.W}
+	Ol := h.RT.MulVec(Op)
+	Dl := h.RT.MulVec(D)
+
+	const inf = 1e300
+	tmin, tmax := -inf, inf
+	enterAxis, enterSign := -1, 0
+	exitAxis, exitSign := -1, 0
+
+	axis := func(o, d, half float64, ax int) (bool, float64, float64, int, int, int, int) {
+		const eps = 1e-12
+		if math.Abs(d) < eps {
+			if math.Abs(o) > half {
+				return false, 0, 0, 0, 0, 0, 0
+			}
+			return true, -inf, inf, 0, 0, 0, 0
 		}
-		P := light.Origin.Add(D.Mul(t))
-		if ok, _, _, _, _, _, _ := scene.VoxelIndexOf(P); ok {
-			hits++
+		t1 := (-half - o) / d
+		t2 := (half - o) / d
+		sgnEnter := -1
+		sgnExit := +1
+		if t1 > t2 {
+			t1, t2 = t2, t1
+			sgnEnter, sgnExit = +1, -1
+		}
+		return true, t1, t2, ax, sgnEnter, ax, sgnExit
+	}
+
+	okX, a1, a2, eAx1, eSg1, xAx1, xSg1 := axis(Ol.X, Dl.X, h.Half.X, 0)
+	if !okX {
+		return cubeHit{}, false
+	}
+	okY, b1, b2, eAx2, eSg2, xAx2, xSg2 := axis(Ol.Y, Dl.Y, h.Half.Y, 1)
+	if !okY {
+		return cubeHit{}, false
+	}
+	okZ, c1, c2, eAx3, eSg3, xAx3, xSg3 := axis(Ol.Z, Dl.Z, h.Half.Z, 2)
+	if !okZ {
+		return cubeHit{}, false
+	}
+	okW, d1, d2, eAx4, eSg4, xAx4, xSg4 := axis(Ol.W, Dl.W, h.Half.W, 3)
+	if !okW {
+		return cubeHit{}, false
+	}
+
+	type slab struct {
+		t1, t2             float64
+		eAx, eSg, xAx, xSg int
+	}
+	sl := []slab{
+		{a1, a2, eAx1, eSg1, xAx1, xSg1},
+		{b1, b2, eAx2, eSg2, xAx2, xSg2},
+		{c1, c2, eAx3, eSg3, xAx3, xSg3},
+		{d1, d2, eAx4, eSg4, xAx4, xSg4},
+	}
+	for _, s := range sl {
+		if s.t1 > tmin {
+			tmin, enterAxis, enterSign = s.t1, s.eAx, s.eSg
+		}
+		if s.t2 < tmax {
+			tmax, exitAxis, exitSign = s.t2, s.xAx, s.xSg
 		}
 	}
-	return float64(hits) / float64(trials)
+	if tmax < 0 || tmin > tmax {
+		return cubeHit{}, false
+	}
+
+	inv := tmin < 0 && tmax > 0
+	var t float64
+	ax, sg := 0, 0
+	if !inv {
+		t, ax, sg = tmin, enterAxis, enterSign // entering
+	} else {
+		t, ax, sg = tmax, exitAxis, exitSign // exiting
+	}
+
+	// normal in local space
+	var Nl Vector4
+	switch ax {
+	case 0:
+		Nl = Vector4{float64(sg), 0, 0, 0}
+	case 1:
+		Nl = Vector4{0, float64(sg), 0, 0}
+	case 2:
+		Nl = Vector4{0, 0, float64(sg), 0}
+	case 3:
+		Nl = Vector4{0, 0, 0, float64(sg)}
+	}
+	Nw := h.R.MulVec(Nl).Norm()
+
+	return cubeHit{t: t, Nw: Nw, hc: h, inv: inv}, true
+}
+
+func nearestCube(scene *Scene3D, O Point4, D Vector4) (cubeHit, bool) {
+	best := cubeHit{}
+	okAny := false
+	bestT := 1e300
+	for _, h := range scene.Hypercubes {
+		hit, ok := intersectRayHypercube(O, D, h)
+		if ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
+	return best, okAny
+}
+
+// reflection & refraction in 4D
+func reflect4(I, N Vector4) Vector4 {
+	return I.Sub(N.Mul(2 * I.Dot(N))).Norm()
+}
+
+func refract4(I, N Vector4, eta float64) (Vector4, bool) {
+	cosi := -I.Dot(N)
+	if cosi < -1 {
+		cosi = -1
+	}
+	if cosi > 1 {
+		cosi = 1
+	}
+	k := 1 - eta*eta*(1-cosi*cosi)
+	if k < 0 {
+		return Vector4{}, false // TIR
+	}
+	T := I.Mul(eta).Add(N.Mul(eta*cosi - math.Sqrt(k)))
+	return T.Norm(), true
+}
+
+// plane distance to W = scene.Center.W (from O along D), +Inf if none
+func planeHitT(scene *Scene3D, O Point4, D Vector4) float64 {
+	if math.Abs(D.W) < 1e-12 {
+		return math.Inf(1)
+	}
+	t := (scene.Center.W - O.W) / D.W
+	if t <= 1e-9 {
+		return math.Inf(1)
+	}
+	return t
+}
+
+func isFinite(x float64) bool { return !math.IsInf(x, 0) && !math.IsNaN(x) }
+
+// pick ONE RGB channel with probability ∝ light color
+// LG:why
+func pickChannelByColor(c RGB, rng *rand.Rand) int {
+	sum := c.R + c.G + c.B
+	if sum <= 0 {
+		return -1
+	}
+	u := rng.Float64() * sum
+	if u < c.R {
+		return ChR
+	}
+	u -= c.R
+	if u < c.G {
+		return ChG
+	}
+	return ChB
+}
+
+func rgbAt(c RGB, ch int) float64 {
+	switch ch {
+	case ChR:
+		return c.R
+	case ChG:
+		return c.G
+	default:
+		return c.B
+	}
 }
 
 // find the global max channel value across the whole buffer (for consistent brightness)
@@ -1068,7 +1163,7 @@ func main() {
 	Nx, Ny, Nz := cfg.SceneRes, cfg.SceneRes, cfg.SceneRes
 
 	// Scene from JSON
-	scene := NewScene3D(cfg.Scene.Center, cfg.Scene.Width, cfg.Scene.Height, cfg.Scene.Depth, Nx, Ny, Nz)
+	scene := NewScene3D(cfg.Scene.Center, cfg.Scene.Width, cfg.Scene.Height, cfg.Scene.Depth, Nx, Ny, Nz, cfg.Scene.MaxBounces)
 
 	// Lights from JSON
 	lights := make([]*ConeLight4, 0, len(cfg.Lights))
