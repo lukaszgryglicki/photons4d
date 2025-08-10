@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -26,13 +27,13 @@ const (
 	SceneRes  = 400
 	ProbeRays = 100_000
 	Spp       = 64
+	NumShards = 1024
 )
 
-const numShards = 1024 // power of two is nice
-type shardLocks struct{ mu [numShards]sync.Mutex }
+type shardLocks struct{ mu [NumShards]sync.Mutex }
 
-func (sl *shardLocks) lock(idx int)   { sl.mu[idx&(numShards-1)].Lock() }
-func (sl *shardLocks) unlock(idx int) { sl.mu[idx&(numShards-1)].Unlock() }
+func (sl *shardLocks) lock(idx int)   { sl.mu[idx&(NumShards-1)].Lock() }
+func (sl *shardLocks) unlock(idx int) { sl.mu[idx&(NumShards-1)].Unlock() }
 
 // ---------------------------------------------------------
 // Geometry & color
@@ -53,6 +54,67 @@ func (p Point4) Add(v Vector4) Point4 {
 // Vector4 represents a direction (not a position) in 4D space.
 type Vector4 struct {
 	X, Y, Z, W float64
+}
+
+// RGB stores color components; each should be in [0,1].
+type RGB struct {
+	R, G, B float64
+}
+
+// ---------------------------------------------------------
+// Light
+// ---------------------------------------------------------
+
+// ConeLight4 is a 4D "spot" light: rays originate at Origin and
+// are restricted to a cone around Direction with half-angle Angle (radians).
+type ConeLight4 struct {
+	Origin    Point4
+	Direction Vector4 // should be unit-length; constructor normalizes
+	Color     RGB     // each in [0,1]
+	Angle     float64 // half-angle in radians, (0, π]
+
+	// cached
+	cosAngle float64
+}
+
+// ---------------------------------------------------------
+// Scene: 3D cube at fixed W with flat voxel buffer
+// ---------------------------------------------------------
+
+// Scene3D stores a 3D volume (axis-aligned in X,Y,Z) embedded at W=Center.W.
+// Voxels are in a flat buffer: len = Nx*Ny*Nz*3 (RGB).
+type Scene3D struct {
+	Center               Point4
+	Width, Height, Depth float64
+	Nx, Ny, Nz           int
+	Buf                  []Real // flat: (((i*Ny)+j)*Nz + k)*3 + c
+}
+
+// ---------- JSON config ----------
+
+type SceneCfg struct {
+	Center Point4  `json:"center"` // { "X":0,"Y":0,"Z":0,"W":0 }
+	Width  float64 `json:"width"`  // e.g. 2.0
+	Height float64 `json:"height"` // e.g. 2.0
+	Depth  float64 `json:"depth"`  // e.g. 2.0
+}
+
+type LightCfg struct {
+	Origin    Point4  `json:"origin"`    // { "X":..., "Y":..., "Z":..., "W":... }
+	Direction Vector4 `json:"direction"` // { "X":..., "Y":..., "Z":..., "W":... }
+	Color     RGB     `json:"color"`     // { "R":..., "G":..., "B":... } in [0,1]
+	AngleDeg  float64 `json:"angleDeg"`  // degrees
+}
+
+type Config struct {
+	SceneRes  int        `json:"sceneRes"`           // N (Nx=Ny=Nz=N)
+	ProbeRays int        `json:"probeRays"`          // trials per light for p_hit
+	Spp       int        `json:"spp"`                // samples per voxel target
+	GIFOut    string     `json:"gifOut"`             // output filename
+	GIFDelay  int        `json:"gifDelay,omitempty"` // 100ths of a sec per frame; default 5
+	Gamma     float64    `json:"gamma,omitempty"`    // tone map gamma; default 0.75
+	Scene     SceneCfg   `json:"scene"`
+	Lights    []LightCfg `json:"lights"`
 }
 
 // Vector functions
@@ -82,11 +144,6 @@ func (v Vector4) Norm() Vector4 {
 	return Vector4{v.X / l, v.Y / l, v.Z / l, v.W / l}
 }
 
-// RGB stores color components; each should be in [0,1].
-type RGB struct {
-	R, G, B float64
-}
-
 // clamp01 clamps each channel to [0,1] (useful for validation).
 func (c RGB) clamp01() RGB {
 	cl := func(x float64) float64 {
@@ -99,22 +156,6 @@ func (c RGB) clamp01() RGB {
 		return x
 	}
 	return RGB{cl(c.R), cl(c.G), cl(c.B)}
-}
-
-// ---------------------------------------------------------
-// Light
-// ---------------------------------------------------------
-
-// ConeLight4 is a 4D "spot" light: rays originate at Origin and
-// are restricted to a cone around Direction with half-angle Angle (radians).
-type ConeLight4 struct {
-	Origin    Point4
-	Direction Vector4 // should be unit-length; constructor normalizes
-	Color     RGB     // each in [0,1]
-	Angle     float64 // half-angle in radians, (0, π]
-
-	// cached
-	cosAngle float64
 }
 
 // NewConeLight4 constructs a cone light, normalizing direction and clamping color.
@@ -233,19 +274,6 @@ func (l *ConeLight4) SampleDir(rng *rand.Rand) Vector4 {
 			return axis.Mul(c).Add(u.Mul(s)).Norm()
 		}
 	}
-}
-
-// ---------------------------------------------------------
-// Scene: 3D cube at fixed W with flat voxel buffer
-// ---------------------------------------------------------
-
-// Scene3D stores a 3D volume (axis-aligned in X,Y,Z) embedded at W=Center.W.
-// Voxels are in a flat buffer: len = Nx*Ny*Nz*3 (RGB).
-type Scene3D struct {
-	Center               Point4
-	Width, Height, Depth float64
-	Nx, Ny, Nz           int
-	Buf                  []Real // flat: (((i*Ny)+j)*Nz + k)*3 + c
 }
 
 // NewScene3D allocates a zero-initialized flat voxel grid for the given size and resolution.
@@ -725,61 +753,92 @@ func SaveAnimatedGIF(scene *Scene3D, path string, delay int, gamma float64) erro
 	return gif.EncodeAll(f, out)
 }
 
+func loadConfig(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+	// Defaults / validation
+	if cfg.SceneRes <= 0 {
+		cfg.SceneRes = SceneRes
+	}
+	if cfg.ProbeRays <= 0 {
+		cfg.ProbeRays = ProbeRays
+	}
+	if cfg.Spp <= 0 {
+		cfg.Spp = Spp
+	}
+	if cfg.GIFOut == "" {
+		cfg.GIFOut = "volume.gif"
+	}
+	if cfg.GIFDelay <= 0 {
+		cfg.GIFDelay = 5
+	}
+	if cfg.Gamma <= 0 {
+		cfg.Gamma = 0.75
+	}
+	if len(cfg.Lights) == 0 {
+		return nil, fmt.Errorf("config has no lights")
+	}
+	return &cfg, nil
+}
+
 // ---------------------------------------------------------
 // main
 // ---------------------------------------------------------
-
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	fmt.Println("4d")
-
-	// Choose resolution. Start with 256^3 to check speed/memory first.
-	// 512^3 with float32 ≈ 1.6 GB; ensure you have enough RAM.
-	Nx, Ny, Nz := SceneRes, SceneRes, SceneRes
-	// Nx, Ny, Nz := 512, 512, 512 // <-- enable if you have >2 GB free
-
-	// Example scene: 2×2×2 cube at W=0
-	scene := NewScene3D(Point4{0, 0, 0, 0}, 2.0, 2.0, 2.0, Nx, Ny, Nz)
-
-	// Example light: at W=+1, pointing toward -W with a warm color, ~25° cone
-	lights := []*ConeLight4{}
-	light, err := NewConeLight4(
-		Point4{0, 0, 0, 1.1},
-		Vector4{0, 0, 0, -1}, // aim toward decreasing W
-		RGB{1.0, 0.8, 0.2},   // color in 0..1
-		25*math.Pi/180.0,     // half-angle
+	var (
+		cfg *Config
+		err error
 	)
+	if len(os.Args) < 2 {
+		cfg, err = loadConfig("config.json")
+	} else {
+		cfg, err = loadConfig(os.Args[1])
+	}
 	if err != nil {
 		panic(err)
 	}
-	lights = append(lights, light)
-	light, err = NewConeLight4(
-		Point4{0.1, -0.1, 0.05, 1.1},
-		Vector4{-0.05, 0.05, -0.025, -0.9}, // aim toward decreasing W
-		RGB{0.3, 0.7, 1.0},                 // color in 0..1
-		30*math.Pi/180.0,                   // half-angle
-	)
-	if err != nil {
-		panic(err)
-	}
-	lights = append(lights, light)
 
-	totalRays := 0
-	needRays := make([]int, len(lights)) // rays needed per light
-	Nvox := Nx * Ny * Nz
-	for i, light := range lights {
-		debugLog("Estimating hit probability for light[%d]: %+v", i+1, light)
-		p := estimateHitProb(light, scene, ProbeRays)
-		// guard agains lights that shine onto our 3D scene too weakly
-		if p < 1e-6 {
-			p = 1e-6
+	// Resolution
+	Nx, Ny, Nz := cfg.SceneRes, cfg.SceneRes, cfg.SceneRes
+
+	// Scene from JSON
+	scene := NewScene3D(cfg.Scene.Center, cfg.Scene.Width, cfg.Scene.Height, cfg.Scene.Depth, Nx, Ny, Nz)
+
+	// Lights from JSON
+	lights := make([]*ConeLight4, 0, len(cfg.Lights))
+	for i, Lc := range cfg.Lights {
+		angle := Lc.AngleDeg * math.Pi / 180.0
+		L, err := NewConeLight4(Lc.Origin, Lc.Direction, Lc.Color, angle)
+		if err != nil {
+			panic(fmt.Errorf("light[%d] invalid: %w", i, err))
 		}
-		need := int(float64(Spp) * float64(Nvox) / p)
-		debugLog("light[%d], p_hit≈%.3f, rays needed for %d spp @ N=%d: %d", i+1, p, Spp, SceneRes, need)
-		needRays[i] = int(need)
-		totalRays += needRays[i]
+		lights = append(lights, L)
 	}
 
+	// Rays per light to hit target SPP
+	Nvox := Nx * Ny * Nz
+	needRays := make([]int, len(lights))
+	totalRays := 0
+	for i, L := range lights {
+		p := estimateHitProb(L, scene, cfg.ProbeRays)
+		if p < 1e-7 {
+			p = 1e-7 // avoid div-by-zero; treat as extremely low hit prob
+		}
+		need := int(float64(cfg.Spp) * float64(Nvox) / p)
+		debugLog("light[%d] p_hit≈%.3f → rays=%d for %d spp @ %dx%dx%d",
+			i, p, need, cfg.Spp, Nx, Ny, Nz)
+		needRays[i] = need
+		totalRays += need
+	}
+
+	// Fire rays (multi-light, sharded writes)
 	start := time.Now()
 	fireRaysFromLights(lights, scene, needRays)
 	runtime.GC()
@@ -794,26 +853,9 @@ func main() {
 		float64(scene.Buf[scene.idx(ci, cj, ck, ChB)]),
 	)
 
-	// Sum total energy (slow for huge grids; ok as a quick check)
-	var sumR, sumG, sumB float64
-	voxels := len(scene.Buf)
-	for i := 0; i < voxels; i += 3 {
-		sumR += float64(scene.Buf[i+ChR])
-		sumG += float64(scene.Buf[i+ChG])
-		sumB += float64(scene.Buf[i+ChB])
-	}
-	voxels /= 3
-	sumR /= float64(voxels)
-	sumG /= float64(voxels)
-	sumB /= float64(voxels)
-	debugLog("Average energy  R: %.6g  G: %.6g  B: %.6g", sumR, sumG, sumB)
-
-	// Save animation: one frame per Z slice
-	outPath := "volume.gif"
-	delay := 5    // 5 × 1/100s = 50 ms per frame ≈ 20 FPS
-	gamma := 0.75 // tweak 0.6..1.0 (lower = brighter)
-	if err := SaveAnimatedGIF(scene, outPath, delay, gamma); err != nil {
+	// Save GIF
+	if err := SaveAnimatedGIF(scene, cfg.GIFOut, cfg.GIFDelay, cfg.Gamma); err != nil {
 		panic(err)
 	}
-	fmt.Println("Saved animated GIF:", outPath)
+	fmt.Println("Saved animated GIF:", cfg.GIFOut)
 }
