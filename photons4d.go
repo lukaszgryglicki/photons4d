@@ -20,14 +20,15 @@ type Real = float64
 
 // Channel indices for readability.
 const (
-	ChR      = 0
-	ChG      = 1
-	ChB      = 2
-	SceneRes = 400
-	Spp      = 64
+	ChR       = 0
+	ChG       = 1
+	ChB       = 2
+	SceneRes  = 400
+	ProbeRays = 100_000
+	Spp       = 64
 )
 
-const numShards = 4096 // power of two is nice
+const numShards = 1024 // power of two is nice
 type shardLocks struct{ mu [numShards]sync.Mutex }
 
 func (sl *shardLocks) lock(idx int)   { sl.mu[idx&(numShards-1)].Lock() }
@@ -530,6 +531,73 @@ func fireRaysParallelShard(light *ConeLight4, scene *Scene3D, totalRays int) {
 	wg.Wait()
 }
 
+// raysPerLight must match len(lights). This gives you full control (e.g., after measuring p_hit per light).
+func fireRaysFromLights(lights []*ConeLight4, scene *Scene3D, raysPerLight []int) {
+	if len(lights) == 0 || len(raysPerLight) != len(lights) {
+		return
+	}
+
+	// Total rays (for progress).
+	totalRays := 0
+	for _, n := range raysPerLight {
+		if n > 0 {
+			totalRays += n
+		}
+	}
+	if totalRays == 0 {
+		return
+	}
+
+	workers := runtime.NumCPU()
+	if workers < 1 {
+		workers = 1
+	}
+
+	// Distribute each light's rays across workers (evenly, with remainder spread).
+	per := make([][]int, len(lights)) // [light][worker] -> count
+	for li, n := range raysPerLight {
+		per[li] = make([]int, workers)
+		base, rem := n/workers, n%workers
+		for w := 0; w < workers; w++ {
+			per[li][w] = base
+			if w < rem {
+				per[li][w]++
+			}
+		}
+	}
+
+	var counter int64
+	nextPrint := int64(1)
+	if totalRays >= 100 {
+		nextPrint = int64(totalRays / 100) // ~1%
+	}
+
+	locks := &shardLocks{}
+	var wg sync.WaitGroup
+	wg.Add(workers)
+
+	for w := 0; w < workers; w++ {
+		wid := w
+		go func() {
+			defer wg.Done()
+			seed := time.Now().UnixNano() ^ int64(uint64(wid)*0x9e3779b97f4a7c15)
+			rng := rand.New(rand.NewSource(seed))
+			for li, L := range lights {
+				n := per[li][wid]
+				for s := 0; s < n; s++ {
+					castOneRayShard(L, scene, rng, locks)
+					fired := atomic.AddInt64(&counter, 1)
+					if fired%nextPrint == 0 {
+						fmt.Printf("[PROGRESS] %.2f%%\n", float64(fired)*100/float64(totalRays))
+					}
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+}
+
 func estimateHitProb(light *ConeLight4, scene *Scene3D, trials int) float64 {
 	hits := 0
 	for i := 0; i < trials; i++ {
@@ -674,8 +742,9 @@ func main() {
 	scene := NewScene3D(Point4{0, 0, 0, 0}, 2.0, 2.0, 2.0, Nx, Ny, Nz)
 
 	// Example light: at W=+1, pointing toward -W with a warm color, ~25° cone
+	lights := []*ConeLight4{}
 	light, err := NewConeLight4(
-		Point4{0, 0, 0, 1.0},
+		Point4{0, 0, 0, 1.1},
 		Vector4{0, 0, 0, -1}, // aim toward decreasing W
 		RGB{1.0, 0.8, 0.2},   // color in 0..1
 		25*math.Pi/180.0,     // half-angle
@@ -683,17 +752,36 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	lights = append(lights, light)
+	light, err = NewConeLight4(
+		Point4{0.1, -0.1, 0.05, 1.1},
+		Vector4{-0.05, 0.05, -0.025, -0.9}, // aim toward decreasing W
+		RGB{0.3, 0.7, 1.0},                 // color in 0..1
+		30*math.Pi/180.0,                   // half-angle
+	)
+	if err != nil {
+		panic(err)
+	}
+	lights = append(lights, light)
 
-	p := estimateHitProb(light, scene, 100000) // 1e5 is plenty quick
-	need := int(float64(Spp) * float64(SceneRes*SceneRes*SceneRes) / p)
-	debugLog("p_hit≈%.3f, rays needed for %d spp @ N=%d: %d\n", p, Spp, SceneRes, need)
+	totalRays := 0
+	needRays := make([]int, len(lights)) // rays needed per light
+	Nvox := Nx * Ny * Nz
+	for i, light := range lights {
+		debugLog("Estimating hit probability for light[%d]: %+v", i+1, light)
+		p := estimateHitProb(light, scene, ProbeRays)
+		// guard agains lights that shine onto our 3D scene too weakly
+		if p < 1e-6 {
+			p = 1e-6
+		}
+		need := int(float64(Spp) * float64(Nvox) / p)
+		debugLog("light[%d], p_hit≈%.3f, rays needed for %d spp @ N=%d: %d", i+1, p, Spp, SceneRes, need)
+		needRays[i] = int(need)
+		totalRays += needRays[i]
+	}
 
-	// Fire a LOT of rays to saturate the scene
-	totalRays := int(need)
 	start := time.Now()
-	// fireRays(light, scene, totalRays)
-	// fireRaysParallel(light, scene, totalRays)
-	fireRaysParallelShard(light, scene, totalRays)
+	fireRaysFromLights(lights, scene, needRays)
 	runtime.GC()
 	elapsed := time.Since(start)
 
