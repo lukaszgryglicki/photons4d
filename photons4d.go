@@ -242,6 +242,12 @@ type RayLogCache struct {
 	rays map[string][]RayLog // map of ray name to logs
 }
 
+// Precompute these once per bounce and pass into nearestCubeT
+type rayRecips struct {
+	invX, invY, invZ, invW Real
+	parX, parY, parZ, parW bool // parallel flags (|D| < eps)
+}
+
 const (
 	Hit            Category = iota // ray hit a hypercube
 	Miss                           // ray missed all hypercubes
@@ -512,6 +518,15 @@ func orthonormal3(a Vector4) (u, v, w Vector4) {
 	return
 }
 
+// helper: integral for S^3 cap CDF piece
+func jS3(t Real) Real { // J(t) = 1/2 * ( t*sqrt(1-t^2) + asin(t) )
+	u := 1 - t*t
+	if u < 0 {
+		u = 0
+	}
+	return 0.5 * (t*math.Sqrt(u) + math.Asin(t))
+}
+
 // NewConeLight4 constructs a cone light and precomputes caches.
 func NewConeLight4(origin Point4, dir Vector4, color RGB, angle Real, void bool) (*ConeLight4, error) {
 	if angle <= 0 || angle > math.Pi {
@@ -547,16 +562,6 @@ func NewConeLight4(origin Point4, dir Vector4, color RGB, angle Real, void bool)
 	}
 	L.U, L.V, L.W = orthonormal3(n)
 
-	// --- S^3 cap sampling caches ---
-	// J(t) = 1/2 * ( t*sqrt(1-t^2) + asin(t) ); area on S^3 between t=cosφ and 1 is J(1)-J(t),
-	// full hemisphere is J(1)-J(-1) = π/2. Acceptance = (J(1)-J(cosθ)) / (π/2).
-	jS3 := func(t Real) Real {
-		u := 1 - t*t
-		if u < 0 {
-			u = 0
-		}
-		return 0.5 * (t*math.Sqrt(u) + math.Asin(t))
-	}
 	Ja := jS3(L.cosAngle)
 	L.acceptProb = (math.Pi/4 - Real(Ja)) / (math.Pi / 2)
 	// Choose rejection if reasonably wide; LUT if narrow (fewer trials == faster).
@@ -835,37 +840,76 @@ func refract4(I, N Vector4, eta Real) (Vector4, bool) {
 	return T, true
 }
 
-// Ray vs Hypercube conservative AABB (4D), return hit and tNear if any.
-func rayAABBParametric(O Point4, D Vector4, minP, maxP Point4) (bool, Real) {
+func rayAABBParametricInv(O Point4, minP, maxP Point4, rr rayRecips) (bool, Real) {
 	tmin, tmax := -1e300, 1e300
 
-	inlineUpdate := func(o, d, mn, mx Real) {
-		const eps = 1e-12
-		if d > eps || d < -eps {
-			inv := 1 / d
-			t1 := (mn - o) * inv
-			t2 := (mx - o) * inv
-			if t1 > t2 {
-				t1, t2 = t2, t1
-			}
-			if t1 > tmin {
-				tmin = t1
-			}
-			if t2 < tmax {
-				tmax = t2
-			}
-			return
+	// X
+	if !rr.parX {
+		t1 := (minP.X - O.X) * rr.invX
+		t2 := (maxP.X - O.X) * rr.invX
+		if t1 > t2 {
+			t1, t2 = t2, t1
 		}
-		if o < mn || o > mx {
-			tmin = 1
-			tmax = 0
+		if t1 > tmin {
+			tmin = t1
 		}
+		if t2 < tmax {
+			tmax = t2
+		}
+	} else if O.X < minP.X || O.X > maxP.X {
+		return false, 0
 	}
 
-	inlineUpdate(O.X, D.X, minP.X, maxP.X)
-	inlineUpdate(O.Y, D.Y, minP.Y, maxP.Y)
-	inlineUpdate(O.Z, D.Z, minP.Z, maxP.Z)
-	inlineUpdate(O.W, D.W, minP.W, maxP.W)
+	// Y
+	if !rr.parY {
+		t1 := (minP.Y - O.Y) * rr.invY
+		t2 := (maxP.Y - O.Y) * rr.invY
+		if t1 > t2 {
+			t1, t2 = t2, t1
+		}
+		if t1 > tmin {
+			tmin = t1
+		}
+		if t2 < tmax {
+			tmax = t2
+		}
+	} else if O.Y < minP.Y || O.Y > maxP.Y {
+		return false, 0
+	}
+
+	// Z
+	if !rr.parZ {
+		t1 := (minP.Z - O.Z) * rr.invZ
+		t2 := (maxP.Z - O.Z) * rr.invZ
+		if t1 > t2 {
+			t1, t2 = t2, t1
+		}
+		if t1 > tmin {
+			tmin = t1
+		}
+		if t2 < tmax {
+			tmax = t2
+		}
+	} else if O.Z < minP.Z || O.Z > maxP.Z {
+		return false, 0
+	}
+
+	// W
+	if !rr.parW {
+		t1 := (minP.W - O.W) * rr.invW
+		t2 := (maxP.W - O.W) * rr.invW
+		if t1 > t2 {
+			t1, t2 = t2, t1
+		}
+		if t1 > tmin {
+			tmin = t1
+		}
+		if t2 < tmax {
+			tmax = t2
+		}
+	} else if O.W < minP.W || O.W > maxP.W {
+		return false, 0
+	}
 
 	if tmax < 0 || tmin > tmax {
 		return false, 0
@@ -883,6 +927,12 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 	// Start at the light with a sampled unit direction.
 	O := light.Origin
 	D := light.SampleDir(rng) // approx unit
+	// normalize for safety
+	l2 := D.Dot(D)
+	if l2 != 0 {
+		D = D.Mul(1 / math.Sqrt(l2))
+	}
+	// normalize for safety:e ends
 
 	totalDist, w := 0.0, 0.0
 
@@ -1267,23 +1317,6 @@ func intersectRayHypercube(O Point4, D Vector4, h *Hypercube4) (hit cubeHit, ok 
 	return cubeHit{t: t, Nw: Nw, hc: h, inv: inv}, true
 }
 
-func nearestCube(scene *Scene3D, O Point4, D Vector4) (cubeHit, bool) {
-	best := cubeHit{}
-	okAny := false
-	bestT := 1e300
-	for _, h := range scene.Hypercubes {
-		if ok, tNear := rayAABBParametric(O, D, h.AABBMin, h.AABBMax); !ok || tNear > bestT {
-			continue
-		}
-		hit, ok := intersectRayHypercube(O, D, h)
-		if ok && hit.t > 1e-12 && hit.t < bestT {
-			bestT, best, okAny = hit.t, hit, true
-		}
-	}
-	return best, okAny
-}
-
-// Like nearestCube, but capped by tMax so we can early-out when the plane is closer.
 func nearestCubeT(scene *Scene3D, O Point4, D Vector4, tMax Real) (cubeHit, bool) {
 	best := cubeHit{}
 	okAny := false
@@ -1291,12 +1324,20 @@ func nearestCubeT(scene *Scene3D, O Point4, D Vector4, tMax Real) (cubeHit, bool
 	if !isFinite(bestT) {
 		bestT = 1e300
 	}
+
+	const eps = 1e-12
+	rr := rayRecips{
+		invX: 1 / D.X, invY: 1 / D.Y, invZ: 1 / D.Z, invW: 1 / D.W,
+		parX: math.Abs(D.X) < eps, parY: math.Abs(D.Y) < eps,
+		parZ: math.Abs(D.Z) < eps, parW: math.Abs(D.W) < eps,
+	}
+
 	for _, h := range scene.Hypercubes {
-		if ok, tNear := rayAABBParametric(O, D, h.AABBMin, h.AABBMax); !ok || tNear > bestT {
+		// early-out with tMax using the same AABB test
+		if ok, tNear := rayAABBParametricInv(O, h.AABBMin, h.AABBMax, rr); !ok || tNear > bestT {
 			continue
 		}
-		hit, ok := intersectRayHypercube(O, D, h)
-		if ok && hit.t > 1e-12 && hit.t < bestT {
+		if hit, ok := intersectRayHypercube(O, D, h); ok && hit.t > 1e-12 && hit.t < bestT {
 			bestT, best, okAny = hit.t, hit, true
 		}
 	}
@@ -1320,15 +1361,6 @@ func sampleS2(rng *rand.Rand) (x, y, z Real) {
 	}
 }
 
-// helper: integral for S^3 cap CDF piece
-func jS3(t Real) Real { // J(t) = 1/2 * ( t*sqrt(1-t^2) + asin(t) )
-	u := 1 - t*t
-	if u < 0 {
-		u = 0
-	}
-	return 0.5 * (t*math.Sqrt(u) + math.Asin(t))
-}
-
 // Fast uniform sample on S^3 without trig/logs (Marsaglia two-disc).
 func unitS3(rng *rand.Rand) Vector4 {
 	for {
@@ -1347,7 +1379,8 @@ func unitS3(rng *rand.Rand) Vector4 {
 			continue
 		}
 		f := math.Sqrt((1 - s1) / s2)
-		return Vector4{2 * x1, 2 * x2, 2 * x3 * f, 2 * x4 * f}
+		// return Vector4{2 * x1, 2 * x2, 2 * x3 * f, 2 * x4 * f}
+		return Vector4{x1, x2, x3 * f, x4 * f}
 	}
 }
 
