@@ -558,7 +558,7 @@ func NewConeLight4(origin Point4, dir Vector4, color RGB, angle Real, void bool)
 		return 0.5 * (t*math.Sqrt(u) + math.Asin(t))
 	}
 	Ja := jS3(L.cosAngle)
-	L.acceptProb = (math.Pi/4 - float64(Ja)) / (math.Pi / 2)
+	L.acceptProb = (math.Pi/4 - Real(Ja)) / (math.Pi / 2)
 	// Choose rejection if reasonably wide; LUT if narrow (fewer trials == faster).
 	L.useReject = L.acceptProb >= LUTRejectThreshold
 	if !L.useReject {
@@ -839,34 +839,33 @@ func refract4(I, N Vector4, eta Real) (Vector4, bool) {
 func rayAABBParametric(O Point4, D Vector4, minP, maxP Point4) (bool, Real) {
 	tmin, tmax := -1e300, 1e300
 
-	update := func(o, d, mn, mx Real) {
+	inlineUpdate := func(o, d, mn, mx Real) {
 		const eps = 1e-12
-		if math.Abs(d) < eps {
-			if o < mn || o > mx {
-				// force miss
-				tmin = 1
-				tmax = 0
-				return
+		if d > eps || d < -eps {
+			inv := 1 / d
+			t1 := (mn - o) * inv
+			t2 := (mx - o) * inv
+			if t1 > t2 {
+				t1, t2 = t2, t1
+			}
+			if t1 > tmin {
+				tmin = t1
+			}
+			if t2 < tmax {
+				tmax = t2
 			}
 			return
 		}
-		t1 := (mn - o) / d
-		t2 := (mx - o) / d
-		if t1 > t2 {
-			t1, t2 = t2, t1
-		}
-		if t1 > tmin {
-			tmin = t1
-		}
-		if t2 < tmax {
-			tmax = t2
+		if o < mn || o > mx {
+			tmin = 1
+			tmax = 0
 		}
 	}
 
-	update(O.X, D.X, minP.X, maxP.X)
-	update(O.Y, D.Y, minP.Y, maxP.Y)
-	update(O.Z, D.Z, minP.Z, maxP.Z)
-	update(O.W, D.W, minP.W, maxP.W)
+	inlineUpdate(O.X, D.X, minP.X, maxP.X)
+	inlineUpdate(O.Y, D.Y, minP.Y, maxP.Y)
+	inlineUpdate(O.Z, D.Z, minP.Z, maxP.Z)
+	inlineUpdate(O.W, D.W, minP.W, maxP.W)
 
 	if tmax < 0 || tmin > tmax {
 		return false, 0
@@ -900,7 +899,7 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 		tPlane := planeHitT(scene, O, D)
 
 		// Next hypercube hit (with AABB pre-cull)
-		hit, okCube := nearestCube(scene, O, D)
+		hit, okCube := nearestCubeT(scene, O, D, tPlane)
 
 		// If no cube ahead or plane is closer → try to deposit on the plane.
 		if !okCube || tPlane < hit.t {
@@ -978,7 +977,10 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 		n := hc.iorArr[ch]
 		tmp := (1 - n) / (1 + n)
 		F0 := tmp * tmp
-		F := F0 + (1-F0)*math.Pow(1-cosTheta, 5) // Schlick Fresnel in [0,1]
+		x := 1 - cosTheta
+		x2 := x * x
+		x5 := x2 * x2 * x
+		F := F0 + (1-F0)*x5
 
 		// Bias Fresnel by your reflect/refract knobs to control the split.
 		rW := hc.refl[ch] * F
@@ -1281,6 +1283,26 @@ func nearestCube(scene *Scene3D, O Point4, D Vector4) (cubeHit, bool) {
 	return best, okAny
 }
 
+// Like nearestCube, but capped by tMax so we can early-out when the plane is closer.
+func nearestCubeT(scene *Scene3D, O Point4, D Vector4, tMax Real) (cubeHit, bool) {
+	best := cubeHit{}
+	okAny := false
+	bestT := tMax
+	if !isFinite(bestT) {
+		bestT = 1e300
+	}
+	for _, h := range scene.Hypercubes {
+		if ok, tNear := rayAABBParametric(O, D, h.AABBMin, h.AABBMax); !ok || tNear > bestT {
+			continue
+		}
+		hit, ok := intersectRayHypercube(O, D, h)
+		if ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
+	return best, okAny
+}
+
 // ---------------------------------------------------------
 // Sampling on cone (cached basis, no rejection)
 // ---------------------------------------------------------
@@ -1307,17 +1329,26 @@ func jS3(t Real) Real { // J(t) = 1/2 * ( t*sqrt(1-t^2) + asin(t) )
 	return 0.5 * (t*math.Sqrt(u) + math.Asin(t))
 }
 
-// Two Box–Muller pairs -> 4 independent standard normals (fewer RNG calls overall).
-func fourNormals(rng *rand.Rand) (float64, float64, float64, float64) {
-	u1 := rng.Float64()
-	u2 := rng.Float64()
-	u3 := rng.Float64()
-	u4 := rng.Float64()
-	r1 := math.Sqrt(-2 * math.Log(u1+1e-12))
-	r2 := math.Sqrt(-2 * math.Log(u3+1e-12))
-	th1 := 2 * math.Pi * u2
-	th2 := 2 * math.Pi * u4
-	return r1 * math.Cos(th1), r1 * math.Sin(th1), r2 * math.Cos(th2), r2 * math.Sin(th2)
+// Fast uniform sample on S^3 without trig/logs (Marsaglia two-disc).
+func unitS3(rng *rand.Rand) Vector4 {
+	for {
+		// first disc
+		x1 := 2*rng.Float64() - 1
+		x2 := 2*rng.Float64() - 1
+		s1 := x1*x1 + x2*x2
+		if s1 >= 1 {
+			continue
+		}
+		// second disc
+		x3 := 2*rng.Float64() - 1
+		x4 := 2*rng.Float64() - 1
+		s2 := x3*x3 + x4*x4
+		if s2 >= 1 {
+			continue
+		}
+		f := math.Sqrt((1 - s1) / s2)
+		return Vector4{2 * x1, 2 * x2, 2 * x3 * f, 2 * x4 * f}
+	}
 }
 
 // Exact uniform cap on S^3 via rejection.
@@ -1331,13 +1362,7 @@ func (l *ConeLight4) SampleDir(rng *rand.Rand) Vector4 {
 		a := l.Direction
 		c := l.cosAngle
 		for {
-			x, y, z, w := fourNormals(rng) // 4 Gaussians
-			n2 := x*x + y*y + z*z + w*w
-			if n2 == 0 {
-				continue
-			}
-			inv := 1 / math.Sqrt(n2)
-			v := Vector4{x * inv, y * inv, z * inv, w * inv}
+			v := unitS3(rng)
 			if a.Dot(v) >= c {
 				return v
 			}
@@ -1345,15 +1370,15 @@ func (l *ConeLight4) SampleDir(rng *rand.Rand) Vector4 {
 	}
 	// LUT inverse-CDF path (fast & deterministic for narrow cones).
 	n := len(l.cosLUT) - 1
-	fu := rng.Float64() * float64(n)
+	fu := rng.Float64() * Real(n)
 	i := int(fu)
 	if i >= n {
 		i = n - 1
-		fu = float64(n - 1)
+		fu = Real(n - 1)
 	}
 	t0 := l.cosLUT[i]
 	t1 := l.cosLUT[i+1]
-	f := fu - float64(i)
+	f := fu - Real(i)
 	cosPhi := t0 + (t1-t0)*Real(f)
 	s := 1 - cosPhi*cosPhi
 	if s < 0 {
