@@ -5,7 +5,7 @@ all: build
 
 build: fmt
 	go build -tags debug -o $(BIN) $(SRC) debug.go
-	strip -s $(BIN)
+	strip $(BIN)
 
 release: fmt
 	go build -o $(BIN) $(SRC) nodebug.go

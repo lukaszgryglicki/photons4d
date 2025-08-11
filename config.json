@@ -1,7 +1,9 @@
 {
-  "sceneRes": 256,
+  "sceneResX": 128,
+  "sceneResY": 128,
+  "sceneResZ": 128,
   "probeRays": 100000,
-  "spp": 64,
+  "spp": 128,
   "gifOut": "volume.gif",
   "gifDelay": 5,
   "gamma": 0.75,

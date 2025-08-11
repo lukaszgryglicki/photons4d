@@ -21,13 +21,19 @@ type Real = float64
 
 // Channel indices for readability.
 const (
-	ChR       = 0
-	ChG       = 1
-	ChB       = 2
-	SceneRes  = 400
-	ProbeRays = 100_000
-	Spp       = 64
-	NumShards = 1024
+	ChR        = 0
+	ChG        = 1
+	ChB        = 2
+	SceneResX  = 256
+	SceneResY  = 256
+	SceneResZ  = 256
+	ProbeRays  = 100_000
+	Spp        = 128 // samples per voxel target
+	GIFOut     = "volume.gif"
+	GIFDelay   = 5 // 100ths of a second per frame
+	Gamma      = 0.75
+	MaxBounces = 32
+	NumShards  = 1024
 )
 
 type shardLocks struct{ mu [NumShards]sync.Mutex }
@@ -109,11 +115,11 @@ type Scene3D struct {
 // ---------- JSON config ----------
 
 type SceneCfg struct {
-	Center     Point4  `json:"center"` // { "X":0,"Y":0,"Z":0,"W":0 }
-	Width      float64 `json:"width"`  // e.g. 2.0
-	Height     float64 `json:"height"` // e.g. 2.0
-	Depth      float64 `json:"depth"`  // e.g. 2.0
-	MaxBounces int     `json:"maxBounces"`
+	Center     Point4  `json:"center"`               // { "X":0,"Y":0,"Z":0,"W":0 }
+	Width      float64 `json:"width"`                // e.g. 2.0
+	Height     float64 `json:"height"`               // e.g. 2.0
+	Depth      float64 `json:"depth"`                // e.g. 2.0
+	MaxBounces int     `json:"maxBounces,omitempty"` // e.g. 10
 }
 
 type LightCfg struct {
@@ -124,7 +130,9 @@ type LightCfg struct {
 }
 
 type Config struct {
-	SceneRes   int            `json:"sceneRes"`           // N (Nx=Ny=Nz=N)
+	SceneResX  int            `json:"sceneResX"`
+	SceneResY  int            `json:"sceneResY"`
+	SceneResZ  int            `json:"sceneResZ"`
 	ProbeRays  int            `json:"probeRays"`          // trials per light for p_hit
 	Spp        int            `json:"spp"`                // samples per voxel target
 	GIFOut     string         `json:"gifOut"`             // output filename
@@ -1117,8 +1125,14 @@ func loadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 	// Defaults / validation
-	if cfg.SceneRes <= 0 {
-		cfg.SceneRes = SceneRes
+	if cfg.SceneResX <= 0 {
+		cfg.SceneResX = SceneResX
+	}
+	if cfg.SceneResY <= 0 {
+		cfg.SceneResY = SceneResY
+	}
+	if cfg.SceneResZ <= 0 {
+		cfg.SceneResZ = SceneResZ
 	}
 	if cfg.ProbeRays <= 0 {
 		cfg.ProbeRays = ProbeRays
@@ -1127,16 +1141,19 @@ func loadConfig(path string) (*Config, error) {
 		cfg.Spp = Spp
 	}
 	if cfg.GIFOut == "" {
-		cfg.GIFOut = "volume.gif"
+		cfg.GIFOut = GIFOut
 	}
 	if cfg.GIFDelay <= 0 {
-		cfg.GIFDelay = 5
+		cfg.GIFDelay = GIFDelay
 	}
 	if cfg.Gamma <= 0 {
-		cfg.Gamma = 0.75
+		cfg.Gamma = Gamma
 	}
 	if len(cfg.Lights) == 0 {
 		return nil, fmt.Errorf("config has no lights")
+	}
+	if cfg.Scene.MaxBounces <= 0 {
+		cfg.Scene.MaxBounces = MaxBounces
 	}
 	return &cfg, nil
 }
@@ -1160,7 +1177,7 @@ func main() {
 	}
 
 	// Resolution
-	Nx, Ny, Nz := cfg.SceneRes, cfg.SceneRes, cfg.SceneRes
+	Nx, Ny, Nz := cfg.SceneResX, cfg.SceneResY, cfg.SceneResZ
 
 	// Scene from JSON
 	scene := NewScene3D(cfg.Scene.Center, cfg.Scene.Width, cfg.Scene.Height, cfg.Scene.Depth, Nx, Ny, Nz, cfg.Scene.MaxBounces)
@@ -1195,7 +1212,7 @@ func main() {
 		if p < 1e-7 {
 			p = 1e-7 // avoid div-by-zero; treat as extremely low hit prob
 		}
-		need := int(float64(cfg.Spp) * float64(Nvox) / p)
+		need := int(3 * float64(cfg.Spp) * float64(Nvox) / p)
 		debugLog("light[%d] p_hit≈%.3f → rays=%d for %d spp @ %dx%dx%d",
 			i, p, need, cfg.Spp, Nx, Ny, Nz)
 		needRays[i] = need
