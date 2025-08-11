@@ -85,8 +85,8 @@ type RGB struct {
 // Light
 // ---------------------------------------------------------
 
-// ConeLight4 is a 4D "spot" light.
-type ConeLight4 struct {
+// Light is a 4D "spot" light.
+type Light struct {
 	Origin    Point4
 	Direction Vector4 // unit
 	Color     RGB     // clamped to [0,1]
@@ -108,7 +108,7 @@ type ConeLight4 struct {
 	cosLUT     []Real // LUT of cosφ in [cosθ,1] for inverse-CDF (len = lutN+1)
 }
 
-// Hypercube4: axis-aligned box in local space, then rotated about origin and translated to Center.
+// HyperCube: axis-aligned box in local space, then rotated about origin and translated to Center.
 // 'Half' are half-lengths along the local X,Y,Z,W axes.
 // pAbs = 1 - (reflect + refract) (per channel). That’s your absorption knob.
 // The non-absorption budget (avail = reflect + refract) gets split each hit by
@@ -116,7 +116,7 @@ type ConeLight4 struct {
 // color tints whatever survives (both reflected and refracted) per interaction.
 // ior (per channel) sets Fresnel strength and dispersion (B > G > R ⇒ stronger “prism”).
 
-type Hypercube4 struct {
+type HyperCube struct {
 	Center Point4
 	Half   Vector4 // half-sizes: Lx/2, Ly/2, Lz/2, Lw/2
 	R      Mat4    // local->world rotation
@@ -145,14 +145,14 @@ type Hypercube4 struct {
 // Scene: 3D cube at fixed W with flat voxel buffer
 // ---------------------------------------------------------
 
-// Scene3D stores a 3D volume (axis-aligned in X,Y,Z) embedded at W=Center.W.
-type Scene3D struct {
+// Scene stores a 3D volume (axis-aligned in X,Y,Z) embedded at W=Center.W.
+type Scene struct {
 	Center               Point4
 	Width, Height, Depth Real
 	Nx, Ny, Nz           int
 	MaxBounces           int
 	Buf                  []Real // flat: (((i*Ny)+j)*Nz + k)*3 + c
-	Hypercubes           []*Hypercube4
+	Hypercubes           []*HyperCube
 
 	// cached bounds & mapping
 	MinX, MaxX Real
@@ -221,7 +221,7 @@ type HypercubeCfg struct {
 type cubeHit struct {
 	t   Real    // param distance along ray
 	Nw  Vector4 // world-space unit normal at hit
-	hc  *Hypercube4
+	hc  *HyperCube
 	inv bool // true if we were inside and are exiting
 }
 
@@ -242,7 +242,7 @@ type RayLogCache struct {
 	rays map[string][]RayLog // map of ray name to logs
 }
 
-// Precompute these once per bounce and pass into nearestCubeT
+// Precompute these once per bounce and pass into nearestCube
 type rayRecips struct {
 	invX, invY, invZ, invW Real
 	parX, parY, parZ, parW bool // parallel flags (|D| < eps)
@@ -287,7 +287,7 @@ func raysStats() {
 }
 
 // Build validates and constructs the runtime object (no defaults).
-func (hc HypercubeCfg) Build() (*Hypercube4, error) {
+func (hc HypercubeCfg) Build() (*HyperCube, error) {
 	rad := hc.RotDeg.Radians()
 
 	if math.Abs(rad.XY)+math.Abs(rad.XZ)+math.Abs(rad.XW)+
@@ -295,7 +295,7 @@ func (hc HypercubeCfg) Build() (*Hypercube4, error) {
 		debugLog("Hypercube rotation is ~zero; check JSON 'rotDeg' keys (xy,xz,xw,yz,yw,zw).")
 	}
 
-	return NewHypercube4(
+	return NewHyperCube(
 		hc.Center,
 		hc.Size,
 		rad,
@@ -527,8 +527,8 @@ func jS3(t Real) Real { // J(t) = 1/2 * ( t*sqrt(1-t^2) + asin(t) )
 	return 0.5 * (t*math.Sqrt(u) + math.Asin(t))
 }
 
-// NewConeLight4 constructs a cone light and precomputes caches.
-func NewConeLight4(origin Point4, dir Vector4, color RGB, angle Real, void bool) (*ConeLight4, error) {
+// NewLight constructs a cone light and precomputes caches.
+func NewLight(origin Point4, dir Vector4, color RGB, angle Real, void bool) (*Light, error) {
 	if angle <= 0 || angle > math.Pi {
 		return nil, errors.New("angle must be in (0, π]")
 	}
@@ -547,7 +547,7 @@ func NewConeLight4(origin Point4, dir Vector4, color RGB, angle Real, void bool)
 		voidCoeff = -1.0 // void light withdraws energy
 	}
 
-	L := &ConeLight4{
+	L := &Light{
 		Origin:      origin,
 		Direction:   n,
 		Color:       c,
@@ -599,13 +599,13 @@ func NewConeLight4(origin Point4, dir Vector4, color RGB, angle Real, void bool)
 	return L, nil
 }
 
-// NewHypercube4 constructs a hypercube and precomputes caches.
-func NewHypercube4(
+// NewHyperCube constructs a hypercube and precomputes caches.
+func NewHyperCube(
 	center Point4,
 	size Vector4, // full edge lengths
 	angles Rot4, // radians
 	color, reflectivity, refractivity, ior RGB,
-) (*Hypercube4, error) {
+) (*HyperCube, error) {
 	if !(size.X > 0 && size.Y > 0 && size.Z > 0 && size.W > 0) {
 		return nil, fmt.Errorf("hypercube size must be >0 on all axes, got %+v", size)
 	}
@@ -633,7 +633,7 @@ func NewHypercube4(
 	}
 
 	R := rotFromAngles(angles)
-	hc := Hypercube4{
+	hc := HyperCube{
 		Center: center,
 		Half:   Vector4{size.X * 0.5, size.Y * 0.5, size.Z * 0.5, size.W * 0.5},
 		R:      R,
@@ -698,13 +698,13 @@ func NewHypercube4(
 		hc.f0[i] = r0 * r0
 	}
 
-	// debugLog("Created Hypercube4: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
+	// debugLog("Created HyperCube: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
 	debugLog("Created hypercube: %+v", &hc)
 	return &hc, nil
 }
 
-// NewScene3D allocates a zero-initialized flat voxel grid and precomputes bounds & strides.
-func NewScene3D(center Point4, width, height, depth Real, nx, ny, nz, maxBounces int) *Scene3D {
+// NewScene allocates a zero-initialized flat voxel grid and precomputes bounds & strides.
+func NewScene(center Point4, width, height, depth Real, nx, ny, nz, maxBounces int) *Scene {
 	if nx <= 0 || ny <= 0 || nz <= 0 {
 		panic("voxel resolution must be positive")
 	}
@@ -724,7 +724,7 @@ func NewScene3D(center Point4, width, height, depth Real, nx, ny, nz, maxBounces
 	strideY := nz * 3
 	strideX := ny * strideY
 
-	s := &Scene3D{
+	s := &Scene{
 		Center:     center,
 		Width:      width,
 		Height:     height,
@@ -752,14 +752,14 @@ func NewScene3D(center Point4, width, height, depth Real, nx, ny, nz, maxBounces
 }
 
 // VoxelSize returns the physical size of each voxel along X,Y,Z.
-func (s *Scene3D) VoxelSize() (dx, dy, dz Real) {
+func (s *Scene) VoxelSize() (dx, dy, dz Real) {
 	dx, dy, dz = s.Width/Real(s.Nx), s.Height/Real(s.Ny), s.Depth/Real(s.Nz)
 	debugLogOnce("Voxel size: (%.5f, %.5f, %.5f)", dx, dy, dz)
 	return
 }
 
 // VoxelIndexOf maps a 4D point to voxel indices and also returns normalized coords (u,v,w) in [0,1].
-func (s *Scene3D) VoxelIndexOf(p Point4) (ok bool, i, j, k int, ux, uy, uz Real) {
+func (s *Scene) VoxelIndexOf(p Point4) (ok bool, i, j, k int, ux, uy, uz Real) {
 	if p.X < s.MinX || p.X >= s.MaxX || p.Y < s.MinY || p.Y >= s.MaxY || p.Z < s.MinZ || p.Z >= s.MaxZ {
 		return false, 0, 0, 0, 0, 0, 0
 	}
@@ -782,11 +782,11 @@ func (s *Scene3D) VoxelIndexOf(p Point4) (ok bool, i, j, k int, ux, uy, uz Real)
 }
 
 // Flat buffer index helper (c ∈ {ChR,ChG,ChB}).
-func (s *Scene3D) idx(i, j, k, c int) int {
+func (s *Scene) idx(i, j, k, c int) int {
 	return i*s.StrideX + j*s.StrideY + k*3 + c
 }
 
-func (s *Scene3D) AddHypercube(h *Hypercube4) {
+func (s *Scene) AddHypercube(h *HyperCube) {
 	s.Hypercubes = append(s.Hypercubes, h)
 }
 
@@ -795,7 +795,7 @@ func (s *Scene3D) AddHypercube(h *Hypercube4) {
 // ---------------------------------------------------------
 
 // fast channel pick with precomputed thresholds
-func pickChannelFast(colorSum, thrR, thrG Real, rng *rand.Rand) int {
+func pickChannel(colorSum, thrR, thrG Real, rng *rand.Rand) int {
 	u := rng.Float64() * colorSum
 	if u < thrR {
 		return ChR
@@ -807,7 +807,7 @@ func pickChannelFast(colorSum, thrR, thrG Real, rng *rand.Rand) int {
 }
 
 // plane distance to W = scene.Center.W (from O along D), +Inf if none
-func planeHitT(scene *Scene3D, O Point4, D Vector4) Real {
+func planeHit(scene *Scene, O Point4, D Vector4) Real {
 	if math.Abs(D.W) < 1e-12 {
 		return math.Inf(1)
 	}
@@ -840,7 +840,7 @@ func refract4(I, N Vector4, eta Real) (Vector4, bool) {
 	return T, true
 }
 
-func rayAABBParametricInv(O Point4, minP, maxP Point4, rr rayRecips) (bool, Real) {
+func rayAABB(O Point4, minP, maxP Point4, rr rayRecips) (bool, Real) {
 	tmin, tmax := -1e300, 1e300
 
 	// X
@@ -917,9 +917,9 @@ func rayAABBParametricInv(O Point4, minP, maxP Point4, rr rayRecips) (bool, Real
 	return true, tmin
 }
 
-func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *shardLocks, deposit bool) bool {
+func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks, deposit bool) bool {
 	// Choose the photon channel.
-	ch := pickChannelFast(light.colorSum, light.thrR, light.thrG, rng)
+	ch := pickChannel(light.colorSum, light.thrR, light.thrG, rng)
 
 	// Initial throughput/energy: sum of channels so that E[deposit] = Color[ch]*w
 	throughput := light.Color.R + light.Color.G + light.Color.B
@@ -946,10 +946,10 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 		}
 
 		// Next plane hit (W == scene.Center.W)
-		tPlane := planeHitT(scene, O, D)
+		tPlane := planeHit(scene, O, D)
 
 		// Next hypercube hit (with AABB pre-cull)
-		hit, okCube := nearestCubeT(scene, O, D, tPlane)
+		hit, okCube := nearestCube(scene, O, D, tPlane)
 
 		// If no cube ahead or plane is closer → try to deposit on the plane.
 		if !okCube || tPlane < hit.t {
@@ -1111,7 +1111,7 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 }
 
 // raysPerLight must match len(lights). This gives you full control (e.g., after measuring p_hit per light).
-func fireRaysFromLights(lights []*ConeLight4, scene *Scene3D, raysPerLight []int) {
+func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 	if len(lights) == 0 || len(raysPerLight) != len(lights) {
 		return
 	}
@@ -1177,7 +1177,7 @@ func fireRaysFromLights(lights []*ConeLight4, scene *Scene3D, raysPerLight []int
 	wg.Wait()
 }
 
-func estimateHitProb(light *ConeLight4, scene *Scene3D, trials int) Real {
+func estimateHitProb(light *Light, scene *Scene, trials int) Real {
 	if trials <= 0 {
 		return 0
 	}
@@ -1228,7 +1228,7 @@ func estimateHitProb(light *ConeLight4, scene *Scene3D, trials int) Real {
 	return Real(totalHits) / Real(trials)
 }
 
-func intersectRayHypercube(O Point4, D Vector4, h *Hypercube4) (hit cubeHit, ok bool) {
+func intersectRayHypercube(O Point4, D Vector4, h *HyperCube) (hit cubeHit, ok bool) {
 	// world -> local
 	Op := Vector4{O.X - h.Center.X, O.Y - h.Center.Y, O.Z - h.Center.Z, O.W - h.Center.W}
 	Ol := h.RT.MulVec(Op)
@@ -1315,7 +1315,7 @@ func intersectRayHypercube(O Point4, D Vector4, h *Hypercube4) (hit cubeHit, ok 
 	return cubeHit{t: t, Nw: Nw, hc: h, inv: inv}, true
 }
 
-func nearestCubeT(scene *Scene3D, O Point4, D Vector4, tMax Real) (cubeHit, bool) {
+func nearestCube(scene *Scene, O Point4, D Vector4, tMax Real) (cubeHit, bool) {
 	best := cubeHit{}
 	okAny := false
 	bestT := tMax
@@ -1332,7 +1332,7 @@ func nearestCubeT(scene *Scene3D, O Point4, D Vector4, tMax Real) (cubeHit, bool
 
 	for _, h := range scene.Hypercubes {
 		// early-out with tMax using the same AABB test
-		if ok, tNear := rayAABBParametricInv(O, h.AABBMin, h.AABBMax, rr); !ok || tNear > bestT {
+		if ok, tNear := rayAABB(O, h.AABBMin, h.AABBMax, rr); !ok || tNear > bestT {
 			continue
 		}
 		if hit, ok := intersectRayHypercube(O, D, h); ok && hit.t > 1e-12 && hit.t < bestT {
@@ -1384,7 +1384,7 @@ func unitS3(rng *rand.Rand) Vector4 {
 
 // Exact uniform cap on S^3 via rejection.
 // Accept if dot(v, axis) >= cos(theta).
-func (l *ConeLight4) SampleDir(rng *rand.Rand) Vector4 {
+func (l *Light) SampleDir(rng *rand.Rand) Vector4 {
 	if l.oneMinusCos == 0 {
 		return l.Direction
 	}
@@ -1429,7 +1429,7 @@ func (l *ConeLight4) SampleDir(rng *rand.Rand) Vector4 {
 // SaveAnimatedGIF writes a GIF with one frame per Z slice (k = 0..Nz-1).
 // delay is in 100ths of a second (e.g., 5 => 20 fps).
 // per-slice normalization + optional gamma (e.g., 0.7 brightens).
-func SaveAnimatedGIF(scene *Scene3D, path string, delay int, gamma Real) error {
+func SaveAnimatedGIF(scene *Scene, path string, delay int, gamma Real) error {
 	Nx, Ny, Nz := scene.Nx, scene.Ny, scene.Nz
 
 	out := &gif.GIF{
@@ -1595,13 +1595,13 @@ func main() {
 	Nx, Ny, Nz := cfg.SceneResX, cfg.SceneResY, cfg.SceneResZ
 
 	// Scene from JSON
-	scene := NewScene3D(cfg.Scene.Center, cfg.Scene.Width, cfg.Scene.Height, cfg.Scene.Depth, Nx, Ny, Nz, cfg.Scene.MaxBounces)
+	scene := NewScene(cfg.Scene.Center, cfg.Scene.Width, cfg.Scene.Height, cfg.Scene.Depth, Nx, Ny, Nz, cfg.Scene.MaxBounces)
 
 	// Lights from JSON
-	lights := make([]*ConeLight4, 0, len(cfg.Lights))
+	lights := make([]*Light, 0, len(cfg.Lights))
 	for i, Lc := range cfg.Lights {
 		angle := Lc.AngleDeg * math.Pi / 180.0
-		L, err := NewConeLight4(Lc.Origin, Lc.Direction, Lc.Color, angle, Lc.VoidLight)
+		L, err := NewLight(Lc.Origin, Lc.Direction, Lc.Color, angle, Lc.VoidLight)
 		if err != nil {
 			panic(fmt.Errorf("light[%d] invalid: %w", i, err))
 		}
@@ -1639,7 +1639,7 @@ func main() {
 
 	// Fire rays (multi-light, sharded writes)
 	start := time.Now()
-	fireRaysFromLights(lights, scene, needRays)
+	castRays(lights, scene, needRays)
 	runtime.GC()
 	elapsed := time.Since(start)
 
