@@ -916,7 +916,7 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 		}
 
 		// Refract
-		var eta Real
+		var eta float64
 		if hit.inv {
 			// exiting: inside -> outside
 			eta = hc.iorArr[ch]
