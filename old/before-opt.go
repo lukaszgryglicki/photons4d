@@ -335,6 +335,16 @@ func rotFromAngles(r Rot4) Mat4 {
 	return R
 }
 
+func NewHypercube4Simplest(center Point4, size Vector4, angles Rot4) *Hypercube4 {
+	R := rotFromAngles(angles)
+	return &Hypercube4{
+		Center: center,
+		Half:   Vector4{size.X * 0.5, size.Y * 0.5, size.Z * 0.5, size.W * 0.5},
+		R:      R,
+		RT:     R.Transpose(),
+	}
+}
+
 func NewHypercube4(
 	center Point4,
 	size Vector4, // full edge lengths in world units
@@ -394,6 +404,18 @@ func NewHypercube4(
 	return &hc, nil
 }
 
+// ContainsPoint: check if world-space point lies inside the rotated box.
+// Steps: translate to origin, rotate into local frame (RT), AABB test vs Half.
+func (h *Hypercube4) ContainsPoint(p Point4) bool {
+	// world -> local
+	v := Vector4{p.X - h.Center.X, p.Y - h.Center.Y, p.Z - h.Center.Z, p.W - h.Center.W}
+	q := h.RT.MulVec(v)
+	return math.Abs(q.X) <= h.Half.X &&
+		math.Abs(q.Y) <= h.Half.Y &&
+		math.Abs(q.Z) <= h.Half.Z &&
+		math.Abs(q.W) <= h.Half.W
+}
+
 // clamp01 clamps each channel to [0,1] (useful for validation).
 func (c RGB) clamp01() RGB {
 	cl := func(x float64) float64 {
@@ -429,12 +451,60 @@ func NewConeLight4(origin Point4, dir Vector4, color RGB, angle float64) (*ConeL
 	return light, nil
 }
 
+// ContainsDir reports whether a given direction lies inside the cone.
+// The input does not have to be unit-length.
+func (l *ConeLight4) ContainsDir(v Vector4) bool {
+	u := v.Norm()
+	// angle between unit vectors via dot product threshold
+	contains := l.Direction.Dot(u) >= l.cosAngle
+	debugLog("ContainsDir: light direction (%f, %f, %f, %f) vs input (%f, %f, %f, %f) => %v", l.Direction.X, l.Direction.Y, l.Direction.Z, l.Direction.W, u.X, u.Y, u.Z, u.W, contains)
+	return contains
+}
+
+func (l *ConeLight4) ContainsPoint(p Point4) bool {
+	v := Vector4{
+		p.X - l.Origin.X,
+		p.Y - l.Origin.Y,
+		p.Z - l.Origin.Z,
+		p.W - l.Origin.W,
+	}
+	dist := v.Len()
+	if dist == 0 {
+		debugLog("ContainsPoint: point is at the origin of the cone: %+v, returning true", l.Origin)
+		return true // point at origin of cone
+	}
+	u := v.Mul(1.0 / dist) // normalize
+	insideAngle := l.Direction.Dot(u) >= l.cosAngle
+	debugLog("ContainsPoint: light origin (%f, %f, %f, %f) vs point (%f, %f, %f, %f) => dist: %f, u: %+v, inside angle: %v", l.Origin.X, l.Origin.Y, l.Origin.Z, l.Origin.W, p.X, p.Y, p.Z, p.W, dist, u, insideAngle)
+	return insideAngle // && dist <= maxLength (if you want range limit)
+}
+
 func randNormal(rng *rand.Rand) float64 {
 	// Box–Muller
 	u1 := rng.Float64()
 	u2 := rng.Float64()
 	r := math.Sqrt(-2 * math.Log(math.Max(u1, 1e-12)))
 	return r * math.Cos(2*math.Pi*u2)
+}
+
+func (l *ConeLight4) SampleDirUniform(rng *rand.Rand) Vector4 {
+	axis := l.Direction.Norm()
+	phi := rng.Float64() * l.Angle
+	c, s := math.Cos(phi), math.Sin(phi)
+
+	for {
+		r := Vector4{
+			randNormal(rng),
+			randNormal(rng),
+			randNormal(rng),
+			randNormal(rng),
+		}
+		ortho := r.Sub(axis.Mul(r.Dot(axis)))
+		if ortho.Len() > 1e-12 {
+			u := ortho.Norm()
+			return axis.Mul(c).Add(u.Mul(s)).Norm()
+		}
+	}
 }
 
 func (l *ConeLight4) SampleDir(rng *rand.Rand) Vector4 {
@@ -959,6 +1029,21 @@ func rgbAt(c RGB, ch int) float64 {
 	}
 }
 
+// find the global max channel value across the whole buffer (for consistent brightness)
+func (s *Scene3D) maxChannel() float64 {
+	maxv := 0.0
+	for i := 0; i < len(s.Buf); i++ {
+		v := float64(s.Buf[i])
+		if v > maxv {
+			maxv = v
+		}
+	}
+	if maxv == 0 {
+		maxv = 1 // avoid div-by-zero
+	}
+	return maxv
+}
+
 // SaveAnimatedGIF writes a GIF with one frame per Z slice (k = 0..Nz-1).
 // delay is in 100ths of a second (e.g., 5 => 20 fps).
 // per-slice normalization + optional gamma (e.g., 0.7 brightens).
@@ -990,7 +1075,7 @@ func SaveAnimatedGIF(scene *Scene3D, path string, delay int, gamma float64) erro
 	for k := 0; k < Nz; k++ {
 		// Progress logging
 		if k%max(1, Nz/100) == 0 { // ~1% steps
-			percent := float64(k+1) * 100 / float64(Nz)
+			percent := float64(k) * 100 / float64(Nz)
 			fmt.Printf("[GIF] %.2f%%\n", percent)
 		}
 		// 1) find max over this slice
