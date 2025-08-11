@@ -256,12 +256,10 @@ func logRay(name string, category Category, origin Point4, direction Vector4, po
 func raysStats() {
 	for k, v := range cache.rays {
 		fmt.Printf("Ray type %s: %d logs\n", k, len(v))
-		/*
-			for _, log := range v {
-				fmt.Printf("  Bounce %d: Category=%d, Origin=%+v, Direction=%+v, Point=%+v, Distance=%.6f\n",
-					log.Bounce, log.Category, log.Origin, log.Direction, log.Point, log.Distance)
-			}
-		*/
+		for _, log := range v {
+			fmt.Printf("  Bounce %d: Category=%d, Origin=%+v, Direction=%+v, Point=%+v, Distance=%.6f\n",
+				log.Bounce, log.Category, log.Origin, log.Direction, log.Point, log.Distance)
+		}
 	}
 }
 
@@ -916,7 +914,7 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 		}
 
 		// Refract
-		var eta float64
+		var eta Real
 		if hit.inv {
 			// exiting: inside -> outside
 			eta = hc.iorArr[ch]

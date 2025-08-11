@@ -100,12 +100,6 @@ type ConeLight4 struct {
 
 // Hypercube4: axis-aligned box in local space, then rotated about origin and translated to Center.
 // 'Half' are half-lengths along the local X,Y,Z,W axes.
-// pAbs = 1 - (reflect + refract) (per channel). That’s your absorption knob.
-// The non-absorption budget (avail = reflect + refract) gets split each hit by
-// Fresnel–Schlick (angle-dependent), biased by your reflect/refract to steer it.
-// color tints whatever survives (both reflected and refracted) per interaction.
-// ior (per channel) sets Fresnel strength and dispersion (B > G > R ⇒ stronger “prism”).
-
 type Hypercube4 struct {
 	Center Point4
 	Half   Vector4 // half-sizes: Lx/2, Ly/2, Lz/2, Lw/2
@@ -263,10 +257,10 @@ func logRay(name string, category Category, origin Point4, direction Vector4, po
 func raysStats() {
 	for k, v := range cache.rays {
 		fmt.Printf("Ray type %s: %d logs\n", k, len(v))
-		//for _, log := range v {
-		//	fmt.Printf("  Bounce %d: Category=%d, Origin=%+v, Direction=%+v, Point=%+v, Distance=%.6f\n",
-		//		log.Bounce, log.Category, log.Origin, log.Direction, log.Point, log.Distance)
-		//}
+		for _, log := range v {
+			fmt.Printf("  Bounce %d: Category=%d, Origin=%+v, Direction=%+v, Point=%+v, Distance=%.6f\n",
+				log.Bounce, log.Category, log.Origin, log.Direction, log.Point, log.Distance)
+		}
 	}
 }
 
@@ -821,8 +815,9 @@ func rayAABBParametric(O Point4, D Vector4, minP, maxP Point4) (bool, Real) {
 	return true, tmin
 }
 
+// castSingleRay traces one photon from `light` through the scene.
 func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *shardLocks, deposit bool) bool {
-	// Choose the photon channel.
+	// Choose the photon channel; if all zero, no photon.
 	ch := pickChannelFast(light.colorSum, light.thrR, light.thrG, rng)
 
 	// Initial throughput/energy: sum of channels so that E[deposit] = Color[ch]*w
@@ -855,8 +850,7 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 				if Debug {
 					logRay("parallel_to_scene", Miss, O, D, Point4{}, bounce, totalDist)
 				}
-				// parallel to plane and no cube to stop us
-				return false
+				return false // parallel to plane and no cube to stop us
 			}
 
 			P := O.Add(D.Mul(tPlane))
@@ -891,62 +885,47 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 
 		hc := hit.hc
 
-		// Outward normal (unit)
+		// Precompute outward normal (unit)
 		N := hit.Nw
 
-		// --- Absorption & Fresnel split (per channel) ---
-		pAbs := hc.pAbs[ch] // your explicit absorption knob
-		avail := 1 - pAbs   // budget to split between reflection/refraction
-		if avail <= 0 {
-			if Debug {
-				logRay("absorbed", Absorb, O, D, P, bounce, totalDist)
-			}
-			return false
-		}
+		// Per-channel base absorption (cached).
+		pAbs := hc.pAbs[ch]
 
-		// cosθ for Schlick (ensure in [0,1])
+		// Fresnel-Schlick per channel, scaled by available non-absorption energy.
+		// cosθ depends on whether we're entering (outside->inside) or exiting (inside->outside).
 		var cosTheta Real
 		if hit.inv {
-			cosTheta = D.Dot(N) // exiting: incident vs outward normal
+			// exiting: angle between incident ray and outward normal
+			cosTheta = D.Dot(N)
 		} else {
-			cosTheta = -D.Dot(N) // entering: flip sign
+			// entering: use -D·N
+			cosTheta = -D.Dot(N)
 		}
 		if cosTheta < 0 {
 			cosTheta = 0
 		} else if cosTheta > 1 {
 			cosTheta = 1
 		}
+		F := hc.f0[ch] + (1-hc.f0[ch])*math.Pow(1-cosTheta, 5)
 
-		// F0 from IOR (outside index = 1.0). Symmetric for entering/exiting.
-		n := hc.iorArr[ch]
-		tmp := (1 - n) / (1 + n)
-		F0 := tmp * tmp
-		F := F0 + (1-F0)*math.Pow(1-cosTheta, 5) // Schlick Fresnel in [0,1]
+		avail := 1 - pAbs     // total energy available to split between refl/refr
+		pReflDyn := avail * F // dynamic reflect prob via Fresnel
+		// pRefrDyn := avail - pReflDyn // not needed explicitly for roulette
 
-		// Bias Fresnel by your reflect/refract knobs to control the split.
-		rW := hc.refl[ch] * F
-		tW := hc.refr[ch] * (1 - F)
-		f := F
-		if sum := rW + tW; sum > 0 {
-			f = rW / sum
-		}
-
-		pReflDyn := avail * f // final reflect probability this hit
-
-		// --- Russian roulette ---
+		// Russian roulette: absorb / reflect / refract.
 		u := rng.Float64()
 		if u < pAbs {
 			if Debug {
 				logRay("absorbed", Absorb, O, D, P, bounce, totalDist)
 			}
-			return false
+			return false // absorbed
 		}
 
-		// Survived → tint throughput by cube color.
+		// Tint throughput by the cube color (per channel) after survival.
 		throughput *= hc.colorArr[ch]
 
 		if u < pAbs+pReflDyn {
-			// Reflect
+			// Reflect (no renorm needed if inputs are unit)
 			D = reflect4(D, N)
 			O = Point4{
 				P.X + D.X*bumpShift,
@@ -996,7 +975,6 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 			logRay("total_internal_refraction", TIR, O, D, P, bounce, totalDist)
 		}
 	}
-
 	if Debug {
 		logRay("too_complex", RecurenceLimit, O, D, Point4{}, scene.MaxBounces, totalDist)
 	}
