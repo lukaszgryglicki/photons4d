@@ -1023,10 +1023,8 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 			cosTheta = 1
 		}
 
-		// F0 from IOR (outside index = 1.0). Symmetric for entering/exiting.
-		n := hc.iorArr[ch]
-		tmp := (1 - n) / (1 + n)
-		F0 := tmp * tmp
+		// Schlick Fresnel using cached F0 (air ↔ material)
+		F0 := hc.f0[ch]
 		x := 1 - cosTheta
 		x2 := x * x
 		x5 := x2 * x2 * x

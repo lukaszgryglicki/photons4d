@@ -1,0 +1,36 @@
+go tool pprof -text cpu.out
+File: photons4d
+Build ID: 725076f617d17d417b909819ba960b139a0c028d
+Type: cpu
+Time: 2025-08-11 18:43:16 CEST
+Duration: 148.24s, Total samples = 2287.29s (1543.01%)
+Showing nodes accounting for 2231.96s, 97.58% of 2287.29s total
+Dropped 94 nodes (cum <= 11.44s)
+      flat  flat%   sum%        cum   cum%
+   537.85s 23.51% 23.51%   1983.07s 86.70%  main.castSingleRay
+   302.13s 13.21% 36.72%   2285.30s 99.91%  main.fireRaysFromLights.func1
+   250.49s 10.95% 47.68%    250.60s 10.96%  main.rayAABBParametricInv
+   218.95s  9.57% 57.25%    435.63s 19.05%  main.intersectRayHypercube
+   198.60s  8.68% 65.93%    900.19s 39.36%  main.nearestCubeT
+   128.67s  5.63% 71.56%    135.28s  5.91%  internal/sync.(*Mutex).Lock (inline)
+    81.46s  3.56% 75.12%     81.49s  3.56%  main.Mat4.MulVec
+    70.30s  3.07% 78.19%     75.79s  3.31%  main.intersectRayHypercube.func1 (inline)
+    60.63s  2.65% 80.84%    216.21s  9.45%  main.(*ConeLight4).SampleDir
+    54.65s  2.39% 83.23%     54.65s  2.39%  runtime.duffcopy
+    48.37s  2.11% 85.35%     48.40s  2.12%  main.Vector4.Mul (inline)
+    40.23s  1.76% 87.10%     75.48s  3.30%  main.sampleS2
+    36.31s  1.59% 88.69%     36.31s  1.59%  math.Sqrt (inline)
+    34.19s  1.49% 90.19%     34.23s  1.50%  math/rand.(*rngSource).Uint64 (inline)
+    33.50s  1.46% 91.65%     33.55s  1.47%  internal/sync.(*Mutex).Unlock (inline)
+    32.90s  1.44% 93.09%     38.57s  1.69%  main.planeHitT
+    27.77s  1.21% 94.30%     84.88s  3.71%  math/rand.(*Rand).Float64 (inline)
+    19.26s  0.84% 95.15%     19.26s  0.84%  main.Vector4.Dot (inline)
+    15.56s  0.68% 95.83%     15.56s  0.68%  main.(*Scene3D).VoxelIndexOf
+    15.45s  0.68% 96.50%     49.69s  2.17%  math/rand.(*rngSource).Int63
+     8.58s  0.38% 96.88%     42.16s  1.84%  main.(*shardLocks).unlock
+     7.41s  0.32% 97.20%     57.10s  2.50%  math/rand.(*Rand).Int63 (inline)
+     5.70s  0.25% 97.45%     16.35s  0.71%  main.pickChannelFast
+     2.44s  0.11% 97.56%     18.31s   0.8%  math.Abs (inline)
+     0.54s 0.024% 97.58%    135.82s  5.94%  main.(*shardLocks).lock (inline)
+     0.02s 0.00087% 97.58%     33.57s  1.47%  sync.(*Mutex).Unlock (inline)
+         0     0% 97.58%    135.28s  5.91%  sync.(*Mutex).Lock (inline)

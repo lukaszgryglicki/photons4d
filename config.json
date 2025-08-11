@@ -1,10 +1,10 @@
 {
-  "sceneResX": 256,
-  "sceneResY": 256,
-  "sceneResZ": 17,
+  "sceneResX": 2048,
+  "sceneResY": 2048,
+  "sceneResZ": 1,
   "probeRays": 65535,
-  "spp": 128,
-  "gifOut": "simple.gif",
+  "spp": 256,
+  "gifOut": "simple2.gif",
   "gifDelay": 10,
   "gamma": 0.8,
   "scene": {
