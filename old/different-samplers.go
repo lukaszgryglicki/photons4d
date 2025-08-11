@@ -560,8 +560,7 @@ func NewHypercube4(
 		hc.iorInv[i] = 1 / hc.iorArr[i]
 	}
 
-	// debugLog("Created Hypercube4: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
-	debugLog("Created hypercube: %+v", &hc)
+	debugLog("Created Hypercube4: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
 	return &hc, nil
 }
 
@@ -1097,8 +1096,71 @@ func nearestCube(scene *Scene3D, O Point4, D Vector4) (cubeHit, bool) {
 // Sampling on cone (cached basis, no rejection)
 // ---------------------------------------------------------
 
+func randNormal(rng *rand.Rand) Real {
+	// Box–Muller
+	u1 := rng.Float64()
+	u2 := rng.Float64()
+	r := math.Sqrt(-2 * math.Log(math.Max(u1, 1e-12)))
+	return r * math.Cos(2*math.Pi*u2)
+}
+
+func (l *ConeLight4) SampleDirA(rng *rand.Rand) Vector4 {
+	axis := l.Direction // unit
+	// Handle zero-width cone quickly
+	if l.oneMinusCos == 0 {
+		return axis
+	}
+	// Sample one orthonormal direction in the subspace orthogonal to axis
+	var u Vector4
+	for {
+		r := Vector4{randNormal(rng), randNormal(rng), randNormal(rng), randNormal(rng)}
+		ortho := r.Sub(axis.Mul(r.Dot(axis)))
+		if ortho.Len() > 1e-12 {
+			u = ortho.Norm()
+			break
+		}
+	}
+	// Uniform over spherical cap
+	u1 := rng.Float64()
+	cosPhi := 1 - u1*l.oneMinusCos
+	sinPhi := math.Sqrt(1 - cosPhi*cosPhi)
+	// Rotate in the axis/u 2D plane
+	return axis.Mul(cosPhi).Add(u.Mul(sinPhi)).Norm()
+}
+
+func (l *ConeLight4) SampleDirB(rng *rand.Rand) Vector4 {
+	// zero-width cone
+	if l.oneMinusCos == 0 {
+		return l.Direction
+	}
+	// sample a unit vector on S^2 (Marsaglia in 3D)
+	var x, y, s float64
+	for {
+		x = 2*rng.Float64() - 1
+		y = 2*rng.Float64() - 1
+		s = x*x + y*y
+		if s > 0 && s < 1 {
+			break
+		}
+	}
+	z := 1 - 2*s
+	inv := 1 / math.Sqrt(x*x+y*y+z*z)
+	x, y, z = x*inv, y*inv, z*inv
+
+	// spherical cap
+	u := rng.Float64()
+	cosPhi := 1 - u*l.oneMinusCos
+	sinPhi := math.Sqrt(1 - cosPhi*cosPhi)
+
+	// compose from cached orthonormal basis
+	ortho := l.U.Mul(x).Add(l.V.Mul(y)).Add(l.W.Mul(z))
+	// exact length is 1 (axis ⟂ ortho), but renorm is cheap if you prefer:
+	// return l.Direction.Mul(cosPhi).Add(ortho.Mul(sinPhi)).Norm()
+	return l.Direction.Mul(cosPhi).Add(ortho.Mul(sinPhi))
+}
+
 // Unit vector on S^2 (correct Marsaglia)
-func sampleS2(rng *rand.Rand) (x, y, z Real) {
+func sampleS2(rng *rand.Rand) (x, y, z float64) {
 	for {
 		u := 2*rng.Float64() - 1
 		v := 2*rng.Float64() - 1

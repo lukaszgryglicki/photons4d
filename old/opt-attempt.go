@@ -82,7 +82,7 @@ type ConeLight4 struct {
 	Origin    Point4
 	Direction Vector4 // unit
 	Color     RGB     // clamped to [0,1]
-	Angle     Real    // half-angle in radians, (0, π]
+	Angle     Real // half-angle in radians, (0, π]
 
 	// cached
 	cosAngle    Real
@@ -112,12 +112,12 @@ type Hypercube4 struct {
 	Normals  [4]Vector4 // world-space unit normals for +X,+Y,+Z,+W faces
 	AABBMin  Point4     // conservative 4D AABB (min)
 	AABBMax  Point4     // conservative 4D AABB (max)
-	refl     [3]Real    // [R,G,B]
-	refr     [3]Real    // [R,G,B]
-	colorArr [3]Real    // [R,G,B]
-	iorArr   [3]Real    // [R,G,B]
-	iorInv   [3]Real    // [1/R, 1/G, 1/B]
-	pAbs     [3]Real    // 1 - refl - refr (clamped ≥ 0)
+	refl     [3]Real // [R,G,B]
+	refr     [3]Real // [R,G,B]
+	colorArr [3]Real // [R,G,B]
+	iorArr   [3]Real // [R,G,B]
+	iorInv   [3]Real // [1/R, 1/G, 1/B]
+	pAbs     [3]Real // 1 - refl - refr (clamped ≥ 0)
 }
 
 // ---------------------------------------------------------
@@ -147,18 +147,18 @@ type Scene3D struct {
 // ---------- JSON config ----------
 
 type SceneCfg struct {
-	Center     Point4 `json:"center"`
-	Width      Real   `json:"width"`
-	Height     Real   `json:"height"`
-	Depth      Real   `json:"depth"`
-	MaxBounces int    `json:"maxBounces,omitempty"`
+	Center     Point4  `json:"center"`
+	Width      Real `json:"width"`
+	Height     Real `json:"height"`
+	Depth      Real `json:"depth"`
+	MaxBounces int     `json:"maxBounces,omitempty"`
 }
 
 type LightCfg struct {
 	Origin    Point4  `json:"origin"`
 	Direction Vector4 `json:"direction"`
 	Color     RGB     `json:"color"`
-	AngleDeg  Real    `json:"angleDeg"`
+	AngleDeg  Real `json:"angleDeg"`
 }
 
 type Config struct {
@@ -169,7 +169,7 @@ type Config struct {
 	Spp        int            `json:"spp"`
 	GIFOut     string         `json:"gifOut"`
 	GIFDelay   int            `json:"gifDelay,omitempty"`
-	Gamma      Real           `json:"gamma,omitempty"`
+	Gamma      Real        `json:"gamma,omitempty"`
 	Scene      SceneCfg       `json:"scene"`
 	Lights     []LightCfg     `json:"lights"`
 	Hypercubes []HypercubeCfg `json:"hypercubes,omitempty"`
@@ -197,7 +197,7 @@ type HypercubeCfg struct {
 }
 
 type cubeHit struct {
-	t   Real    // param distance along ray
+	t   Real // param distance along ray
 	Nw  Vector4 // world-space unit normal at hit
 	hc  *Hypercube4
 	inv bool // true if we were inside and are exiting
@@ -242,7 +242,7 @@ func (p Point4) Add(v Vector4) Point4 {
 // Vector functions
 func (a Vector4) Add(b Vector4) Vector4 { return Vector4{a.X + b.X, a.Y + b.Y, a.Z + b.Z, a.W + b.W} }
 func (a Vector4) Sub(b Vector4) Vector4 { return Vector4{a.X - b.X, a.Y - b.Y, a.Z - b.Z, a.W - b.W} }
-func (v Vector4) Mul(s Real) Vector4    { return Vector4{v.X * s, v.Y * s, v.Z * s, v.W * s} }
+func (v Vector4) Mul(s Real) Vector4 { return Vector4{v.X * s, v.Y * s, v.Z * s, v.W * s} }
 
 // Dot returns the dot product between two 4D vectors.
 func (a Vector4) Dot(b Vector4) Real {
@@ -376,62 +376,20 @@ func (c RGB) clamp01() RGB {
 	return RGB{cl(c.R), cl(c.G), cl(c.B)}
 }
 
-// robust 3D orthonormal basis in the subspace orthogonal to 'a' (unit)
+// Build a 3-vector orthonormal basis in the 3D subspace orthogonal to 'a' (unit).
 func orthonormal3(a Vector4) (u, v, w Vector4) {
-	const eps = 1e-12
-	// try up to a few random seeds to avoid degeneracy
-	tryBuild := func(seed int64) (Vector4, Vector4, Vector4, bool) {
-		rng := rand.New(rand.NewSource(seed))
-		// three random candidates
-		r1 := Vector4{rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64()}
-		r2 := Vector4{rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64()}
-		r3 := Vector4{rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64()}
-
-		// project each to ⟂ a and Gram–Schmidt
-		proj := func(x Vector4) Vector4 { return x.Sub(a.Mul(x.Dot(a))) }
-
-		u := proj(r1)
-		lu := u.Len()
-		if lu < eps {
-			return Vector4{}, Vector4{}, Vector4{}, false
-		}
-		u = u.Mul(1 / lu)
-
-		v := proj(r2).Sub(u.Mul(r2.Dot(u)))
-		lv := v.Len()
-		if lv < eps {
-			return Vector4{}, Vector4{}, Vector4{}, false
-		}
-		v = v.Mul(1 / lv)
-
-		w := proj(r3).Sub(u.Mul(r3.Dot(u))).Sub(v.Mul(r3.Dot(v)))
-		lw := w.Len()
-		if lw < eps {
-			return Vector4{}, Vector4{}, Vector4{}, false
-		}
-		w = w.Mul(1 / lw)
-
-		return u, v, w, true
-	}
-
-	seed := time.Now().UnixNano()
-	for tries := 0; tries < 8; tries++ {
-		if uu, vv, ww, ok := tryBuild(seed + int64(tries)*0x4f1bbcdcbfa53e0a); ok {
-			return uu, vv, ww
-		}
-	}
-	// ultra-conservative fallback: deterministic helpers
+	// pick helper not parallel to a
 	h := Vector4{1, 0, 0, 0}
 	if math.Abs(a.X) > 0.9 {
 		h = Vector4{0, 1, 0, 0}
 	}
-	u = h.Sub(a.Mul(h.Dot(a))).Norm()
+	u = (h.Sub(a.Mul(h.Dot(a)))).Norm()
 
 	h2 := Vector4{0, 0, 1, 0}
-	v = h2.Sub(a.Mul(h2.Dot(a))).Sub(u.Mul(h2.Dot(u))).Norm()
+	v = (h2.Sub(a.Mul(h2.Dot(a))).Sub(u.Mul(h2.Dot(u)))).Norm()
 
 	h3 := Vector4{0, 0, 0, 1}
-	w = h3.Sub(a.Mul(h3.Dot(a))).Sub(u.Mul(h3.Dot(u))).Sub(v.Mul(h3.Dot(v))).Norm()
+	w = (h3.Sub(a.Mul(h3.Dot(a))).Sub(u.Mul(h3.Dot(u))).Sub(v.Mul(h3.Dot(v)))).Norm()
 	return
 }
 
@@ -560,8 +518,7 @@ func NewHypercube4(
 		hc.iorInv[i] = 1 / hc.iorArr[i]
 	}
 
-	// debugLog("Created Hypercube4: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
-	debugLog("Created hypercube: %+v", &hc)
+	debugLog("Created Hypercube4: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
 	return &hc, nil
 }
 
@@ -1097,34 +1054,58 @@ func nearestCube(scene *Scene3D, O Point4, D Vector4) (cubeHit, bool) {
 // Sampling on cone (cached basis, no rejection)
 // ---------------------------------------------------------
 
-// Unit vector on S^2 (correct Marsaglia)
-func sampleS2(rng *rand.Rand) (x, y, z Real) {
+func (l *ConeLight4) SampleDirBroken(rng *rand.Rand) Vector4 {
+	// sample direction on S^2 (Marsaglia)
+	var x, y, s Real
 	for {
-		u := 2*rng.Float64() - 1
-		v := 2*rng.Float64() - 1
-		s := u*u + v*v
+		x = 2*rng.Float64() - 1
+		y = 2*rng.Float64() - 1
+		s = x*x + y*y
 		if s > 0 && s < 1 {
-			f := 2 * math.Sqrt(1-s)
-			return u * f, v * f, 1 - 2*s // already unit
+			break
 		}
 	}
-}
+	z := 1 - 2*s
+	inv := 1 / math.Sqrt(x*x+y*y+z*z)
+	x, y, z = x*inv, y*inv, z*inv
 
-func (l *ConeLight4) SampleDir(rng *rand.Rand) Vector4 {
-	if l.oneMinusCos == 0 {
-		return l.Direction
-	}
-	// Spherical cap: cosφ ∈ [cosθ,1] linearly (same distribution as your A)
+	// spherical cap: cosφ ∈ [cosθ,1] linearly
 	u := rng.Float64()
 	cosPhi := 1 - u*l.oneMinusCos
 	sinPhi := math.Sqrt(1 - cosPhi*cosPhi)
 
-	// Uniform orientation in the 3D subspace orthogonal to axis
-	x, y, z := sampleS2(rng)
-	ortho := l.U.Mul(x).Add(l.V.Mul(y)).Add(l.W.Mul(z)) // unit, ⟂ axis
-
-	// Compose; length is ~1 numerically
+	// compose in 4D: axis * cosφ + (x*U + y*V + z*W) * sinφ
+	ortho := l.U.Mul(x).Add(l.V.Mul(y)).Add(l.W.Mul(z))
 	return l.Direction.Mul(cosPhi).Add(ortho.Mul(sinPhi))
+}
+
+func randNormal(rng *rand.Rand) Real {
+	// Box–Muller
+	u1 := rng.Float64()
+	u2 := rng.Float64()
+	r := math.Sqrt(-2 * math.Log(math.Max(u1, 1e-12)))
+	return r * math.Cos(2*math.Pi*u2)
+}
+
+func (l *ConeLight4) SampleDir(rng *rand.Rand) Vector4 {
+	axis := l.Direction // already unit
+	// Sample orthonormal direction in the 3D subspace orthogonal to axis
+	var u Vector4
+	for {
+		r := Vector4{randNormal(rng), randNormal(rng), randNormal(rng), randNormal(rng)}
+		ortho := r.Sub(axis.Mul(r.Dot(axis)))
+		if ortho.Len() > 1e-12 {
+			u = ortho.Norm()
+			break
+		}
+	}
+	// Uniform over spherical cap: cosφ is linear in U
+	// cosφ ∈ [cosθ, 1], with θ = l.Angle
+	u1 := rng.Float64()
+	cosPhi := 1 - u1*(l.oneMinusCos)
+	sinPhi := math.Sqrt(1 - cosPhi*cosPhi)
+	// Rotate in the axis/u 2D plane
+	return axis.Mul(cosPhi).Add(u.Mul(sinPhi)).Norm()
 }
 
 // ---------------------------------------------------------

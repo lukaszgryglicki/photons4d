@@ -36,12 +36,6 @@ const (
 	NumShards  = 1024
 )
 
-// hot-loop constants reused across bounces
-const (
-	epsDist   = 1e-6
-	bumpShift = 1e-6
-)
-
 type shardLocks struct{ mu [NumShards]sync.Mutex }
 
 // ---------------------------------------------------------
@@ -77,21 +71,20 @@ type RGB struct {
 // Light
 // ---------------------------------------------------------
 
-// ConeLight4 is a 4D "spot" light.
+// ConeLight4 is a 4D "spot" light: rays originate at Origin and
+// are restricted to a cone around Direction with half-angle Angle (radians).
 type ConeLight4 struct {
 	Origin    Point4
-	Direction Vector4 // unit
-	Color     RGB     // clamped to [0,1]
+	Direction Vector4 // should be unit-length; constructor normalizes
+	Color     RGB     // each in [0,1]
 	Angle     Real    // half-angle in radians, (0, π]
 
 	// cached
 	cosAngle    Real
 	oneMinusCos Real
 	colorSum    Real
-	thrR        Real // cumulative threshold for R
-	thrG        Real // cumulative threshold for R+G
-	// orthonormal basis for the 3D subspace orthogonal to Direction
-	U, V, W Vector4
+	thrR, thrG  Real    // cumulative thresholds in [0,colorSum]
+	U, V, W     Vector4 // orthonormal basis s.t. {U,V,W} ⟂ Direction and unit
 }
 
 // Hypercube4: axis-aligned box in local space, then rotated about origin and translated to Center.
@@ -101,23 +94,11 @@ type Hypercube4 struct {
 	Half   Vector4 // half-sizes: Lx/2, Ly/2, Lz/2, Lw/2
 	R      Mat4    // local->world rotation
 	RT     Mat4    // world->local rotation (R^T, since R is orthonormal)
-
 	// Material (per-channel):
 	Color   RGB // tint/filter applied to reflected & refracted energy
 	Reflect RGB // fraction reflected per channel (0..1)
 	Refract RGB // fraction refracted per channel (0..1)
-	IOR     RGB // index of refraction inside cube per channel
-
-	// cached
-	Normals  [4]Vector4 // world-space unit normals for +X,+Y,+Z,+W faces
-	AABBMin  Point4     // conservative 4D AABB (min)
-	AABBMax  Point4     // conservative 4D AABB (max)
-	refl     [3]Real    // [R,G,B]
-	refr     [3]Real    // [R,G,B]
-	colorArr [3]Real    // [R,G,B]
-	iorArr   [3]Real    // [R,G,B]
-	iorInv   [3]Real    // [1/R, 1/G, 1/B]
-	pAbs     [3]Real    // 1 - refl - refr (clamped ≥ 0)
+	IOR     RGB // index of refraction inside cube per channel (e.g., {1.5,1.5,1.6})
 }
 
 // ---------------------------------------------------------
@@ -125,6 +106,7 @@ type Hypercube4 struct {
 // ---------------------------------------------------------
 
 // Scene3D stores a 3D volume (axis-aligned in X,Y,Z) embedded at W=Center.W.
+// Voxels are in a flat buffer: len = Nx*Ny*Nz*3 (RGB).
 type Scene3D struct {
 	Center               Point4
 	Width, Height, Depth Real
@@ -132,44 +114,34 @@ type Scene3D struct {
 	MaxBounces           int
 	Buf                  []Real // flat: (((i*Ny)+j)*Nz + k)*3 + c
 	Hypercubes           []*Hypercube4
-
-	// cached bounds & mapping
-	MinX, MaxX Real
-	MinY, MaxY Real
-	MinZ, MaxZ Real
-	InvSpanX   Real
-	InvSpanY   Real
-	InvSpanZ   Real
-	StrideX    int // i * StrideX + j * StrideY + k*3 + c
-	StrideY    int
 }
 
 // ---------- JSON config ----------
 
 type SceneCfg struct {
-	Center     Point4 `json:"center"`
-	Width      Real   `json:"width"`
-	Height     Real   `json:"height"`
-	Depth      Real   `json:"depth"`
-	MaxBounces int    `json:"maxBounces,omitempty"`
+	Center     Point4 `json:"center"`               // { "X":0,"Y":0,"Z":0,"W":0 }
+	Width      Real   `json:"width"`                // e.g. 2.0
+	Height     Real   `json:"height"`               // e.g. 2.0
+	Depth      Real   `json:"depth"`                // e.g. 2.0
+	MaxBounces int    `json:"maxBounces,omitempty"` // e.g. 10
 }
 
 type LightCfg struct {
-	Origin    Point4  `json:"origin"`
-	Direction Vector4 `json:"direction"`
-	Color     RGB     `json:"color"`
-	AngleDeg  Real    `json:"angleDeg"`
+	Origin    Point4  `json:"origin"`    // { "X":..., "Y":..., "Z":..., "W":... }
+	Direction Vector4 `json:"direction"` // { "X":..., "Y":..., "Z":..., "W":... }
+	Color     RGB     `json:"color"`     // { "R":..., "G":..., "B":... } in [0,1]
+	AngleDeg  Real    `json:"angleDeg"`  // degrees half angle
 }
 
 type Config struct {
 	SceneResX  int            `json:"sceneResX"`
 	SceneResY  int            `json:"sceneResY"`
 	SceneResZ  int            `json:"sceneResZ"`
-	ProbeRays  int            `json:"probeRays"`
-	Spp        int            `json:"spp"`
-	GIFOut     string         `json:"gifOut"`
-	GIFDelay   int            `json:"gifDelay,omitempty"`
-	Gamma      Real           `json:"gamma,omitempty"`
+	ProbeRays  int            `json:"probeRays"`          // trials per light for p_hit
+	Spp        int            `json:"spp"`                // samples per voxel target
+	GIFOut     string         `json:"gifOut"`             // output filename
+	GIFDelay   int            `json:"gifDelay,omitempty"` // 100ths of a sec per frame; default 5
+	Gamma      Real           `json:"gamma,omitempty"`    // tone map gamma; default 0.75
 	Scene      SceneCfg       `json:"scene"`
 	Lights     []LightCfg     `json:"lights"`
 	Hypercubes []HypercubeCfg `json:"hypercubes,omitempty"`
@@ -190,10 +162,10 @@ type HypercubeCfg struct {
 	Size   Vector4 `json:"size"`
 	RotDeg Rot4Deg `json:"rotDeg"`
 
-	Color   RGB `json:"color"`
-	Reflect RGB `json:"reflect"`
-	Refract RGB `json:"refract"`
-	IOR     RGB `json:"ior"`
+	Color   RGB `json:"color"`   // required
+	Reflect RGB `json:"reflect"` // required
+	Refract RGB `json:"refract"` // required
+	IOR     RGB `json:"ior"`     // required (per-channel)
 }
 
 type cubeHit struct {
@@ -207,6 +179,7 @@ type cubeHit struct {
 func (hc HypercubeCfg) Build() (*Hypercube4, error) {
 	rad := hc.RotDeg.Radians()
 
+	// Optional sanity check: warn if all angles are ~zero.
 	if math.Abs(rad.XY)+math.Abs(rad.XZ)+math.Abs(rad.XW)+
 		math.Abs(rad.YZ)+math.Abs(rad.YW)+math.Abs(rad.ZW) < 1e-12 {
 		debugLog("Hypercube rotation is ~zero; check JSON 'rotDeg' keys (xy,xz,xw,yz,yw,zw).")
@@ -236,7 +209,9 @@ func (sl *shardLocks) unlock(idx int) { sl.mu[idx&(NumShards-1)].Unlock() }
 
 // Add lets you translate a Point4 by a Vector4.
 func (p Point4) Add(v Vector4) Point4 {
-	return Point4{p.X + v.X, p.Y + v.Y, p.Z + v.Z, p.W + v.W}
+	point := Point4{p.X + v.X, p.Y + v.Y, p.Z + v.Z, p.W + v.W}
+	// debugLog("Adding Vector4 to Point4: (%f, %f, %f, %f) + (%f, %f, %f, %f) = (%f, %f, %f, %f)", p.X, p.Y, p.Z, p.W, v.X, v.Y, v.Z, v.W, point.X, point.Y, point.Z, point.W)
+	return point
 }
 
 // Vector functions
@@ -246,13 +221,18 @@ func (v Vector4) Mul(s Real) Vector4    { return Vector4{v.X * s, v.Y * s, v.Z *
 
 // Dot returns the dot product between two 4D vectors.
 func (a Vector4) Dot(b Vector4) Real {
-	return a.X*b.X + a.Y*b.Y + a.Z*b.Z + a.W*b.W
+	dot := a.X*b.X + a.Y*b.Y + a.Z*b.Z + a.W*b.W
+	// debugLog("Dot product: (%f, %f, %f, %f) . (%f, %f, %f, %f) = %f", a.X, a.Y, a.Z, a.W, b.X, b.Y, b.Z, b.W, dot)
+	return dot
 }
 
 // Len returns the Euclidean length of the vector.
-func (v Vector4) Len() Real { return math.Sqrt(v.Dot(v)) }
+func (v Vector4) Len() Real {
+	return math.Sqrt(v.Dot(v))
+}
 
 // Norm returns a unit-length version of the vector.
+// If the vector is (near) zero, it returns the input unchanged.
 func (v Vector4) Norm() Vector4 {
 	l := v.Len()
 	if l == 0 {
@@ -347,6 +327,7 @@ func rotZW(a Real) Mat4 {
 }
 
 // Compose rotation from angles.
+// Order matters; here we apply right-to-left: first XY, then XZ, XW, YZ, YW, ZW.
 func rotFromAngles(r Rot4) Mat4 {
 	R := I4()
 	R = rotZW(r.ZW).Mul(R)
@@ -358,125 +339,22 @@ func rotFromAngles(r Rot4) Mat4 {
 	return R
 }
 
-// ---------------------------------------------------------
-// Construction helpers / caches
-// ---------------------------------------------------------
-
-// clamp01 clamps each channel to [0,1].
-func (c RGB) clamp01() RGB {
-	cl := func(x Real) Real {
-		if x < 0 {
-			return 0
-		}
-		if x > 1 {
-			return 1
-		}
-		return x
-	}
-	return RGB{cl(c.R), cl(c.G), cl(c.B)}
-}
-
-// robust 3D orthonormal basis in the subspace orthogonal to 'a' (unit)
-func orthonormal3(a Vector4) (u, v, w Vector4) {
-	const eps = 1e-12
-	// try up to a few random seeds to avoid degeneracy
-	tryBuild := func(seed int64) (Vector4, Vector4, Vector4, bool) {
-		rng := rand.New(rand.NewSource(seed))
-		// three random candidates
-		r1 := Vector4{rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64()}
-		r2 := Vector4{rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64()}
-		r3 := Vector4{rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64()}
-
-		// project each to ⟂ a and Gram–Schmidt
-		proj := func(x Vector4) Vector4 { return x.Sub(a.Mul(x.Dot(a))) }
-
-		u := proj(r1)
-		lu := u.Len()
-		if lu < eps {
-			return Vector4{}, Vector4{}, Vector4{}, false
-		}
-		u = u.Mul(1 / lu)
-
-		v := proj(r2).Sub(u.Mul(r2.Dot(u)))
-		lv := v.Len()
-		if lv < eps {
-			return Vector4{}, Vector4{}, Vector4{}, false
-		}
-		v = v.Mul(1 / lv)
-
-		w := proj(r3).Sub(u.Mul(r3.Dot(u))).Sub(v.Mul(r3.Dot(v)))
-		lw := w.Len()
-		if lw < eps {
-			return Vector4{}, Vector4{}, Vector4{}, false
-		}
-		w = w.Mul(1 / lw)
-
-		return u, v, w, true
-	}
-
-	seed := time.Now().UnixNano()
-	for tries := 0; tries < 8; tries++ {
-		if uu, vv, ww, ok := tryBuild(seed + int64(tries)*0x4f1bbcdcbfa53e0a); ok {
-			return uu, vv, ww
-		}
-	}
-	// ultra-conservative fallback: deterministic helpers
-	h := Vector4{1, 0, 0, 0}
-	if math.Abs(a.X) > 0.9 {
-		h = Vector4{0, 1, 0, 0}
-	}
-	u = h.Sub(a.Mul(h.Dot(a))).Norm()
-
-	h2 := Vector4{0, 0, 1, 0}
-	v = h2.Sub(a.Mul(h2.Dot(a))).Sub(u.Mul(h2.Dot(u))).Norm()
-
-	h3 := Vector4{0, 0, 0, 1}
-	w = h3.Sub(a.Mul(h3.Dot(a))).Sub(u.Mul(h3.Dot(u))).Sub(v.Mul(h3.Dot(v))).Norm()
-	return
-}
-
-// NewConeLight4 constructs a cone light and precomputes caches.
-func NewConeLight4(origin Point4, dir Vector4, color RGB, angle Real) (*ConeLight4, error) {
-	if angle <= 0 || angle > math.Pi {
-		return nil, errors.New("angle must be in (0, π]")
-	}
-	n := dir.Norm()
-	if n.Len() == 0 {
-		return nil, errors.New("direction must be non-zero")
-	}
-	c := color.clamp01()
-	csum := c.R + c.G + c.B
-	cosA := math.Cos(angle)
-
-	L := &ConeLight4{
-		Origin:      origin,
-		Direction:   n,
-		Color:       c,
-		Angle:       angle,
-		cosAngle:    cosA,
-		oneMinusCos: 1 - cosA,
-		colorSum:    csum,
-		thrR:        c.R,
-		thrG:        c.R + c.G,
-	}
-	L.U, L.V, L.W = orthonormal3(n)
-
-	debugLog("Created light %+v", L)
-	return L, nil
-}
-
-// NewHypercube4 constructs a hypercube and precomputes caches.
 func NewHypercube4(
 	center Point4,
-	size Vector4, // full edge lengths
-	angles Rot4, // radians
+	size Vector4, // full edge lengths in world units
+	angles Rot4, // rotation in radians
 	color, reflectivity, refractivity, ior RGB,
 ) (*Hypercube4, error) {
+
+	// Size must be positive on all axes
 	if !(size.X > 0 && size.Y > 0 && size.Z > 0 && size.W > 0) {
 		return nil, fmt.Errorf("hypercube size must be >0 on all axes, got %+v", size)
 	}
+
+	// Helper: in [0,1]
 	in01 := func(x Real) bool { return x >= 0 && x <= 1 }
 
+	// Validate [0,1] ranges for reflect/refract; and per-channel sum ≤ 1
 	type ch struct {
 		n    string
 		r, t Real
@@ -494,11 +372,15 @@ func NewHypercube4(
 			return nil, fmt.Errorf("per-channel reflect+refract must be ≤1; channel %s got %.6g", c.n, c.r+c.t)
 		}
 	}
+
+	// IOR must be strictly positive
 	if !(ior.R > 0 && ior.G > 0 && ior.B > 0) {
 		return nil, fmt.Errorf("IOR must be > 0 per channel; got %+v", ior)
 	}
 
+	// Build rotation
 	R := rotFromAngles(angles)
+
 	hc := Hypercube4{
 		Center: center,
 		Half:   Vector4{size.X * 0.5, size.Y * 0.5, size.Z * 0.5, size.W * 0.5},
@@ -511,103 +393,108 @@ func NewHypercube4(
 		IOR:     ior,
 	}
 
-	// world normals = columns of R (already unit)
-	hc.Normals[0] = Vector4{R.M[0][0], R.M[1][0], R.M[2][0], R.M[3][0]}
-	hc.Normals[1] = Vector4{R.M[0][1], R.M[1][1], R.M[2][1], R.M[3][1]}
-	hc.Normals[2] = Vector4{R.M[0][2], R.M[1][2], R.M[2][2], R.M[3][2]}
-	hc.Normals[3] = Vector4{R.M[0][3], R.M[1][3], R.M[2][3], R.M[3][3]}
-
-	// precompute AABB by projecting extents
-	abs := func(x Real) Real {
-		if x < 0 {
-			return -x
-		}
-		return x
-	}
-	extent := func(row int) (min, max Real) {
-		off := abs(R.M[row][0])*hc.Half.X + abs(R.M[row][1])*hc.Half.Y + abs(R.M[row][2])*hc.Half.Z + abs(R.M[row][3])*hc.Half.W
-		var c Real
-		switch row {
-		case 0:
-			c = hc.Center.X
-		case 1:
-			c = hc.Center.Y
-		case 2:
-			c = hc.Center.Z
-		default:
-			c = hc.Center.W
-		}
-		return c - off, c + off
-	}
-	minX, maxX := extent(0)
-	minY, maxY := extent(1)
-	minZ, maxZ := extent(2)
-	minW, maxW := extent(3)
-	hc.AABBMin = Point4{minX, minY, minZ, minW}
-	hc.AABBMax = Point4{maxX, maxY, maxZ, maxW}
-
-	// material arrays
-	hc.refl = [3]Real{reflectivity.R, reflectivity.G, reflectivity.B}
-	hc.refr = [3]Real{refractivity.R, refractivity.G, refractivity.B}
-	hc.colorArr = [3]Real{color.R, color.G, color.B}
-	hc.iorArr = [3]Real{ior.R, ior.G, ior.B}
-	for i := 0; i < 3; i++ {
-		p := 1 - hc.refl[i] - hc.refr[i]
-		if p < 0 {
-			p = 0
-		}
-		hc.pAbs[i] = p
-		hc.iorInv[i] = 1 / hc.iorArr[i]
-	}
-
-	// debugLog("Created Hypercube4: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
-	debugLog("Created hypercube: %+v", &hc)
+	// debugLog("Created Hypercube4: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color.clamp01(), hc.Reflect.clamp01(), hc.Refract.clamp01(), hc.IOR)
+	debugLog("Created Hypercube4: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
 	return &hc, nil
 }
 
-// NewScene3D allocates a zero-initialized flat voxel grid and precomputes bounds & strides.
+// clamp01 clamps each channel to [0,1] (useful for validation).
+func (c RGB) clamp01() RGB {
+	cl := func(x Real) Real {
+		if x < 0 {
+			return 0
+		}
+		if x > 1 {
+			return 1
+		}
+		return x
+	}
+	return RGB{cl(c.R), cl(c.G), cl(c.B)}
+}
+
+// Build an orthonormal basis {U,V,W} in the 3D subspace orthogonal to A (unit).
+func orthonormal3(a Vector4) (u, v, w Vector4) {
+	// pick a helper not (near-)parallel to a
+	h := Vector4{1, 0, 0, 0}
+	if math.Abs(a.X) > 0.9 {
+		h = Vector4{0, 1, 0, 0}
+	}
+	u = (h.Sub(a.Mul(h.Dot(a)))).Norm()
+	// any vector not collinear with u or a
+	h2 := Vector4{0, 0, 1, 0}
+	v = (h2.Sub(a.Mul(h2.Dot(a))).Sub(u.Mul(h2.Dot(u)))).Norm()
+	// third via Gram–Schmidt
+	// pick a different seed to reduce degeneracy risk
+	h3 := Vector4{0, 0, 0, 1}
+	w = (h3.Sub(a.Mul(h3.Dot(a))).Sub(u.Mul(h3.Dot(u))).Sub(v.Mul(h3.Dot(v)))).Norm()
+	return
+}
+
+// NewConeLight4 constructs a cone light, normalizing direction and clamping color.
+// Angle must be in (0, π]. Returns an error if the direction is zero or angle is invalid.
+func NewConeLight4(origin Point4, dir Vector4, color RGB, angle Real) (*ConeLight4, error) {
+	if angle <= 0 || angle > math.Pi {
+		return nil, errors.New("angle must be in (0, π]")
+	}
+	n := dir.Norm()
+	if n.Len() == 0 {
+		return nil, errors.New("direction must be non-zero")
+	}
+	cosA := math.Cos(angle)
+	c := color.clamp01()
+	L := &ConeLight4{
+		Origin: origin, Direction: n, Color: c, Angle: angle,
+		cosAngle:    cosA,
+		oneMinusCos: 1 - cosA,
+		colorSum:    c.R + c.G + c.B,
+	}
+	L.thrR = c.R                    // [0, colorSum)
+	L.thrG = c.R + c.G              // [0, colorSum)
+	L.U, L.V, L.W = orthonormal3(n) // build once
+	return L, nil
+}
+
+func randNormal(rng *rand.Rand) Real {
+	// Box–Muller
+	u1 := rng.Float64()
+	u2 := rng.Float64()
+	r := math.Sqrt(-2 * math.Log(math.Max(u1, 1e-12)))
+	return r * math.Cos(2*math.Pi*u2)
+}
+
+func (l *ConeLight4) SampleDir(rng *rand.Rand) Vector4 {
+	axis := l.Direction // already unit
+	// Sample orthonormal direction in the 3D subspace orthogonal to axis
+	var u Vector4
+	for {
+		r := Vector4{randNormal(rng), randNormal(rng), randNormal(rng), randNormal(rng)}
+		ortho := r.Sub(axis.Mul(r.Dot(axis)))
+		if ortho.Len() > 1e-12 {
+			u = ortho.Norm()
+			break
+		}
+	}
+	// Uniform over spherical cap: cosφ is linear in U
+	// cosφ ∈ [cosθ, 1], with θ = l.Angle
+	u1 := rng.Float64()
+	cosPhi := 1 - u1*(l.oneMinusCos)
+	sinPhi := math.Sqrt(1 - cosPhi*cosPhi)
+	// Rotate in the axis/u 2D plane
+	return axis.Mul(cosPhi).Add(u.Mul(sinPhi)).Norm()
+}
+
+// NewScene3D allocates a zero-initialized flat voxel grid for the given size and resolution.
 func NewScene3D(center Point4, width, height, depth Real, nx, ny, nz, maxBounces int) *Scene3D {
 	if nx <= 0 || ny <= 0 || nz <= 0 {
 		panic("voxel resolution must be positive")
 	}
 	total := nx * ny * nz * 3
-
-	halfX := width * 0.5
-	halfY := height * 0.5
-	halfZ := depth * 0.5
-	minX, maxX := center.X-halfX, center.X+halfX
-	minY, maxY := center.Y-halfY, center.Y+halfY
-	minZ, maxZ := center.Z-halfZ, center.Z+halfZ
-
-	invSpanX := 1.0 / (maxX - minX)
-	invSpanY := 1.0 / (maxY - minY)
-	invSpanZ := 1.0 / (maxZ - minZ)
-
-	strideY := nz * 3
-	strideX := ny * strideY
-
 	s := &Scene3D{
-		Center:     center,
-		Width:      width,
-		Height:     height,
-		Depth:      depth,
-		Nx:         nx,
-		Ny:         ny,
-		Nz:         nz,
+		Center: center,
+		Width:  width, Height: height, Depth: depth,
+		Nx: nx, Ny: ny, Nz: nz,
 		Buf:        make([]Real, total),
 		MaxBounces: maxBounces,
-
-		MinX:     minX,
-		MaxX:     maxX,
-		MinY:     minY,
-		MaxY:     maxY,
-		MinZ:     minZ,
-		MaxZ:     maxZ,
-		InvSpanX: invSpanX,
-		InvSpanY: invSpanY,
-		InvSpanZ: invSpanZ,
-		StrideX:  strideX,
-		StrideY:  strideY,
 	}
 	debugLog("Created scene center=%+v, size=(%.2f, %.2f, %.2f), resolution=(%d, %d, %d), maxBounces=%d", center, width, height, depth, nx, ny, nz, maxBounces)
 	return s
@@ -620,14 +507,30 @@ func (s *Scene3D) VoxelSize() (dx, dy, dz Real) {
 	return
 }
 
+// Bounds returns the min/max corners (in X,Y,Z; W is fixed) of the cube.
+func (s *Scene3D) Bounds() (minX, maxX, minY, maxY, minZ, maxZ, W Real) {
+	halfX := s.Width * 0.5
+	halfY := s.Height * 0.5
+	halfZ := s.Depth * 0.5
+	minX, maxX, minY, maxY, minZ, maxZ, W = s.Center.X-halfX, s.Center.X+halfX,
+		s.Center.Y-halfY, s.Center.Y+halfY,
+		s.Center.Z-halfZ, s.Center.Z+halfZ,
+		s.Center.W
+	debugLogOnce("Scene bounds: X=(%.5f, %.5f), Y=(%.5f, %.5f), Z=(%.5f, %.5f), W=%.5f", minX, maxX, minY, maxY, minZ, maxZ, W)
+	return
+}
+
 // VoxelIndexOf maps a 4D point to voxel indices and also returns normalized coords (u,v,w) in [0,1].
 func (s *Scene3D) VoxelIndexOf(p Point4) (ok bool, i, j, k int, ux, uy, uz Real) {
-	if p.X < s.MinX || p.X >= s.MaxX || p.Y < s.MinY || p.Y >= s.MaxY || p.Z < s.MinZ || p.Z >= s.MaxZ {
+	minX, maxX, minY, maxY, minZ, maxZ, _ := s.Bounds()
+	if p.X < minX || p.X >= maxX || p.Y < minY || p.Y >= maxY || p.Z < minZ || p.Z >= maxZ {
+		// LG:skip
+		// debugLog("VoxelIndexOf: point (%f, %f, %f, %f) is outside bounds", p.X, p.Y, p.Z, p.W)
 		return false, 0, 0, 0, 0, 0, 0
 	}
-	ux = (p.X - s.MinX) * s.InvSpanX
-	uy = (p.Y - s.MinY) * s.InvSpanY
-	uz = (p.Z - s.MinZ) * s.InvSpanZ
+	ux = (p.X - minX) / (maxX - minX)
+	uy = (p.Y - minY) / (maxY - minY)
+	uz = (p.Z - minZ) / (maxZ - minZ)
 	i = int(ux * Real(s.Nx))
 	j = int(uy * Real(s.Ny))
 	k = int(uz * Real(s.Nz))
@@ -640,114 +543,34 @@ func (s *Scene3D) VoxelIndexOf(p Point4) (ok bool, i, j, k int, ux, uy, uz Real)
 	if k == s.Nz {
 		k = s.Nz - 1
 	}
+	// LG:skip
+	// debugLog("VoxelIndexOf: point (%f, %f, %f, %f) maps to voxel i=%d j=%d k=%d (u=%.3f v=%.3f w=%.3f)", p.X, p.Y, p.Z, p.W, i, j, k, ux, uy, uz)
 	return true, i, j, k, ux, uy, uz
 }
 
 // Flat buffer index helper (c ∈ {ChR,ChG,ChB}).
 func (s *Scene3D) idx(i, j, k, c int) int {
-	return i*s.StrideX + j*s.StrideY + k*3 + c
+	return (((i*s.Ny)+j)*s.Nz+k)*3 + c
 }
 
 func (s *Scene3D) AddHypercube(h *Hypercube4) {
 	s.Hypercubes = append(s.Hypercubes, h)
 }
 
-// ---------------------------------------------------------
-// Ray casting
-// ---------------------------------------------------------
-
-// fast channel pick with precomputed thresholds
-func pickChannelFast(colorSum, thrR, thrG Real, rng *rand.Rand) int {
-	if colorSum <= 0 {
-		return -1
-	}
-	u := rng.Float64() * colorSum
-	if u < thrR {
-		return ChR
-	}
-	if u < thrG {
-		return ChG
-	}
-	return ChB
-}
-
-// plane distance to W = scene.Center.W (from O along D), +Inf if none
-func planeHitT(scene *Scene3D, O Point4, D Vector4) Real {
-	if math.Abs(D.W) < 1e-12 {
-		return math.Inf(1)
-	}
-	t := (scene.Center.W - O.W) / D.W
-	if t <= 1e-9 {
-		return math.Inf(1)
-	}
-	return t
-}
-
-func isFinite(x Real) bool { return !math.IsInf(x, 0) && !math.IsNaN(x) }
-
-// reflection & refraction in 4D (assume unit I,N; periodic renorm in loop)
-func reflect4(I, N Vector4) Vector4 {
-	return I.Sub(N.Mul(2 * I.Dot(N)))
-}
-
-func refract4(I, N Vector4, eta Real) (Vector4, bool) {
-	cosi := -I.Dot(N)
-	if cosi < -1 {
-		cosi = -1
-	} else if cosi > 1 {
-		cosi = 1
-	}
-	k := 1 - eta*eta*(1-cosi*cosi)
-	if k < 0 {
-		return Vector4{}, false // TIR
-	}
-	T := I.Mul(eta).Add(N.Mul(eta*cosi - math.Sqrt(k)))
-	return T, true
-}
-
-// Ray vs Hypercube conservative AABB (4D), return hit and tNear if any.
-func rayAABBParametric(O Point4, D Vector4, minP, maxP Point4) (bool, Real) {
-	tmin, tmax := -1e300, 1e300
-
-	update := func(o, d, mn, mx Real) {
-		const eps = 1e-12
-		if math.Abs(d) < eps {
-			if o < mn || o > mx {
-				// force miss
-				tmin = 1
-				tmax = 0
-				return
-			}
-			return
-		}
-		t1 := (mn - o) / d
-		t2 := (mx - o) / d
-		if t1 > t2 {
-			t1, t2 = t2, t1
-		}
-		if t1 > tmin {
-			tmin = t1
-		}
-		if t2 < tmax {
-			tmax = t2
-		}
-	}
-
-	update(O.X, D.X, minP.X, maxP.X)
-	update(O.Y, D.Y, minP.Y, maxP.Y)
-	update(O.Z, D.Z, minP.Z, maxP.Z)
-	update(O.W, D.W, minP.W, maxP.W)
-
-	if tmax < 0 || tmin > tmax {
-		return false, 0
-	}
-	return true, tmin
-}
-
 // castSingleRay traces one photon from `light` through the scene.
+//   - Picks ONE RGB channel (R/G/B) with probability ∝ light.Color.
+//   - Marches the ray, always taking the nearest event: a hypercube hit or the W-plane hit.
+//   - On hypercube, Russian-roulette per channel: absorb / reflect / refract.
+//   - Energy is tinted by cube.Color[ch] on each surface interaction.
+//   - Travel distance is accumulated across all segments; deposit uses 1/(dist^2 + eps).
+//   - If deposit==true, it writes into scene.Buf with shard locks; otherwise it only tests
+//     and returns whether the photon would have deposited.
+//
+// Returns true iff it deposits into any voxel on the plane.
 func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *shardLocks, deposit bool) bool {
 	// Choose the photon channel; if all zero, no photon.
 	ch := pickChannelFast(light.colorSum, light.thrR, light.thrG, rng)
+	// ch := pickChannelByColor(light.Color, rng)
 	if ch < 0 {
 		return false
 	}
@@ -757,23 +580,18 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 
 	// Start at the light with a sampled unit direction.
 	O := light.Origin
-	D := light.SampleDir(rng) // approx unit
+	D := light.SampleDir(rng) // unit
+
+	const eps = 1e-6
+	const bump = 1e-6
 
 	totalDist := 0.0
 
 	for bounce := 0; bounce < scene.MaxBounces; bounce++ {
-		// optional periodic re-normalization for numerical stability
-		if (bounce & 3) == 3 {
-			l2 := D.Dot(D)
-			if l2 > 0 {
-				D = D.Mul(1 / math.Sqrt(l2))
-			}
-		}
-
 		// Next plane hit (W == scene.Center.W)
 		tPlane := planeHitT(scene, O, D)
 
-		// Next hypercube hit (with AABB pre-cull)
+		// Next hypercube hit
 		hit, okCube := nearestCube(scene, O, D)
 
 		// If no cube ahead or plane is closer → try to deposit on the plane.
@@ -785,7 +603,7 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 			P := O.Add(D.Mul(tPlane))
 			if ok, i, j, k, _, _, _ := scene.VoxelIndexOf(P); ok {
 				totalDist += tPlane
-				w := 1.0 / (totalDist*totalDist + epsDist)
+				w := 1.0 / (totalDist*totalDist + eps)
 
 				if deposit {
 					base := scene.idx(i, j, k, ChR)
@@ -799,6 +617,7 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 				}
 				return true
 			}
+			// Missed the volume bounds on the plane.
 			return false
 		}
 
@@ -807,10 +626,13 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 		totalDist += hit.t
 
 		hc := hit.hc
-		// Per-channel probabilities (cached arrays).
-		pRefl := hc.refl[ch]
-		//pRefr := hc.refr[ch]
-		pAbs := hc.pAbs[ch]
+		// Per-channel probabilities.
+		pRefl := rgbAt(hc.Reflect, ch)
+		pRefr := rgbAt(hc.Refract, ch)
+		pAbs := 1.0 - pRefl - pRefr
+		if pAbs < 0 {
+			pAbs = 0 // numeric clamp
+		}
 
 		// Russian roulette: absorb / reflect / refract.
 		u := rng.Float64()
@@ -819,31 +641,31 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 		}
 
 		// Tint throughput by the cube color (per channel).
-		throughput *= hc.colorArr[ch]
+		throughput *= rgbAt(hc.Color, ch)
 
 		N := hit.Nw // outward normal (unit)
 
 		if u < pAbs+pRefl {
-			// Reflect (no renorm needed if inputs are unit)
+			// Reflect
 			D = reflect4(D, N)
 			O = Point4{
-				P.X + D.X*bumpShift,
-				P.Y + D.Y*bumpShift,
-				P.Z + D.Z*bumpShift,
-				P.W + D.W*bumpShift,
+				P.X + D.X*bump,
+				P.Y + D.Y*bump,
+				P.Z + D.Z*bump,
+				P.W + D.W*bump,
 			}
 			continue
 		}
 
 		// Refract
 		nOutside := 1.0
-		nInside := hc.iorArr[ch]
+		nInside := rgbAt(hc.IOR, ch)
 		var n1, n2 Real
 		if hit.inv {
-			// exiting
+			// We were inside, exiting to outside.
 			n1, n2 = nInside, nOutside
 		} else {
-			// entering
+			// Entering the cube.
 			n1, n2 = nOutside, nInside
 		}
 		eta := n1 / n2
@@ -851,10 +673,10 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 		if T, ok := refract4(D, N, eta); ok {
 			D = T
 			O = Point4{
-				P.X + D.X*bumpShift,
-				P.Y + D.Y*bumpShift,
-				P.Z + D.Z*bumpShift,
-				P.W + D.W*bumpShift,
+				P.X + D.X*bump,
+				P.Y + D.Y*bump,
+				P.Z + D.Z*bump,
+				P.W + D.W*bump,
 			}
 			continue
 		}
@@ -862,13 +684,14 @@ func castSingleRay(light *ConeLight4, scene *Scene3D, rng *rand.Rand, locks *sha
 		// Total internal reflection fallback.
 		D = reflect4(D, N)
 		O = Point4{
-			P.X + D.X*bumpShift,
-			P.Y + D.Y*bumpShift,
-			P.Z + D.Z*bumpShift,
-			P.W + D.W*bumpShift,
+			P.X + D.X*bump,
+			P.Y + D.Y*bump,
+			P.Z + D.Z*bump,
+			P.W + D.W*bump,
 		}
 	}
 
+	// Safety bail-out (path didn't terminate sanely).
 	return false
 }
 
@@ -1068,11 +891,19 @@ func intersectRayHypercube(O Point4, D Vector4, h *Hypercube4) (hit cubeHit, ok 
 		t, ax, sg = tmax, exitAxis, exitSign // exiting
 	}
 
-	// pick cached world normal (unit), flip by sign
-	Nw := h.Normals[ax]
-	if sg < 0 {
-		Nw = Nw.Mul(-1)
+	// normal in local space
+	var Nl Vector4
+	switch ax {
+	case 0:
+		Nl = Vector4{Real(sg), 0, 0, 0}
+	case 1:
+		Nl = Vector4{0, Real(sg), 0, 0}
+	case 2:
+		Nl = Vector4{0, 0, Real(sg), 0}
+	case 3:
+		Nl = Vector4{0, 0, 0, Real(sg)}
 	}
+	Nw := h.R.MulVec(Nl).Norm()
 
 	return cubeHit{t: t, Nw: Nw, hc: h, inv: inv}, true
 }
@@ -1082,9 +913,6 @@ func nearestCube(scene *Scene3D, O Point4, D Vector4) (cubeHit, bool) {
 	okAny := false
 	bestT := 1e300
 	for _, h := range scene.Hypercubes {
-		if ok, tNear := rayAABBParametric(O, D, h.AABBMin, h.AABBMax); !ok || tNear > bestT {
-			continue
-		}
 		hit, ok := intersectRayHypercube(O, D, h)
 		if ok && hit.t > 1e-12 && hit.t < bestT {
 			bestT, best, okAny = hit.t, hit, true
@@ -1093,43 +921,65 @@ func nearestCube(scene *Scene3D, O Point4, D Vector4) (cubeHit, bool) {
 	return best, okAny
 }
 
-// ---------------------------------------------------------
-// Sampling on cone (cached basis, no rejection)
-// ---------------------------------------------------------
-
-// Unit vector on S^2 (correct Marsaglia)
-func sampleS2(rng *rand.Rand) (x, y, z Real) {
-	for {
-		u := 2*rng.Float64() - 1
-		v := 2*rng.Float64() - 1
-		s := u*u + v*v
-		if s > 0 && s < 1 {
-			f := 2 * math.Sqrt(1-s)
-			return u * f, v * f, 1 - 2*s // already unit
-		}
-	}
+// reflection & refraction in 4D
+func reflect4(I, N Vector4) Vector4 {
+	return I.Sub(N.Mul(2 * I.Dot(N))).Norm()
 }
 
-func (l *ConeLight4) SampleDir(rng *rand.Rand) Vector4 {
-	if l.oneMinusCos == 0 {
-		return l.Direction
+func refract4(I, N Vector4, eta Real) (Vector4, bool) {
+	cosi := -I.Dot(N)
+	if cosi < -1 {
+		cosi = -1
 	}
-	// Spherical cap: cosφ ∈ [cosθ,1] linearly (same distribution as your A)
-	u := rng.Float64()
-	cosPhi := 1 - u*l.oneMinusCos
-	sinPhi := math.Sqrt(1 - cosPhi*cosPhi)
-
-	// Uniform orientation in the 3D subspace orthogonal to axis
-	x, y, z := sampleS2(rng)
-	ortho := l.U.Mul(x).Add(l.V.Mul(y)).Add(l.W.Mul(z)) // unit, ⟂ axis
-
-	// Compose; length is ~1 numerically
-	return l.Direction.Mul(cosPhi).Add(ortho.Mul(sinPhi))
+	if cosi > 1 {
+		cosi = 1
+	}
+	k := 1 - eta*eta*(1-cosi*cosi)
+	if k < 0 {
+		return Vector4{}, false // TIR
+	}
+	T := I.Mul(eta).Add(N.Mul(eta*cosi - math.Sqrt(k)))
+	return T.Norm(), true
 }
 
-// ---------------------------------------------------------
-// GIF writer
-// ---------------------------------------------------------
+// plane distance to W = scene.Center.W (from O along D), +Inf if none
+func planeHitT(scene *Scene3D, O Point4, D Vector4) Real {
+	if math.Abs(D.W) < 1e-12 {
+		return math.Inf(1)
+	}
+	t := (scene.Center.W - O.W) / D.W
+	if t <= 1e-9 {
+		return math.Inf(1)
+	}
+	return t
+}
+
+func isFinite(x Real) bool { return !math.IsInf(x, 0) && !math.IsNaN(x) }
+
+func pickChannelFast(csum, thrR, thrG Real, rng *rand.Rand) int {
+	if csum <= 0 {
+		return -1
+	}
+	u := rng.Float64() * csum
+	if u < thrR {
+		return ChR
+	}
+	if u < thrG {
+		return ChG
+	}
+	return ChB
+}
+
+func rgbAt(c RGB, ch int) Real {
+	switch ch {
+	case ChR:
+		return c.R
+	case ChG:
+		return c.G
+	default:
+		return c.B
+	}
+}
 
 // SaveAnimatedGIF writes a GIF with one frame per Z slice (k = 0..Nz-1).
 // delay is in 100ths of a second (e.g., 5 => 20 fps).
@@ -1161,7 +1011,6 @@ func SaveAnimatedGIF(scene *Scene3D, path string, delay int, gamma Real) error {
 
 	for k := 0; k < Nz; k++ {
 		// Progress logging
-		// (relies on max(int,int) from your debug helpers)
 		if k%max(1, Nz/100) == 0 { // ~1% steps
 			percent := Real(k+1) * 100 / Real(Nz)
 			fmt.Printf("[GIF] %.2f%%\n", percent)
@@ -1171,14 +1020,18 @@ func SaveAnimatedGIF(scene *Scene3D, path string, delay int, gamma Real) error {
 		for j := 0; j < Ny; j++ {
 			for i := 0; i < Nx; i++ {
 				idx := scene.idx(i, j, k, ChR)
+				// use luminance-ish max across channels
+				r := Real(scene.Buf[idx])
+				g := Real(scene.Buf[idx+1])
+				b := Real(scene.Buf[idx+2])
 				// peak across channels
-				if r := Real(scene.Buf[idx+0]); r > sliceMax {
+				if r > sliceMax {
 					sliceMax = r
 				}
-				if g := Real(scene.Buf[idx+1]); g > sliceMax {
+				if g > sliceMax {
 					sliceMax = g
 				}
-				if b := Real(scene.Buf[idx+2]); b > sliceMax {
+				if b > sliceMax {
 					sliceMax = b
 				}
 			}
@@ -1191,14 +1044,13 @@ func SaveAnimatedGIF(scene *Scene3D, path string, delay int, gamma Real) error {
 		// 2) fill RGBA (flip Y so up is up)
 		for j := 0; j < Ny; j++ {
 			y := Ny - 1 - j
-			rowOff := y * rgba.Stride
 			for i := 0; i < Nx; i++ {
 				idx := scene.idx(i, j, k, ChR)
-				r := toByte(Real(scene.Buf[idx+0]), scale)
+				r := toByte(Real(scene.Buf[idx]), scale)
 				g := toByte(Real(scene.Buf[idx+1]), scale)
 				b := toByte(Real(scene.Buf[idx+2]), scale)
-				p := rowOff + i*4
-				rgba.Pix[p+0] = r
+				p := rgba.PixOffset(i, y)
+				rgba.Pix[p] = r
 				rgba.Pix[p+1] = g
 				rgba.Pix[p+2] = b
 				rgba.Pix[p+3] = 255
