@@ -1,6 +1,6 @@
 {
-  "sceneResX": 512,
-  "sceneResY": 512,
+  "sceneResX": 256,
+  "sceneResY": 256,
   "sceneResZ": 17,
   "probeRays": 65535,
   "spp": 128,

@@ -12,7 +12,6 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
-	"runtime/pprof"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -38,10 +37,7 @@ const (
 	AttenuateD2 = false // if true, attenuate light by 1/d^2 (distance squared) for each bounce (not needed in radiance model)
 )
 
-var (
-	Debug   = false // set to true for verbose debug output
-	Profile = false // set to true to enable CPU profiling
-)
+var Debug = false // set to true for verbose debug output
 
 // hot-loop constants reused across bounces
 const (
@@ -101,10 +97,6 @@ type ConeLight4 struct {
 	voidCoeff   Real
 	// orthonormal basis for the 3D subspace orthogonal to Direction
 	U, V, W Vector4
-	// S^3-cap sampling caches
-	acceptProb Real   // area ratio of cap (rejection acceptance)
-	useReject  bool   // true => use rejection sampler, false => LUT inverse-CDF
-	cosLUT     []Real // LUT of cosφ in [cosθ,1] for inverse-CDF (len = lutN+1)
 }
 
 // Hypercube4: axis-aligned box in local space, then rotated about origin and translated to Center.
@@ -545,49 +537,6 @@ func NewConeLight4(origin Point4, dir Vector4, color RGB, angle Real, void bool)
 		voidCoeff:   voidCoeff,
 	}
 	L.U, L.V, L.W = orthonormal3(n)
-
-	// --- S^3 cap sampling caches ---
-	// J(t) = 1/2 * ( t*sqrt(1-t^2) + asin(t) ); area on S^3 between t=cosφ and 1 is J(1)-J(t),
-	// full hemisphere is J(1)-J(-1) = π/2. Acceptance = (J(1)-J(cosθ)) / (π/2).
-	jS3 := func(t Real) Real {
-		u := 1 - t*t
-		if u < 0 {
-			u = 0
-		}
-		return 0.5 * (t*math.Sqrt(u) + math.Asin(t))
-	}
-	Ja := jS3(L.cosAngle)
-	L.acceptProb = (math.Pi/4 - float64(Ja)) / (math.Pi / 2)
-	// Choose rejection if reasonably wide; LUT if narrow (fewer trials == faster).
-	L.useReject = L.acceptProb >= 0.08
-	if !L.useReject {
-		// Build small inverse-CDF LUT once.
-		const lutN = 256
-		L.cosLUT = make([]Real, lutN+1)
-		J1 := math.Pi / 4
-		for i := 0; i <= lutN; i++ {
-			u := Real(i) / Real(lutN)
-			target := Ja + u*(Real(J1)-Ja)
-			// Newton solve J(t)=target on [cosθ,1], good init:
-			t := L.cosAngle + u*(1-L.cosAngle)
-			for it := 0; it < 4; it++ {
-				denom := 1 - t*t
-				if denom <= 1e-18 {
-					t = 1 - 1e-9
-					break
-				}
-				Jt := 0.5 * (t*math.Sqrt(denom) + math.Asin(t))
-				t -= (Jt - target) / math.Sqrt(denom) // J'(t)=sqrt(1-t^2)
-				if t < L.cosAngle {
-					t = 0.5 * (t + L.cosAngle)
-				}
-				if t > 1-1e-12 {
-					t = 1 - 1e-12
-				}
-			}
-			L.cosLUT[i] = t
-		}
-	}
 
 	debugLog("Created light %+v", L)
 	return L, nil
@@ -1297,6 +1246,45 @@ func sampleS2(rng *rand.Rand) (x, y, z Real) {
 	}
 }
 
+func (l *ConeLight4) SampleDirS2(rng *rand.Rand) Vector4 {
+	if l.oneMinusCos == 0 {
+		return l.Direction
+	}
+	// Spherical cap: cosφ ∈ [cosθ,1] linearly (same distribution as your A)
+	u := rng.Float64()
+	cosPhi := 1 - u*l.oneMinusCos
+	sinPhi := math.Sqrt(1 - cosPhi*cosPhi)
+
+	// Uniform orientation in the 3D subspace orthogonal to axis
+	x, y, z := sampleS2(rng)
+	ortho := l.U.Mul(x).Add(l.V.Mul(y)).Add(l.W.Mul(z)) // unit, ⟂ axis
+
+	// Compose; length is ~1 numerically
+	return l.Direction.Mul(cosPhi).Add(ortho.Mul(sinPhi))
+}
+
+// Exact uniform cap on S^3 via rejection.
+// Accept if dot(v, axis) >= cos(theta).
+func (l *ConeLight4) SampleDirS3(rng *rand.Rand) Vector4 {
+	if l.oneMinusCos == 0 {
+		return l.Direction
+	}
+	c := l.cosAngle
+	a := l.Direction
+	for {
+		// Sample a random 4D unit vector (normalize 4 Gaussians).
+		v := Vector4{rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64()}
+		n := math.Sqrt(v.Dot(v))
+		if n == 0 {
+			continue
+		}
+		v = v.Mul(1 / n)
+		if a.Dot(v) >= c {
+			return v
+		}
+	}
+}
+
 // helper: integral for S^3 cap CDF piece
 func jS3(t Real) Real { // J(t) = 1/2 * ( t*sqrt(1-t^2) + asin(t) )
 	u := 1 - t*t
@@ -1306,62 +1294,48 @@ func jS3(t Real) Real { // J(t) = 1/2 * ( t*sqrt(1-t^2) + asin(t) )
 	return 0.5 * (t*math.Sqrt(u) + math.Asin(t))
 }
 
-// Two Box–Muller pairs -> 4 independent standard normals (fewer RNG calls overall).
-func fourNormals(rng *rand.Rand) (float64, float64, float64, float64) {
-	u1 := rng.Float64()
-	u2 := rng.Float64()
-	u3 := rng.Float64()
-	u4 := rng.Float64()
-	r1 := math.Sqrt(-2 * math.Log(u1+1e-12))
-	r2 := math.Sqrt(-2 * math.Log(u3+1e-12))
-	th1 := 2 * math.Pi * u2
-	th2 := 2 * math.Pi * u4
-	return r1 * math.Cos(th1), r1 * math.Sin(th1), r2 * math.Cos(th2), r2 * math.Sin(th2)
+// sample cosφ with pdf ∝ sqrt(1 - t^2) on [a,1], a=cosθ
+func sampleCosPhiS3(a Real, rng *rand.Rand) Real {
+	Ja := jS3(a)
+	target := Ja + Real(rng.Float64())*(math.Pi/4-Ja) // J(1)=π/4
+	// good init:
+	t := a + (1-a)*Real(rng.Float64())
+	for i := 0; i < 3; i++ {
+		u := 1 - t*t
+		if u <= 1e-18 {
+			t = 1 - 1e-9
+			break
+		}
+		Jt := jS3(t)
+		t -= (Jt - target) / math.Sqrt(u) // Newton; J'(t)=sqrt(1-t^2)
+		if t < a {
+			t = 0.5 * (t + a)
+		}
+		if t > 1-1e-12 {
+			t = 1 - 1e-12
+		}
+	}
+	if t < a {
+		t = a
+	}
+	if t > 1 {
+		t = 1
+	}
+	return t
 }
 
-// Exact uniform cap on S^3 via rejection.
-// Accept if dot(v, axis) >= cos(theta).
 func (l *ConeLight4) SampleDir(rng *rand.Rand) Vector4 {
 	if l.oneMinusCos == 0 {
 		return l.Direction
 	}
-	if l.useReject {
-		// Exact uniform cap on S^3 via rejection.
-		a := l.Direction
-		c := l.cosAngle
-		for {
-			x, y, z, w := fourNormals(rng) // 4 Gaussians
-			n2 := x*x + y*y + z*z + w*w
-			if n2 == 0 {
-				continue
-			}
-			inv := 1 / math.Sqrt(n2)
-			v := Vector4{x * inv, y * inv, z * inv, w * inv}
-			if a.Dot(v) >= c {
-				return v
-			}
-		}
-	}
-	// LUT inverse-CDF path (fast & deterministic for narrow cones).
-	n := len(l.cosLUT) - 1
-	fu := rng.Float64() * float64(n)
-	i := int(fu)
-	if i >= n {
-		i = n - 1
-		fu = float64(n - 1)
-	}
-	t0 := l.cosLUT[i]
-	t1 := l.cosLUT[i+1]
-	f := fu - float64(i)
-	cosPhi := t0 + (t1-t0)*Real(f)
-	s := 1 - cosPhi*cosPhi
-	if s < 0 {
-		s = 0
-	}
-	sinPhi := math.Sqrt(s)
-	// Uniform orientation in the 3D subspace orthogonal to axis
+	// correct S^3 cap law for cosφ
+	cosPhi := sampleCosPhiS3(l.cosAngle, rng)
+	sinPhi := math.Sqrt(max(0, 1-cosPhi*cosPhi))
+
+	// uniform orientation in 3D subspace (same as you had)
 	x, y, z := sampleS2(rng)
-	ortho := l.U.Mul(x).Add(l.V.Mul(y)).Add(l.W.Mul(z)) // unit, ⟂ axis
+	ortho := l.U.Mul(x).Add(l.V.Mul(y)).Add(l.W.Mul(z))
+
 	return l.Direction.Mul(cosPhi).Add(ortho.Mul(sinPhi))
 }
 
@@ -1513,17 +1487,6 @@ func main() {
 	)
 
 	Debug = os.Getenv("DEBUG") != ""
-	Profile = os.Getenv("PROFILE") != ""
-	if Profile {
-		f, err := os.Create("cpu.out")
-		if err != nil {
-			panic(err)
-		}
-		if err := pprof.StartCPUProfile(f); err != nil {
-			panic(err)
-		}
-		defer pprof.StopCPUProfile()
-	}
 
 	if len(os.Args) < 2 {
 		cfg, err = loadConfig("config.json")

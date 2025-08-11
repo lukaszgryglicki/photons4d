@@ -17,5 +17,8 @@ run: build
 fmt:
 	go fmt $(SRC) debug.go nodebug.go
 
+profile:
+	go tool pprof -text cpu.out
+
 clean:
 	rm -f $(BIN)
