@@ -11,7 +11,6 @@ import (
 // We transform planes via A^{-T} with A = R * diag(scale), and set d by max over world verts.
 type Cell16 struct {
 	Center  Point4
-	Side    Real
 	Scale   Vector4
 	R       Mat4
 	RT      Mat4
@@ -69,14 +68,10 @@ func signVectors16() [16]Vector4 {
 
 func NewCell16(
 	center Point4,
-	side Real,
 	scale Vector4,
 	angles Rot4,
 	color, reflectivity, refractivity, ior RGB,
 ) (*Cell16, error) {
-	if !(side > 0) {
-		return nil, fmt.Errorf("16-cell side must be > 0, got %.6g", side)
-	}
 	if !(scale.X > 0 && scale.Y > 0 && scale.Z > 0 && scale.W > 0) {
 		return nil, fmt.Errorf("16-cell per-axis scale must be > 0 on all axes, got %+v", scale)
 	}
@@ -116,7 +111,7 @@ func NewCell16(
 			}
 		}
 	}
-	u := side / base
+	u := 1.0 / base
 
 	// transform vertices to world
 	var Wv [8]Point4
@@ -158,7 +153,6 @@ func NewCell16(
 
 	c := &Cell16{
 		Center:  center,
-		Side:    side,
 		Scale:   scale,
 		R:       R,
 		RT:      R.Transpose(),
@@ -216,7 +210,7 @@ func NewCell16(
 		c.N[i], c.D[i] = nw, d
 	}
 
-	DebugLog("Created 16-cell: center=%+v, side=%.6g, scale=%+v, AABB=[%+v .. %+v]", center, side, scale, c.AABBMin, c.AABBMax)
+	DebugLog("Created 16-cell: center=%+v, scale=%+v, AABB=[%+v .. %+v]", center, scale, c.AABBMin, c.AABBMax)
 	return c, nil
 }
 

@@ -11,7 +11,6 @@ import (
 // world-space normal n_w = (R*S^{-1}) n_l (scale cancels in d via support).
 type Cell24 struct {
 	Center  Point4
-	Side    Real
 	Scale   Vector4
 	R       Mat4
 	RT      Mat4
@@ -59,14 +58,10 @@ func canonical24Verts() [24]Vector4 {
 
 func NewCell24(
 	center Point4,
-	side Real,
 	scale Vector4,
 	angles Rot4,
 	color, reflectivity, refractivity, ior RGB,
 ) (*Cell24, error) {
-	if !(side > 0) {
-		return nil, fmt.Errorf("24-cell side must be > 0, got %.6g", side)
-	}
 	if !(scale.X > 0 && scale.Y > 0 && scale.Z > 0 && scale.W > 0) {
 		return nil, fmt.Errorf("24-cell per-axis scale must be > 0 on all axes, got %+v", scale)
 	}
@@ -105,7 +100,7 @@ func NewCell24(
 			}
 		}
 	}
-	u := side / base
+	u := 1.0 / base
 
 	var Wv [24]Point4
 	minX, maxX := +1e300, -1e300
@@ -146,7 +141,6 @@ func NewCell24(
 
 	c := &Cell24{
 		Center:  center,
-		Side:    side,
 		Scale:   scale,
 		R:       R,
 		RT:      R.Transpose(),
@@ -203,7 +197,7 @@ func NewCell24(
 		c.N[i], c.D[i] = nw, d
 	}
 
-	DebugLog("Created 24-cell: center=%+v, side=%.6g, scale=%+v, AABB=[%+v .. %+v]", center, side, scale, c.AABBMin, c.AABBMax)
+	DebugLog("Created 24-cell: center=%+v, scale=%+v, AABB=[%+v .. %+v]", center, scale, c.AABBMin, c.AABBMax)
 	return c, nil
 }
 

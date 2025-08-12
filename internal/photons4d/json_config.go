@@ -67,7 +67,6 @@ type HyperSphereCfg struct {
 
 type Cell5Cfg struct {
 	Center Point4  `json:"center"`
-	Side   Real    `json:"side"`            // edge length before per-axis Scale
 	Scale  Vector4 `json:"scale,omitempty"` // defaults 1 on each axis
 	RotDeg Rot4Deg `json:"rotDeg"`
 
@@ -90,7 +89,6 @@ type Cell8Cfg struct {
 
 type Cell16Cfg struct {
 	Center  Point4  `json:"center"`
-	Side    Real    `json:"side"`
 	Scale   Vector4 `json:"scale,omitempty"`
 	RotDeg  Rot4Deg `json:"rotDeg"`
 	Color   RGB     `json:"color"`
@@ -101,7 +99,6 @@ type Cell16Cfg struct {
 
 type Cell24Cfg struct {
 	Center  Point4  `json:"center"`
-	Side    Real    `json:"side"`
 	Scale   Vector4 `json:"scale,omitempty"`
 	RotDeg  Rot4Deg `json:"rotDeg"`
 	Color   RGB     `json:"color"`
@@ -197,7 +194,7 @@ func (s Cell5Cfg) Build() (*Cell5, error) {
 	if sc.W == 0 {
 		sc.W = 1
 	}
-	return NewCell5(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
+	return NewCell5(s.Center, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
 }
 
 func (s Cell16Cfg) Build() (*Cell16, error) {
@@ -215,7 +212,7 @@ func (s Cell16Cfg) Build() (*Cell16, error) {
 	if sc.W == 0 {
 		sc.W = 1
 	}
-	return NewCell16(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
+	return NewCell16(s.Center, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
 }
 
 func (s Cell24Cfg) Build() (*Cell24, error) {
@@ -233,7 +230,7 @@ func (s Cell24Cfg) Build() (*Cell24, error) {
 	if sc.W == 0 {
 		sc.W = 1
 	}
-	return NewCell24(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
+	return NewCell24(s.Center, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
 }
 
 func (c Cell120Cfg) Build() (*Cell120, error) {

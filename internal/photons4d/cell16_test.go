@@ -7,10 +7,9 @@ import (
 
 func TestNewCell16AndIntersect(t *testing.T) {
 	c16, err := NewCell16(
-		Point4{0, 0, 0, 0.6}, // clearly in front of W=0 plane
-		0.3,                  // edge length
-		Vector4{1, 1, 1, 1},  // no anisotropic scale
-		Rot4{},               // identity rotation
+		Point4{0, 0, 0, 0.6},    // clearly in front of W=0 plane
+		Vector4{.3, .3, .3, .3}, // no anisotropic scale
+		Rot4{},                  // identity rotation
 		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{1.3, 1.3, 1.3},
 	)
 	if err != nil {
@@ -43,8 +42,7 @@ func TestNewCell16AndIntersect(t *testing.T) {
 func TestSceneAABBWithCell16(t *testing.T) {
 	c16, err := NewCell16(
 		Point4{0.1, -0.2, 0.05, 0.4},
-		0.25,
-		Vector4{1.1, 0.9, 1.0, 0.8},
+		Vector4{.275, 0.225, .25, 0.2},
 		Rot4{XY: 0.2, XZ: -0.15, ZW: 0.3},
 		RGB{1, 1, 1}, RGB{0.1, 0.1, 0.1}, RGB{0.8, 0.8, 0.8}, RGB{1.3, 1.3, 1.3},
 	)

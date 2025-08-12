@@ -17,8 +17,7 @@ import (
 // so normals are correct even under anisotropic scaling.
 type Cell5 struct {
 	Center  Point4
-	Side    Real    // desired edge length before per-axis Scale
-	Scale   Vector4 // per-axis scaling applied after Side
+	Scale   Vector4 // per-axis scaling
 	R       Mat4    // local->world rotation
 	RT      Mat4    // world->local (R^T)
 	Color   RGB
@@ -99,14 +98,10 @@ func canonicalCell5() [5]Vector4 {
 
 func NewCell5(
 	center Point4,
-	side Real,
 	scale Vector4,
 	angles Rot4, // radians
 	color, reflectivity, refractivity, ior RGB,
 ) (*Cell5, error) {
-	if !(side > 0) {
-		return nil, fmt.Errorf("cell5 side must be > 0, got %.6g", side)
-	}
 	// validate scale
 	if !(scale.X > 0 && scale.Y > 0 && scale.Z > 0 && scale.W > 0) {
 		return nil, fmt.Errorf("cell5 per-axis scale must be > 0 on all axes, got %+v", scale)
@@ -139,7 +134,7 @@ func NewCell5(
 	V := canonicalCell5()
 	// base edge length
 	base := V[0].Sub(V[1]).Len()
-	u := side / base
+	u := 1.0 / base
 
 	// transform to world
 	var Wv [5]Point4
@@ -168,7 +163,6 @@ func NewCell5(
 
 	sx4 := &Cell5{
 		Center:  center,
-		Side:    side,
 		Scale:   scale,
 		R:       R,
 		RT:      R.Transpose(),
@@ -241,7 +235,7 @@ func NewCell5(
 		sx4.N[i], sx4.D[i] = n, d
 	}
 
-	DebugLog("Created 5-cell: center=%+v, side=%.6g, scale=%+v, AABB=[%+v .. %+v]", center, side, scale, sx4.AABBMin, sx4.AABBMax)
+	DebugLog("Created 5-cell: center=%+v, scale=%+v, AABB=[%+v .. %+v]", center, scale, sx4.AABBMin, sx4.AABBMax)
 	return sx4, nil
 }
 

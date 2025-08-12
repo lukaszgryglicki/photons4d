@@ -121,8 +121,7 @@ func TestRefractionThrough_Cell5(t *testing.T) {
 	ior := Real(1.1)
 	sx, err := NewCell5(
 		Point4{0, 0, 0, 0.6},
-		0.30,
-		Vector4{1, 1, 1, 1},
+		Vector4{.3, .3, .3, .3},
 		Rot4{},
 		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
 	)
@@ -171,8 +170,7 @@ func TestRefractionThrough_Cell16(t *testing.T) {
 	ior := Real(1.1)
 	c16, err := NewCell16(
 		Point4{0, 0, 0, 0.6},
-		0.30,
-		Vector4{1, 1, 1, 1},
+		Vector4{.3, .3, .3, .3},
 		Rot4{},
 		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
 	)
@@ -221,8 +219,7 @@ func TestRefractionThrough_Cell24(t *testing.T) {
 	ior := Real(1.1)
 	c24, err := NewCell24(
 		Point4{0, 0, 0, 0.6},
-		0.30,
-		Vector4{1, 1, 1, 1},
+		Vector4{.3, .3, .3, .3},
 		Rot4{},
 		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
 	)
