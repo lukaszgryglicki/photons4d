@@ -53,17 +53,6 @@ type Rot4Deg struct {
 	ZW Real `json:"zw"`
 }
 
-type Cell8Cfg struct {
-	Center Point4  `json:"center"`
-	Size   Vector4 `json:"size"`
-	RotDeg Rot4Deg `json:"rotDeg"`
-
-	Color   RGB `json:"color"`
-	Reflect RGB `json:"reflect"`
-	Refract RGB `json:"refract"`
-	IOR     RGB `json:"ior"`
-}
-
 type HyperSphereCfg struct {
 	Center Point4  `json:"center"`
 	Radius Real    `json:"radius"`          // base radius
@@ -80,6 +69,17 @@ type Cell5Cfg struct {
 	Center Point4  `json:"center"`
 	Side   Real    `json:"side"`            // edge length before per-axis Scale
 	Scale  Vector4 `json:"scale,omitempty"` // defaults 1 on each axis
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type Cell8Cfg struct {
+	Center Point4  `json:"center"`
+	Size   Vector4 `json:"size"`
 	RotDeg Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
