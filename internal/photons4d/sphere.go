@@ -156,14 +156,15 @@ func intersectRayHyperSphere(O Point4, D Vector4, h *HyperSphere) (hit objectHit
 		t0, t1 = t1, t0
 	}
 
-	const eps = 1e-12
+	// Tolerant inside/outside test near the surface, consistent with cube.
+	const epsInside = 1e-12
 	inv := false
 	t := t0
-	if t <= eps {
+	if t <= epsInside {
 		t = t1
 		inv = true // origin was inside ⇒ first positive is the exit
 	}
-	if t <= eps {
+	if t <= epsInside {
 		return objectHit{}, false
 	}
 

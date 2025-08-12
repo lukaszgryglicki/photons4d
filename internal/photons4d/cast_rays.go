@@ -149,6 +149,10 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		if u < pAbs+pReflDyn {
 			// Reflect
 			D = reflect4(D, N)
+			// keep direction unit-length
+			if l2 := D.Dot(D); l2 > 0 {
+				D = D.Mul(1 / math.Sqrt(l2))
+			}
 			O = Point4{
 				P.X + D.X*bumpShift,
 				P.Y + D.Y*bumpShift,
@@ -172,6 +176,10 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		}
 		if T, ok := refract4(D, N, eta); ok {
 			D = T
+			// keep direction unit-length
+			if l2 := D.Dot(D); l2 > 0 {
+				D = D.Mul(1 / math.Sqrt(l2))
+			}
 			O = Point4{
 				P.X + D.X*bumpShift,
 				P.Y + D.Y*bumpShift,
@@ -186,6 +194,9 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 
 		// Total internal reflection fallback.
 		D = reflect4(D, N)
+		if l2 := D.Dot(D); l2 > 0 {
+			D = D.Mul(1 / math.Sqrt(l2))
+		}
 		O = Point4{
 			P.X + D.X*bumpShift,
 			P.Y + D.Y*bumpShift,

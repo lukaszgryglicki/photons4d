@@ -148,8 +148,10 @@ func intersectRayHypercube(O Point4, D Vector4, h *HyperCube) (hit objectHit, ok
 	Ol := h.RT.MulVec(Op)
 	Dl := h.RT.MulVec(D)
 
-	const inf = 1e300
-	tmin, tmax := -inf, inf
+	// Use real infinities for clarity.
+	ninf := math.Inf(-1)
+	inf := math.Inf(1)
+	tmin, tmax := ninf, inf
 	enterAxis, enterSign := -1, 0
 	exitAxis, exitSign := -1, 0
 
@@ -159,7 +161,9 @@ func intersectRayHypercube(O Point4, D Vector4, h *HyperCube) (hit objectHit, ok
 			if math.Abs(o) > half {
 				return false, 0, 0, 0, 0, 0, 0
 			}
-			return true, -inf, inf, 0, 0, 0, 0
+			// Inside this slab and parallel: do not tighten; preserve axis id.
+			// Use +1 as a neutral sign so later flip logic is consistent.
+			return true, ninf, inf, ax, +1, ax, +1
 		}
 		t1 := (-half - o) / d
 		t2 := (half - o) / d
@@ -199,11 +203,13 @@ func intersectRayHypercube(O Point4, D Vector4, h *HyperCube) (hit objectHit, ok
 		{c1, c2, eAx3, eSg3, xAx3, xSg3},
 		{d1, d2, eAx4, eSg4, xAx4, xSg4},
 	}
+	// Small tolerance to make face choice deterministic under ties.
+	const tie = 1e-15
 	for _, s := range sl {
-		if s.t1 > tmin {
+		if s.t1 > tmin+tie {
 			tmin, enterAxis, enterSign = s.t1, s.eAx, s.eSg
 		}
-		if s.t2 < tmax {
+		if s.t2 < tmax-tie {
 			tmax, exitAxis, exitSign = s.t2, s.xAx, s.xSg
 		}
 	}
@@ -211,7 +217,15 @@ func intersectRayHypercube(O Point4, D Vector4, h *HyperCube) (hit objectHit, ok
 		return objectHit{}, false
 	}
 
-	inv := tmin < 0 && tmax > 0
+	// More stable inside/outside test near faces.
+	const epsInside = 1e-12
+	inv := tmin < epsInside && tmax > epsInside
+
+	// If nothing tightened (all slabs parallel), we cannot define a face.
+	if enterAxis < 0 && exitAxis < 0 {
+		return objectHit{}, false
+	}
+
 	var t Real
 	ax, sg := 0, 0
 	if !inv {
@@ -238,10 +252,24 @@ func nearestHit(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) 
 	}
 
 	const eps = 1e-12
+	parX := math.Abs(D.X) < eps
+	parY := math.Abs(D.Y) < eps
+	parZ := math.Abs(D.Z) < eps
+	parW := math.Abs(D.W) < eps
 	rr := rayRecips{
-		invX: 1 / D.X, invY: 1 / D.Y, invZ: 1 / D.Z, invW: 1 / D.W,
-		parX: math.Abs(D.X) < eps, parY: math.Abs(D.Y) < eps,
-		parZ: math.Abs(D.Z) < eps, parW: math.Abs(D.W) < eps,
+		parX: parX, parY: parY, parZ: parZ, parW: parW,
+	}
+	if !parX {
+		rr.invX = 1 / D.X
+	}
+	if !parY {
+		rr.invY = 1 / D.Y
+	}
+	if !parZ {
+		rr.invZ = 1 / D.Z
+	}
+	if !parW {
+		rr.invW = 1 / D.W
 	}
 
 	// cubes
