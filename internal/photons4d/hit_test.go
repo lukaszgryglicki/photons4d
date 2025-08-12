@@ -26,3 +26,19 @@ func TestPlaneHit(t *testing.T) {
 		t.Fatalf("expected +Inf for behind/tiny, got %.6g", tneg)
 	}
 }
+
+func TestNearestHit_PrefersCloser(t *testing.T) {
+	scene := NewScene(Point4{0, 0, 0, 0}, 2, 2, 2, 4, 4, 1, 8)
+	c := newUnitCubeAtW0p5()
+	scene.AddHypercube(c)
+
+	O := Point4{0, 0, 0, 0}
+	D := Vector4{0, 0, 0, 1}
+	h, ok := nearestHit(scene, O, D, math.Inf(1))
+	if !ok {
+		t.Fatal("expected a cube hit")
+	}
+	if math.Abs(float64(h.t-0.4)) > 1e-9 {
+		t.Fatalf("nearest t wrong: %.12g", h.t)
+	}
+}

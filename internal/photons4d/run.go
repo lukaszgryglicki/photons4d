@@ -13,7 +13,12 @@ func Run(cfgPath string) error {
 	}
 
 	if Debug {
-		cfg.SceneResX, cfg.SceneResY, cfg.SceneResZ, cfg.Spp, cfg.Scene.MaxBounces = imax(cfg.SceneResX>>3, 4), imax(cfg.SceneResY>>3, 4), imax(cfg.SceneResZ>>2, 1), imax(cfg.Spp>>2, 4), imax(cfg.Scene.MaxBounces>>1, 8)
+		cfg.SceneResX, cfg.SceneResY, cfg.SceneResZ, cfg.Spp, cfg.Scene.MaxBounces =
+			imax(cfg.SceneResX>>3, 4),
+			imax(cfg.SceneResY>>3, 4),
+			imax(cfg.SceneResZ>>2, 1),
+			imax(cfg.Spp>>2, 4),
+			imax(cfg.Scene.MaxBounces>>1, 8)
 		DebugLog("Debug mode: reduced resolution to %d x %d x %d, spp to %d and max bounces to %d", cfg.SceneResX, cfg.SceneResY, cfg.SceneResZ, cfg.Spp, cfg.Scene.MaxBounces)
 	}
 
@@ -38,13 +43,20 @@ func Run(cfgPath string) error {
 		scene.AddHypercube(h)
 	}
 
-	for i, scfg := range cfg.Hyperspheres {
+	for _, scfg := range cfg.Hyperspheres {
 		h, err := scfg.Build()
 		if err != nil {
-			_ = i // keep if you log
 			continue
 		}
 		scene.AddHyperSphere(h)
+	}
+
+	for _, scfg := range cfg.Simplexes {
+		sx, err := scfg.Build()
+		if err != nil {
+			continue
+		}
+		scene.AddSimplex5(sx)
 	}
 
 	Nvox := Nx * Ny * Nz
@@ -83,7 +95,6 @@ func Run(cfgPath string) error {
 		}
 		DebugLog("Saved PNG sequence with prefix: %s", prefix)
 	} else {
-		// Save GIF
 		if err := SaveAnimatedGIF(scene, cfg.GIFOut, cfg.GIFDelay, cfg.Gamma); err != nil {
 			panic(err)
 		}

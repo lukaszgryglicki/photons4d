@@ -9,6 +9,7 @@ type Scene struct {
 	Buf                  []Real // flat: (((i*Ny)+j)*Nz + k)*3 + c
 	Hypercubes           []*HyperCube
 	Hyperspheres         []*HyperSphere
+	Simplexes            []*Simplex5
 
 	// cached bounds & mapping
 	MinX, MaxX Real
@@ -110,4 +111,8 @@ func (s *Scene) AddHypercube(h *HyperCube) {
 
 func (s *Scene) AddHyperSphere(h *HyperSphere) {
 	s.Hyperspheres = append(s.Hyperspheres, h)
+}
+
+func (s *Scene) AddSimplex5(h *Simplex5) {
+	s.Simplexes = append(s.Simplexes, h)
 }

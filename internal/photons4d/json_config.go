@@ -36,6 +36,7 @@ type Config struct {
 	Lights       []LightCfg       `json:"lights"`
 	Hypercubes   []HypercubeCfg   `json:"hypercubes,omitempty"`
 	Hyperspheres []HyperSphereCfg `json:"hyperspheres,omitempty"`
+	Simplexes    []Simplex5Cfg    `json:"simplexes,omitempty"`
 }
 
 // Rotation in degrees for JSON (friendlier than radians).
@@ -63,6 +64,18 @@ type HyperSphereCfg struct {
 	Center Point4  `json:"center"`
 	Radius Real    `json:"radius"`          // base radius
 	Scale  Vector4 `json:"scale,omitempty"` // optional per-axis scale; defaults 1
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type Simplex5Cfg struct {
+	Center Point4  `json:"center"`
+	Side   Real    `json:"side"`            // edge length before per-axis Scale
+	Scale  Vector4 `json:"scale,omitempty"` // defaults 1 on each axis
 	RotDeg Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
@@ -119,6 +132,24 @@ func (hs HyperSphereCfg) Build() (*HyperSphere, error) {
 	}
 	radii := Vector4{hs.Radius * sc.X, hs.Radius * sc.Y, hs.Radius * sc.Z, hs.Radius * sc.W}
 	return NewHyperSphere(hs.Center, radii, rad, hs.Color, hs.Reflect, hs.Refract, hs.IOR)
+}
+
+func (s Simplex5Cfg) Build() (*Simplex5, error) {
+	rad := s.RotDeg.Radians()
+	sc := s.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	return NewSimplex5(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
 }
 
 func loadConfig(path string) (*Config, error) {
