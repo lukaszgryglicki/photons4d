@@ -88,45 +88,49 @@ type Cell8Cfg struct {
 }
 
 type Cell16Cfg struct {
-	Center  Point4  `json:"center"`
-	Scale   Vector4 `json:"scale,omitempty"`
-	RotDeg  Rot4Deg `json:"rotDeg"`
-	Color   RGB     `json:"color"`
-	Reflect RGB     `json:"reflect"`
-	Refract RGB     `json:"refract"`
-	IOR     RGB     `json:"ior"`
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
 }
 
 type Cell24Cfg struct {
-	Center  Point4  `json:"center"`
-	Scale   Vector4 `json:"scale,omitempty"`
-	RotDeg  Rot4Deg `json:"rotDeg"`
-	Color   RGB     `json:"color"`
-	Reflect RGB     `json:"reflect"`
-	Refract RGB     `json:"refract"`
-	IOR     RGB     `json:"ior"`
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
 }
 
 type Cell120Cfg struct {
-	Center  Point4  `json:"center"`
-	Radius  Real    `json:"radius"`
-	Scale   Vector4 `json:"scale,omitempty"`
-	RotDeg  Rot4Deg `json:"rotDeg"`
-	Color   RGB     `json:"color"`
-	Reflect RGB     `json:"reflect"`
-	Refract RGB     `json:"refract"`
-	IOR     RGB     `json:"ior"`
+	Center Point4  `json:"center"`
+	Radius Real    `json:"radius"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
 }
 
 type Cell600Cfg struct {
-	Center  Point4  `json:"center"`
-	Radius  Real    `json:"radius"`
-	Scale   Vector4 `json:"scale,omitempty"`
-	RotDeg  Rot4Deg `json:"rotDeg"`
-	Color   RGB     `json:"color"`
-	Reflect RGB     `json:"reflect"`
-	Refract RGB     `json:"refract"`
-	IOR     RGB     `json:"ior"`
+	Center Point4  `json:"center"`
+	Radius Real    `json:"radius"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
 }
 
 func (r Rot4Deg) Radians() Rot4 {
