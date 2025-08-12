@@ -4,7 +4,7 @@
   "sceneResZ": 1,
   "probeRays": 65535,
   "spp": 192,
-  "gifOut": "simple.gif",
+  "gifOut": "./gifs/simple.gif",
   "gifDelay": 10,
   "gamma": 0.8,
   "scene": {

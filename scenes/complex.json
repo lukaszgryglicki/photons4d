@@ -4,7 +4,7 @@
   "sceneResZ": 17,
   "probeRays": 100000,
   "spp": 128,
-  "gifOut": "volume.gif",
+  "gifOut": "./gifs/volume.gif",
   "gifDelay": 5,
   "gamma": 0.75,
   "scene": {
