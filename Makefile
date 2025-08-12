@@ -1,24 +1,28 @@
-SRC = photons4d.go
-BIN = photons4d
+BIN := photons4d
+CMD := ./cmd/photons4d
+
+.PHONY: all build release run fmt runprofile profile clean
 
 all: build
 
 build: fmt
-	go build -tags debug -o $(BIN) $(SRC) debug.go
-	strip $(BIN)
+	go build -tags debug -o $(BIN) $(CMD)
 
 release: fmt
-	go build -o $(BIN) $(SRC) nodebug.go
-	strip -s $(BIN)
+	go build -o $(BIN) $(CMD)
+	strip $(BIN)
 
 run: build
 	./$(BIN)
 
-fmt:
-	go fmt $(SRC) debug.go nodebug.go
+runprofile: release
+	PROFILE=1 ./$(BIN)
 
-profile:
-	go tool pprof -text cpu.out
+fmt:
+	go fmt ./...
+
+profile: runprofile
+	go tool pprof -text cpu.out > cpu.out.txt && cat cpu.out.txt
 
 clean:
-	rm -f $(BIN)
+	rm -f $(BIN) cpu.out out

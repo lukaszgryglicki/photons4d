@@ -1,36 +1,36 @@
-go tool pprof -text cpu.out
 File: photons4d
-Build ID: 725076f617d17d417b909819ba960b139a0c028d
+Build ID: 9a7cbde073fb6b546c0f3060fdbcfbcdd0ce9fb1
 Type: cpu
-Time: 2025-08-11 18:43:16 CEST
-Duration: 148.24s, Total samples = 2287.29s (1543.01%)
-Showing nodes accounting for 2231.96s, 97.58% of 2287.29s total
-Dropped 94 nodes (cum <= 11.44s)
+Time: 2025-08-12 06:50:00 CEST
+Duration: 15.69s, Total samples = 231.49s (1475.82%)
+Showing nodes accounting for 224.68s, 97.06% of 231.49s total
+Dropped 69 nodes (cum <= 1.16s)
       flat  flat%   sum%        cum   cum%
-   537.85s 23.51% 23.51%   1983.07s 86.70%  main.castSingleRay
-   302.13s 13.21% 36.72%   2285.30s 99.91%  main.fireRaysFromLights.func1
-   250.49s 10.95% 47.68%    250.60s 10.96%  main.rayAABBParametricInv
-   218.95s  9.57% 57.25%    435.63s 19.05%  main.intersectRayHypercube
-   198.60s  8.68% 65.93%    900.19s 39.36%  main.nearestCubeT
-   128.67s  5.63% 71.56%    135.28s  5.91%  internal/sync.(*Mutex).Lock (inline)
-    81.46s  3.56% 75.12%     81.49s  3.56%  main.Mat4.MulVec
-    70.30s  3.07% 78.19%     75.79s  3.31%  main.intersectRayHypercube.func1 (inline)
-    60.63s  2.65% 80.84%    216.21s  9.45%  main.(*ConeLight4).SampleDir
-    54.65s  2.39% 83.23%     54.65s  2.39%  runtime.duffcopy
-    48.37s  2.11% 85.35%     48.40s  2.12%  main.Vector4.Mul (inline)
-    40.23s  1.76% 87.10%     75.48s  3.30%  main.sampleS2
-    36.31s  1.59% 88.69%     36.31s  1.59%  math.Sqrt (inline)
-    34.19s  1.49% 90.19%     34.23s  1.50%  math/rand.(*rngSource).Uint64 (inline)
-    33.50s  1.46% 91.65%     33.55s  1.47%  internal/sync.(*Mutex).Unlock (inline)
-    32.90s  1.44% 93.09%     38.57s  1.69%  main.planeHitT
-    27.77s  1.21% 94.30%     84.88s  3.71%  math/rand.(*Rand).Float64 (inline)
-    19.26s  0.84% 95.15%     19.26s  0.84%  main.Vector4.Dot (inline)
-    15.56s  0.68% 95.83%     15.56s  0.68%  main.(*Scene3D).VoxelIndexOf
-    15.45s  0.68% 96.50%     49.69s  2.17%  math/rand.(*rngSource).Int63
-     8.58s  0.38% 96.88%     42.16s  1.84%  main.(*shardLocks).unlock
-     7.41s  0.32% 97.20%     57.10s  2.50%  math/rand.(*Rand).Int63 (inline)
-     5.70s  0.25% 97.45%     16.35s  0.71%  main.pickChannelFast
-     2.44s  0.11% 97.56%     18.31s   0.8%  math.Abs (inline)
-     0.54s 0.024% 97.58%    135.82s  5.94%  main.(*shardLocks).lock (inline)
-     0.02s 0.00087% 97.58%     33.57s  1.47%  sync.(*Mutex).Unlock (inline)
-         0     0% 97.58%    135.28s  5.91%  sync.(*Mutex).Lock (inline)
+    36.89s 15.94% 15.94%    213.06s 92.04%  github.com/lukaszgryglicki/photons4d/internal/photons4d.castSingleRay
+    31.55s 13.63% 29.56%     31.57s 13.64%  github.com/lukaszgryglicki/photons4d/internal/photons4d.rayAABB
+    28.24s 12.20% 41.76%     53.81s 23.25%  github.com/lukaszgryglicki/photons4d/internal/photons4d.intersectRayHypercube
+    24.84s 10.73% 52.49%    112.39s 48.55%  github.com/lukaszgryglicki/photons4d/internal/photons4d.nearestCube
+    17.79s  7.68% 60.18%    230.85s 99.72%  github.com/lukaszgryglicki/photons4d/internal/photons4d.castRays.func1
+    14.29s  6.17% 66.35%     14.60s  6.31%  internal/sync.(*Mutex).Lock (inline)
+     9.43s  4.07% 70.43%      9.44s  4.08%  github.com/lukaszgryglicki/photons4d/internal/photons4d.Mat4.MulVec
+     8.68s  3.75% 74.18%      9.28s  4.01%  github.com/lukaszgryglicki/photons4d/internal/photons4d.intersectRayHypercube.func1 (inline)
+     7.62s  3.29% 77.47%     27.12s 11.72%  github.com/lukaszgryglicki/photons4d/internal/photons4d.(*Light).SampleDir
+     6.17s  2.67% 80.13%      6.17s  2.67%  runtime.duffcopy
+     6.09s  2.63% 82.76%      6.09s  2.63%  github.com/lukaszgryglicki/photons4d/internal/photons4d.Vector4.Mul (inline)
+     5.04s  2.18% 84.94%      9.71s  4.19%  github.com/lukaszgryglicki/photons4d/internal/photons4d.sampleS2
+     4.42s  1.91% 86.85%      4.99s  2.16%  github.com/lukaszgryglicki/photons4d/internal/photons4d.planeHit
+     4.31s  1.86% 88.71%      4.32s  1.87%  math.Sqrt (inline)
+     4.16s  1.80% 90.51%      4.16s  1.80%  math/rand.(*rngSource).Uint64 (inline)
+     3.69s  1.59% 92.10%     10.91s  4.71%  math/rand.(*Rand).Float64 (inline)
+     2.52s  1.09% 93.19%      2.52s  1.09%  github.com/lukaszgryglicki/photons4d/internal/photons4d.Vector4.Dot (inline)
+     2.38s  1.03% 94.22%      2.38s  1.03%  internal/sync.(*Mutex).Unlock (inline)
+     1.82s  0.79% 95.01%      5.98s  2.58%  math/rand.(*rngSource).Int63
+     1.69s  0.73% 95.74%      1.69s  0.73%  github.com/lukaszgryglicki/photons4d/internal/photons4d.(*Scene).VoxelIndexOf
+     1.23s  0.53% 96.27%      7.21s  3.11%  math/rand.(*Rand).Int63 (inline)
+     0.74s  0.32% 96.59%      2.14s  0.92%  github.com/lukaszgryglicki/photons4d/internal/photons4d.pickChannel
+     0.62s  0.27% 96.86%         3s  1.30%  github.com/lukaszgryglicki/photons4d/internal/photons4d.(*shardLocks).unlock
+     0.31s  0.13% 96.99%      2.11s  0.91%  math.Abs (inline)
+     0.13s 0.056% 97.05%      1.25s  0.54%  github.com/lukaszgryglicki/photons4d/internal/photons4d.isFinite (inline)
+     0.03s 0.013% 97.06%     14.63s  6.32%  github.com/lukaszgryglicki/photons4d/internal/photons4d.(*shardLocks).lock (inline)
+         0     0% 97.06%     14.60s  6.31%  sync.(*Mutex).Lock (inline)
+         0     0% 97.06%      2.38s  1.03%  sync.(*Mutex).Unlock (inline)
