@@ -8,12 +8,12 @@ import (
 type Category uint8
 
 const (
-	Hit            Category = iota // ray hit a hypercube
-	Miss                           // ray missed all hypercubes
-	Absorb                         // ray absorbed by a hypercube (no reflection or refraction)
-	Reflect                        // ray reflected off a hypercube
-	Refract                        // ray refracted through a hypercube
-	TIR                            // total internal reflection (ray did not exit hypercube)
+	Hit            Category = iota // ray hit
+	Miss                           // ray missed
+	Absorb                         // ray absorbed
+	Reflect                        // ray reflected
+	Refract                        // ray refracted
+	TIR                            // total internal reflection (ray did not exit object)
 	RecurenceLimit                 // ray hit a recurrence limit (e.g. max bounces exceeded)
 )
 

@@ -7,7 +7,7 @@ type Scene struct {
 	Nx, Ny, Nz           int
 	MaxBounces           int
 	Buf                  []Real // flat: (((i*Ny)+j)*Nz + k)*3 + c
-	Hypercubes           []*HyperCube
+	Cells8               []*Cell8
 	Hyperspheres         []*HyperSphere
 	Cells5               []*Cell5
 	Cells16              []*SixteenCell
@@ -109,8 +109,8 @@ func (s *Scene) idx(i, j, k, c int) int {
 	return i*s.StrideX + j*s.StrideY + k*3 + c
 }
 
-func (s *Scene) AddHypercube(h *HyperCube) {
-	s.Hypercubes = append(s.Hypercubes, h)
+func (s *Scene) AddCell8(h *Cell8) {
+	s.Cells8 = append(s.Cells8, h)
 }
 
 func (s *Scene) AddHyperSphere(h *HyperSphere) {

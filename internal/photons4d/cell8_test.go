@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func newUnitCubeAtW0p5() *HyperCube {
-	h, err := NewHyperCube(
+func newUnitCubeAtW0p5() *Cell8 {
+	h, err := NewCell8(
 		Point4{0, 0, 0, 0.5},
 		Vector4{0.2, 0.2, 0.2, 0.2}, // edges 0.2 ⇒ half 0.1
 		Rot4{},                      // identity
@@ -18,13 +18,13 @@ func newUnitCubeAtW0p5() *HyperCube {
 	return h
 }
 
-func TestIntersectRayHypercube_EnterExit(t *testing.T) {
+func TestIntersectRayCell8_EnterExit(t *testing.T) {
 	h := newUnitCubeAtW0p5()
 
 	// Outside, coming along +W axis towards cube center
 	O := Point4{0, 0, 0, 0}
 	D := Vector4{0, 0, 0, 1}
-	hit, ok := intersectRayHypercube(O, D, h)
+	hit, ok := intersectRayCell8(O, D, h)
 	if !ok {
 		t.Fatal("expected hit")
 	}
@@ -43,7 +43,7 @@ func TestIntersectRayHypercube_EnterExit(t *testing.T) {
 	// Start inside the cube: O.W=0.5 (center), shoot +W, expect exit on +W face at t=+0.1
 	O2 := Point4{0, 0, 0, 0.5}
 	D2 := Vector4{0, 0, 0, 1}
-	hit2, ok2 := intersectRayHypercube(O2, D2, h)
+	hit2, ok2 := intersectRayCell8(O2, D2, h)
 	if !ok2 {
 		t.Fatal("expected hit from inside")
 	}

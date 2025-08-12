@@ -5,7 +5,7 @@ import (
 	"math"
 )
 
-// HyperCube: axis-aligned box in local space, then rotated about origin and translated to Center.
+// Cell8: axis-aligned box in local space, then rotated about origin and translated to Center.
 // 'Half' are half-lengths along the local X,Y,Z,W axes.
 // pAbs = 1 - (reflect + refract) (per channel). That’s your absorption knob.
 // The non-absorption budget (avail = reflect + refract) gets split each hit by
@@ -13,7 +13,7 @@ import (
 // color tints whatever survives (both reflected and refracted) per interaction.
 // ior (per channel) sets Fresnel strength and dispersion (B > G > R ⇒ stronger “prism”).
 
-type HyperCube struct {
+type Cell8 struct {
 	Center Point4
 	Half   Vector4 // half-sizes: Lx/2, Ly/2, Lz/2, Lw/2
 	R      Mat4    // local->world rotation
@@ -38,15 +38,15 @@ type HyperCube struct {
 	f0       [3]Real    // Schlick F0 per channel = ((ior-1)/(ior+1))^2
 }
 
-// NewHyperCube constructs a hypercube and precomputes caches.
-func NewHyperCube(
+// NewCell8 constructs a cell8 and precomputes caches.
+func NewCell8(
 	center Point4,
 	size Vector4, // full edge lengths
 	angles Rot4, // radians
 	color, reflectivity, refractivity, ior RGB,
-) (*HyperCube, error) {
+) (*Cell8, error) {
 	if !(size.X > 0 && size.Y > 0 && size.Z > 0 && size.W > 0) {
-		return nil, fmt.Errorf("hypercube size must be >0 on all axes, got %+v", size)
+		return nil, fmt.Errorf("cell8 size must be >0 on all axes, got %+v", size)
 	}
 	in01 := func(x Real) bool { return x >= 0 && x <= 1 }
 
@@ -72,7 +72,7 @@ func NewHyperCube(
 	}
 
 	R := rotFromAngles(angles)
-	hc := HyperCube{
+	hc := Cell8{
 		Center: center,
 		Half:   Vector4{size.X * 0.5, size.Y * 0.5, size.Z * 0.5, size.W * 0.5},
 		R:      R,
@@ -137,12 +137,12 @@ func NewHyperCube(
 		hc.f0[i] = r0 * r0
 	}
 
-	// DebugLog("Created HyperCube: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
-	DebugLog("Created hypercube: %+v", &hc)
+	// DebugLog("Created Cell8: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
+	DebugLog("Created cell8: %+v", &hc)
 	return &hc, nil
 }
 
-func intersectRayHypercube(O Point4, D Vector4, h *HyperCube) (hit objectHit, ok bool) {
+func intersectRayCell8(O Point4, D Vector4, h *Cell8) (hit objectHit, ok bool) {
 	// world -> local
 	Op := Vector4{O.X - h.Center.X, O.Y - h.Center.Y, O.Z - h.Center.Z, O.W - h.Center.W}
 	Ol := h.RT.MulVec(Op)

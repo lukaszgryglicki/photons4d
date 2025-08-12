@@ -30,7 +30,7 @@ func TestPlaneHit(t *testing.T) {
 func TestNearestHit_PrefersCloser(t *testing.T) {
 	scene := NewScene(Point4{0, 0, 0, 0}, 2, 2, 2, 4, 4, 1, 8)
 	c := newUnitCubeAtW0p5()
-	scene.AddHypercube(c)
+	scene.AddCell8(c)
 
 	O := Point4{0, 0, 0, 0}
 	D := Vector4{0, 0, 0, 1}

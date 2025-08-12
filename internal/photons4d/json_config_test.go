@@ -12,9 +12,9 @@ func TestRot4DegRadians(t *testing.T) {
 	}
 }
 
-func TestHypercubeCfgBuildAndValidation(t *testing.T) {
+func TestCell8CfgBuildAndValidation(t *testing.T) {
 	// Valid
-	h, err := (HypercubeCfg{
+	h, err := (Cell8Cfg{
 		Center: Point4{0, 0, 0, 0.5},
 		Size:   Vector4{1, 1, 1, 1},
 		RotDeg: Rot4Deg{},
@@ -24,7 +24,7 @@ func TestHypercubeCfgBuildAndValidation(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	// Invalid size
-	_, err = (HypercubeCfg{
+	_, err = (Cell8Cfg{
 		Center: Point4{}, Size: Vector4{0, 1, 1, 1},
 		RotDeg: Rot4Deg{}, Color: RGB{1, 1, 1}, Reflect: RGB{0, 0, 0}, Refract: RGB{1, 1, 1}, IOR: RGB{1.1, 1.1, 1.1},
 	}).Build()

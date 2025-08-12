@@ -34,9 +34,9 @@ type Config struct {
 	Gamma        Real                `json:"gamma,omitempty"`
 	Scene        SceneCfg            `json:"scene"`
 	Lights       []LightCfg          `json:"lights"`
-	Hypercubes   []HypercubeCfg      `json:"hypercubes,omitempty"`
 	Hyperspheres []HyperSphereCfg    `json:"hyperspheres,omitempty"`
 	Cells5       []Cell5Cfg          `json:"cells5,omitempty"`
+	Cells8       []Cell8Cfg          `json:"cells8,omitempty"`
 	Cells16      []SixteenCellCfg    `json:"cells16,omitempty"`
 	Cells24      []TwentyFourCellCfg `json:"cells24,omitempty"`
 	Cells120     []Cell120Cfg        `json:"cells120,omitempty"`
@@ -53,7 +53,7 @@ type Rot4Deg struct {
 	ZW Real `json:"zw"`
 }
 
-type HypercubeCfg struct {
+type Cell8Cfg struct {
 	Center Point4  `json:"center"`
 	Size   Vector4 `json:"size"`
 	RotDeg Rot4Deg `json:"rotDeg"`
@@ -141,15 +141,15 @@ func (r Rot4Deg) Radians() Rot4 {
 }
 
 // Build validates and constructs the runtime object (no defaults).
-func (hc HypercubeCfg) Build() (*HyperCube, error) {
+func (hc Cell8Cfg) Build() (*Cell8, error) {
 	rad := hc.RotDeg.Radians()
 
 	if math.Abs(rad.XY)+math.Abs(rad.XZ)+math.Abs(rad.XW)+
 		math.Abs(rad.YZ)+math.Abs(rad.YW)+math.Abs(rad.ZW) < 1e-12 {
-		// DebugLog("Hypercube rotation is ~zero; check JSON 'rotDeg' keys (xy,xz,xw,yz,yw,zw).")
+		// DebugLog("Cell8 rotation is ~zero; check JSON 'rotDeg' keys (xy,xz,xw,yz,yw,zw).")
 	}
 
-	return NewHyperCube(
+	return NewCell8(
 		hc.Center,
 		hc.Size,
 		rad,

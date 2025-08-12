@@ -35,12 +35,12 @@ func Run(cfgPath string) error {
 		lights = append(lights, L)
 	}
 
-	for _, hc := range cfg.Hypercubes {
+	for _, hc := range cfg.Cells8 {
 		h, err := hc.Build()
 		if err != nil {
 			continue
 		}
-		scene.AddHypercube(h)
+		scene.AddCell8(h)
 	}
 
 	for _, scfg := range cfg.Hyperspheres {

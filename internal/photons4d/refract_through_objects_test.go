@@ -10,9 +10,9 @@ func bumpPoint(p Point4, d Vector4, eps Real) Point4 {
 	return Point4{p.X + d.X*eps, p.Y + d.Y*eps, p.Z + d.Z*eps, p.W + d.W*eps}
 }
 
-func TestRefractionThrough_Hypercube(t *testing.T) {
+func TestRefractionThrough_Cell8(t *testing.T) {
 	ior := Real(1.1) // mild to avoid TIR in weird angles
-	h, err := NewHyperCube(
+	h, err := NewCell8(
 		Point4{0, 0, 0, 0.6},
 		Vector4{0.3, 0.3, 0.3, 0.3},
 		Rot4{},
@@ -26,7 +26,7 @@ func TestRefractionThrough_Hypercube(t *testing.T) {
 	D := Vector4{0, 0, 0, 1} // shoot along +W
 
 	// 1) enter
-	h1, ok := intersectRayHypercube(O, D, h)
+	h1, ok := intersectRayCell8(O, D, h)
 	if !ok || h1.inv {
 		t.Fatalf("expected entering hit, ok=%v inv=%v", ok, h1.inv)
 	}
@@ -40,7 +40,7 @@ func TestRefractionThrough_Hypercube(t *testing.T) {
 
 	// 2) inside -> move a bit and hit far side
 	O2 := bumpPoint(P1, T1, bumpShift)
-	h2, ok := intersectRayHypercube(O2, T1, h)
+	h2, ok := intersectRayCell8(O2, T1, h)
 	if !ok || !h2.inv {
 		t.Fatalf("expected inside->exit hit, ok=%v inv=%v", ok, h2.inv)
 	}
@@ -59,7 +59,7 @@ func TestRefractionThrough_Hypercube(t *testing.T) {
 	}
 	// and we shouldn't immediately re-enter a convex object
 	O3 := bumpPoint(P2, T2, bumpShift)
-	if h3, ok := intersectRayHypercube(O3, T2, h); ok && h3.t < 1e-6 {
+	if h3, ok := intersectRayCell8(O3, T2, h); ok && h3.t < 1e-6 {
 		t.Fatalf("ray re-entered immediately after exit")
 	}
 }

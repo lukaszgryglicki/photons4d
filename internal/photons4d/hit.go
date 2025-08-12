@@ -7,7 +7,7 @@ import (
 type objectHit struct {
 	t    Real
 	Nw   Vector4
-	hc   *HyperCube
+	hc   *Cell8
 	hs   *HyperSphere
 	s5   *Cell5
 	c16  *SixteenCell
@@ -184,11 +184,11 @@ func nearestHit(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) 
 	}
 
 	// cubes
-	for _, h := range scene.Hypercubes {
+	for _, h := range scene.Cells8 {
 		if ok, tNear := rayAABB(O, h.AABBMin, h.AABBMax, rr); !ok || tNear > bestT {
 			continue
 		}
-		if hit, ok := intersectRayHypercube(O, D, h); ok && hit.t > 1e-12 && hit.t < bestT {
+		if hit, ok := intersectRayCell8(O, D, h); ok && hit.t > 1e-12 && hit.t < bestT {
 			bestT, best, okAny = hit.t, hit, true
 		}
 	}

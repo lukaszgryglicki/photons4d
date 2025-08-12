@@ -4,7 +4,7 @@
   "sceneResZ": 1,
   "probeRays": 65535,
   "spp": 512,
-  "gifOut": "./gifs/tiny_cube.gif",
+  "gifOut": "./gifs/tiny_cell8.gif",
   "gifDelay": 10,
   "gamma": 0.8,
   "scene": {
@@ -23,7 +23,7 @@
       "voidLight": false
     }
   ],
-  "hypercubes": [
+  "cells8": [
     {
       "center": {"X": 0.0, "Y": 0.0, "Z": 0.0, "W": 0.5},
       "size":   {"X": 0.1, "Y": 0.1, "Z": 0.1, "W": 0.1},

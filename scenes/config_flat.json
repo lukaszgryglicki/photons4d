@@ -23,7 +23,7 @@
       "voidLight": false
     }
   ],
-  "hypercubes": [
+  "cells8": [
     {
       "center": {"X": 0.0, "Y": 0.0, "Z": 0.0, "W": 0.5},
       "size":   {"X": 0.2, "Y": 0.2, "Z": 0.2, "W": 0.2},

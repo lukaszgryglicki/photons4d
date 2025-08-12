@@ -87,7 +87,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 			return false
 		}
 
-		// Otherwise: hypercube is the first event.
+		// Otherwise: cell8 is the first event.
 		P := O.Add(D.Mul(hit.t))
 		totalDist += hit.t
 

@@ -93,7 +93,7 @@ func verts600Unit() []Vector4 {
 		}
 	}
 
-	// B: 16 hypercube-like
+	// B: 16 cell8-like
 	b := Real(0.5)
 	for sx := -1; sx <= 1; sx += 2 {
 		for sy := -1; sy <= 1; sy += 2 {
