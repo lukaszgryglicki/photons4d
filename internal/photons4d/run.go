@@ -59,6 +59,38 @@ func Run(cfgPath string) error {
 		scene.AddSimplex5(sx)
 	}
 
+	for _, scfg := range cfg.Cells16 {
+		obj, err := scfg.Build()
+		if err != nil {
+			continue
+		}
+		scene.AddSixteenCell(obj)
+	}
+
+	for _, scfg := range cfg.Cells24 {
+		obj, err := scfg.Build()
+		if err != nil {
+			continue
+		}
+		scene.AddTwentyFourCell(obj)
+	}
+
+	for _, cc := range cfg.Cells120 {
+		h, err := cc.Build()
+		if err != nil {
+			continue
+		}
+		scene.AddCell120(h)
+	}
+
+	for _, cc := range cfg.Cells600 {
+		h, err := cc.Build()
+		if err != nil {
+			continue
+		}
+		scene.AddCell600(h)
+	}
+
 	Nvox := Nx * Ny * Nz
 	needRays := make([]int, len(lights))
 	totalRays := 0

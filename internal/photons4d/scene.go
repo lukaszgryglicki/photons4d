@@ -10,6 +10,10 @@ type Scene struct {
 	Hypercubes           []*HyperCube
 	Hyperspheres         []*HyperSphere
 	Simplexes            []*Simplex5
+	Cells16              []*SixteenCell
+	Cells24              []*TwentyFourCell
+	Cells120             []*Cell120
+	Cells600             []*Cell600
 
 	// cached bounds & mapping
 	MinX, MaxX Real
@@ -115,4 +119,18 @@ func (s *Scene) AddHyperSphere(h *HyperSphere) {
 
 func (s *Scene) AddSimplex5(h *Simplex5) {
 	s.Simplexes = append(s.Simplexes, h)
+}
+
+func (s *Scene) AddSixteenCell(h *SixteenCell) {
+	s.Cells16 = append(s.Cells16, h)
+}
+func (s *Scene) AddTwentyFourCell(h *TwentyFourCell) {
+	s.Cells24 = append(s.Cells24, h)
+}
+
+func (s *Scene) AddCell120(c *Cell120) {
+	s.Cells120 = append(s.Cells120, c)
+}
+func (s *Scene) AddCell600(c *Cell600) {
+	s.Cells600 = append(s.Cells600, c)
 }

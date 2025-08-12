@@ -24,19 +24,23 @@ type LightCfg struct {
 }
 
 type Config struct {
-	SceneResX    int              `json:"sceneResX"`
-	SceneResY    int              `json:"sceneResY"`
-	SceneResZ    int              `json:"sceneResZ"`
-	ProbeRays    int              `json:"probeRays"`
-	Spp          int              `json:"spp"`
-	GIFOut       string           `json:"gifOut"`
-	GIFDelay     int              `json:"gifDelay,omitempty"`
-	Gamma        Real             `json:"gamma,omitempty"`
-	Scene        SceneCfg         `json:"scene"`
-	Lights       []LightCfg       `json:"lights"`
-	Hypercubes   []HypercubeCfg   `json:"hypercubes,omitempty"`
-	Hyperspheres []HyperSphereCfg `json:"hyperspheres,omitempty"`
-	Simplexes    []Simplex5Cfg    `json:"simplexes,omitempty"`
+	SceneResX    int                 `json:"sceneResX"`
+	SceneResY    int                 `json:"sceneResY"`
+	SceneResZ    int                 `json:"sceneResZ"`
+	ProbeRays    int                 `json:"probeRays"`
+	Spp          int                 `json:"spp"`
+	GIFOut       string              `json:"gifOut"`
+	GIFDelay     int                 `json:"gifDelay,omitempty"`
+	Gamma        Real                `json:"gamma,omitempty"`
+	Scene        SceneCfg            `json:"scene"`
+	Lights       []LightCfg          `json:"lights"`
+	Hypercubes   []HypercubeCfg      `json:"hypercubes,omitempty"`
+	Hyperspheres []HyperSphereCfg    `json:"hyperspheres,omitempty"`
+	Simplexes    []Simplex5Cfg       `json:"simplexes,omitempty"`
+	Cells16      []SixteenCellCfg    `json:"cells16,omitempty"`
+	Cells24      []TwentyFourCellCfg `json:"cells24,omitempty"`
+	Cells120     []Cell120Cfg        `json:"cells120,omitempty"`
+	Cells600     []Cell600Cfg        `json:"cells600,omitempty"`
 }
 
 // Rotation in degrees for JSON (friendlier than radians).
@@ -84,6 +88,50 @@ type Simplex5Cfg struct {
 	IOR     RGB `json:"ior"`
 }
 
+type SixteenCellCfg struct {
+	Center  Point4  `json:"center"`
+	Side    Real    `json:"side"`
+	Scale   Vector4 `json:"scale,omitempty"`
+	RotDeg  Rot4Deg `json:"rotDeg"`
+	Color   RGB     `json:"color"`
+	Reflect RGB     `json:"reflect"`
+	Refract RGB     `json:"refract"`
+	IOR     RGB     `json:"ior"`
+}
+
+type TwentyFourCellCfg struct {
+	Center  Point4  `json:"center"`
+	Side    Real    `json:"side"`
+	Scale   Vector4 `json:"scale,omitempty"`
+	RotDeg  Rot4Deg `json:"rotDeg"`
+	Color   RGB     `json:"color"`
+	Reflect RGB     `json:"reflect"`
+	Refract RGB     `json:"refract"`
+	IOR     RGB     `json:"ior"`
+}
+
+type Cell120Cfg struct {
+	Center  Point4  `json:"center"`
+	Radius  Real    `json:"radius"`
+	Scale   Vector4 `json:"scale,omitempty"`
+	RotDeg  Rot4Deg `json:"rotDeg"`
+	Color   RGB     `json:"color"`
+	Reflect RGB     `json:"reflect"`
+	Refract RGB     `json:"refract"`
+	IOR     RGB     `json:"ior"`
+}
+
+type Cell600Cfg struct {
+	Center  Point4  `json:"center"`
+	Radius  Real    `json:"radius"`
+	Scale   Vector4 `json:"scale,omitempty"`
+	RotDeg  Rot4Deg `json:"rotDeg"`
+	Color   RGB     `json:"color"`
+	Reflect RGB     `json:"reflect"`
+	Refract RGB     `json:"refract"`
+	IOR     RGB     `json:"ior"`
+}
+
 func (r Rot4Deg) Radians() Rot4 {
 	const k = math.Pi / 180
 	return Rot4{
@@ -98,7 +146,7 @@ func (hc HypercubeCfg) Build() (*HyperCube, error) {
 
 	if math.Abs(rad.XY)+math.Abs(rad.XZ)+math.Abs(rad.XW)+
 		math.Abs(rad.YZ)+math.Abs(rad.YW)+math.Abs(rad.ZW) < 1e-12 {
-		DebugLog("Hypercube rotation is ~zero; check JSON 'rotDeg' keys (xy,xz,xw,yz,yw,zw).")
+		// DebugLog("Hypercube rotation is ~zero; check JSON 'rotDeg' keys (xy,xz,xw,yz,yw,zw).")
 	}
 
 	return NewHyperCube(
@@ -150,6 +198,75 @@ func (s Simplex5Cfg) Build() (*Simplex5, error) {
 		sc.W = 1
 	}
 	return NewSimplex5(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
+}
+
+func (s SixteenCellCfg) Build() (*SixteenCell, error) {
+	rad := s.RotDeg.Radians()
+	sc := s.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	return NewSixteenCell(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
+}
+
+func (s TwentyFourCellCfg) Build() (*TwentyFourCell, error) {
+	rad := s.RotDeg.Radians()
+	sc := s.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	return NewTwentyFourCell(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
+}
+
+func (c Cell120Cfg) Build() (*Cell120, error) {
+	sc := c.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	return NewCell120(c.Center, c.Radius, sc, c.RotDeg.Radians(), c.Color, c.Reflect, c.Refract, c.IOR)
+}
+func (c Cell600Cfg) Build() (*Cell600, error) {
+	sc := c.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	return NewCell600(c.Center, c.Radius, sc, c.RotDeg.Radians(), c.Color, c.Reflect, c.Refract, c.IOR)
 }
 
 func loadConfig(path string) (*Config, error) {
