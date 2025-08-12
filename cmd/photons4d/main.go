@@ -15,6 +15,7 @@ func main() {
 
 	photons4d.Debug = os.Getenv("DEBUG") != ""
 	photons4d.UseLocks = os.Getenv("SKIP_LOCKS") == ""
+	photons4d.PNG = os.Getenv("PNG") != ""
 	profile := os.Getenv("PROFILE") != ""
 	if profile {
 		f, err := os.Create("cpu.out")

@@ -2,6 +2,7 @@ package photons4d
 
 import (
 	"math"
+	"strings"
 	"time"
 )
 
@@ -60,10 +61,19 @@ func Run(cfgPath string) error {
 		raysStats()
 	}
 
-	// Save GIF
-	if err := SaveAnimatedGIF(scene, cfg.GIFOut, cfg.GIFDelay, cfg.Gamma); err != nil {
-		panic(err)
+	if PNG {
+		prefix := strings.Replace(cfg.GIFOut, ".gif", "", 1)
+		prefix = strings.Replace(prefix, "gifs/", "pngs/", 1)
+		if err := SavePNGSequence16(scene, prefix, cfg.Gamma); err != nil {
+			panic(err)
+		}
+		DebugLog("Saved PNG sequence with prefix: %s", prefix)
+	} else {
+		// Save GIF
+		if err := SaveAnimatedGIF(scene, cfg.GIFOut, cfg.GIFDelay, cfg.Gamma); err != nil {
+			panic(err)
+		}
+		DebugLog("Saved animated GIF: %s", cfg.GIFOut)
 	}
-	DebugLog("Saved animated GIF: %s", cfg.GIFOut)
 	return nil
 }

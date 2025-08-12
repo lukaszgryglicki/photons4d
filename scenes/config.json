@@ -1,7 +1,7 @@
 {
-  "sceneResX": 1024,
-  "sceneResY": 1024,
-  "sceneResZ": 1,
+  "sceneResX": 800,
+  "sceneResY": 600,
+  "sceneResZ": 51,
   "probeRays": 65535,
   "spp": 192,
   "gifOut": "./gifs/simple.gif",
