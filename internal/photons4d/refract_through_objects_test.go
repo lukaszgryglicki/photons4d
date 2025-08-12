@@ -117,9 +117,9 @@ func TestRefractionThrough_HyperSphere(t *testing.T) {
 	}
 }
 
-func TestRefractionThrough_Simplex5(t *testing.T) {
+func TestRefractionThrough_Cell5(t *testing.T) {
 	ior := Real(1.1)
-	sx, err := NewSimplex5(
+	sx, err := NewCell5(
 		Point4{0, 0, 0, 0.6},
 		0.30,
 		Vector4{1, 1, 1, 1},
@@ -133,7 +133,7 @@ func TestRefractionThrough_Simplex5(t *testing.T) {
 	O := Point4{0, 0, 0, 0}
 	D := Vector4{0, 0, 0, 1}
 
-	h1, ok := intersectRaySimplex5(O, D, sx)
+	h1, ok := intersectRayCell5(O, D, sx)
 	if !ok || h1.inv {
 		t.Fatalf("expected entering 5-cell hit, ok=%v inv=%v", ok, h1.inv)
 	}
@@ -145,7 +145,7 @@ func TestRefractionThrough_Simplex5(t *testing.T) {
 	T1 = T1.Norm()
 
 	O2 := bumpPoint(P1, T1, bumpShift)
-	h2, ok := intersectRaySimplex5(O2, T1, sx)
+	h2, ok := intersectRayCell5(O2, T1, sx)
 	if !ok || !h2.inv {
 		t.Fatalf("expected inside->exit 5-cell hit, ok=%v inv=%v", ok, h2.inv)
 	}
@@ -161,7 +161,7 @@ func TestRefractionThrough_Simplex5(t *testing.T) {
 		t.Fatalf("not exiting outward: N·T2=%.12g", h2.Nw.Dot(T2))
 	}
 	O3 := bumpPoint(P2, T2, bumpShift)
-	if h3, ok := intersectRaySimplex5(O3, T2, sx); ok && h3.t < 1e-6 {
+	if h3, ok := intersectRayCell5(O3, T2, sx); ok && h3.t < 1e-6 {
 		t.Fatalf("ray re-entered immediately after exit")
 	}
 }

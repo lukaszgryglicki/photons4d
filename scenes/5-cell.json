@@ -23,7 +23,7 @@
       "voidLight": false
     }
   ],
-  "simplexes": [
+  "cells5": [
     {
       "center": { "X": 0.0, "Y": 0.0, "Z": 0.0, "W": 0.30 },
       "side": 0.3,

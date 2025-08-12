@@ -51,12 +51,12 @@ func Run(cfgPath string) error {
 		scene.AddHyperSphere(h)
 	}
 
-	for _, scfg := range cfg.Simplexes {
+	for _, scfg := range cfg.Cells5 {
 		sx, err := scfg.Build()
 		if err != nil {
 			continue
 		}
-		scene.AddSimplex5(sx)
+		scene.AddCell5(sx)
 	}
 
 	for _, scfg := range cfg.Cells16 {

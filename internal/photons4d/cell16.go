@@ -221,7 +221,7 @@ func NewSixteenCell(
 }
 
 func intersectRaySixteen(O Point4, D Vector4, c *SixteenCell) (hit objectHit, ok bool) {
-	// identical half-space clip as simplex
+	// identical half-space clip as cell5
 	tEnter, tExit := -1e300, 1e300
 	enterIdx, exitIdx := -1, -1
 	for i := 0; i < 16; i++ {

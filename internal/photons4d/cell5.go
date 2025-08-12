@@ -5,7 +5,7 @@ import (
 	"math"
 )
 
-// Simplex5 represents a (possibly anisotropically scaled) 4D regular simplex (5-cell).
+// Cell5 represents a (possibly anisotropically scaled) 4D regular cell5 (5-cell).
 // Build pipeline (local space):
 //  1. start from a centered regular 5-cell with canonical coordinates,
 //  2. uniformly scale to match requested side length,
@@ -15,7 +15,7 @@ import (
 //
 // We compute world-space facet planes (outward normals) from transformed vertices,
 // so normals are correct even under anisotropic scaling.
-type Simplex5 struct {
+type Cell5 struct {
 	Center  Point4
 	Side    Real    // desired edge length before per-axis Scale
 	Scale   Vector4 // per-axis scaling applied after Side
@@ -66,7 +66,7 @@ func max4(a, b, c, d Real) Real { return math.Max(math.Max(a, b), math.Max(c, d)
 // canonical regular 5-cell vertices in R^4 centered at origin.
 // Constructed from 5D {e_i - centroid} projected onto the 4D
 // subspace orthogonal to (1,1,1,1,1) via an orthonormal basis.
-func canonicalSimplex5() [5]Vector4 {
+func canonicalCell5() [5]Vector4 {
 	// Orthonormal rows (b1..b4) ⟂ (1,1,1,1,1).
 	// Each bi is length 1 and rows are mutually orthogonal.
 	B := [4][5]Real{
@@ -97,19 +97,19 @@ func canonicalSimplex5() [5]Vector4 {
 
 // ---- construction -----------------------------------------------------------
 
-func NewSimplex5(
+func NewCell5(
 	center Point4,
 	side Real,
 	scale Vector4,
 	angles Rot4, // radians
 	color, reflectivity, refractivity, ior RGB,
-) (*Simplex5, error) {
+) (*Cell5, error) {
 	if !(side > 0) {
-		return nil, fmt.Errorf("simplex side must be > 0, got %.6g", side)
+		return nil, fmt.Errorf("cell5 side must be > 0, got %.6g", side)
 	}
 	// validate scale
 	if !(scale.X > 0 && scale.Y > 0 && scale.Z > 0 && scale.W > 0) {
-		return nil, fmt.Errorf("simplex per-axis scale must be > 0 on all axes, got %+v", scale)
+		return nil, fmt.Errorf("cell5 per-axis scale must be > 0 on all axes, got %+v", scale)
 	}
 	in01 := func(x Real) bool { return x >= 0 && x <= 1 }
 	type ch struct {
@@ -136,7 +136,7 @@ func NewSimplex5(
 	sx, sy, sz, sw := scale.X, scale.Y, scale.Z, scale.W
 
 	// canonical vertices (centered at origin)
-	V := canonicalSimplex5()
+	V := canonicalCell5()
 	// base edge length
 	base := V[0].Sub(V[1]).Len()
 	u := side / base
@@ -166,7 +166,7 @@ func NewSimplex5(
 		maxW = math.Max(maxW, Wv[i].W)
 	}
 
-	sx4 := &Simplex5{
+	sx4 := &Cell5{
 		Center:  center,
 		Side:    side,
 		Scale:   scale,
@@ -247,7 +247,7 @@ func NewSimplex5(
 
 // intersect ray with a convex 4D polytope defined by planes N·x <= d (N outward).
 // Returns first positive intersection if starting outside, or the exit if starting inside.
-func intersectRaySimplex5(O Point4, D Vector4, s *Simplex5) (hit objectHit, ok bool) {
+func intersectRayCell5(O Point4, D Vector4, s *Cell5) (hit objectHit, ok bool) {
 	// Slab-like half-space clipping across planes
 	tEnter := -1e300
 	tExit := 1e300
@@ -288,7 +288,7 @@ func intersectRaySimplex5(O Point4, D Vector4, s *Simplex5) (hit objectHit, ok b
 	}
 
 	if tExit < 1e-12 && tEnter < 1e-12 {
-		// simplex is entirely behind or we're touching at origin; treat as no hit
+		// cell5 is entirely behind or we're touching at origin; treat as no hit
 		return objectHit{}, false
 	}
 	if tEnter > tExit {

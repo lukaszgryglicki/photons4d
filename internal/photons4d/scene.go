@@ -9,7 +9,7 @@ type Scene struct {
 	Buf                  []Real // flat: (((i*Ny)+j)*Nz + k)*3 + c
 	Hypercubes           []*HyperCube
 	Hyperspheres         []*HyperSphere
-	Simplexes            []*Simplex5
+	Cells5               []*Cell5
 	Cells16              []*SixteenCell
 	Cells24              []*TwentyFourCell
 	Cells120             []*Cell120
@@ -117,8 +117,8 @@ func (s *Scene) AddHyperSphere(h *HyperSphere) {
 	s.Hyperspheres = append(s.Hyperspheres, h)
 }
 
-func (s *Scene) AddSimplex5(h *Simplex5) {
-	s.Simplexes = append(s.Simplexes, h)
+func (s *Scene) AddCell5(h *Cell5) {
+	s.Cells5 = append(s.Cells5, h)
 }
 
 func (s *Scene) AddSixteenCell(h *SixteenCell) {

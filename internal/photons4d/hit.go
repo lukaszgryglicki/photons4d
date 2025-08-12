@@ -9,7 +9,7 @@ type objectHit struct {
 	Nw   Vector4
 	hc   *HyperCube
 	hs   *HyperSphere
-	s5   *Simplex5
+	s5   *Cell5
 	c16  *SixteenCell
 	c24  *TwentyFourCell
 	poly *cellPoly // for 120/600 cells
@@ -203,12 +203,12 @@ func nearestHit(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) 
 		}
 	}
 
-	// simplexes (5-cell)
-	for _, s := range scene.Simplexes {
+	// (5-cell)
+	for _, s := range scene.Cells5 {
 		if ok, tNear := rayAABB(O, s.AABBMin, s.AABBMax, rr); !ok || tNear > bestT {
 			continue
 		}
-		if hit, ok := intersectRaySimplex5(O, D, s); ok && hit.t > 1e-12 && hit.t < bestT {
+		if hit, ok := intersectRayCell5(O, D, s); ok && hit.t > 1e-12 && hit.t < bestT {
 			bestT, best, okAny = hit.t, hit, true
 		}
 	}

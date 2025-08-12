@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestNewSimplex5AndIntersect(t *testing.T) {
-	sx, err := NewSimplex5(
+func TestNewCell5AndIntersect(t *testing.T) {
+	sx, err := NewCell5(
 		Point4{0, 0, 0, 0.25}, // slightly in front of scene plane
 		0.4,                   // edge length
 		Vector4{1, 1, 1, 1},   // no anisotropic scale
@@ -14,14 +14,14 @@ func TestNewSimplex5AndIntersect(t *testing.T) {
 		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{1.2, 1.2, 1.2},
 	)
 	if err != nil {
-		t.Fatalf("NewSimplex5: %v", err)
+		t.Fatalf("NewCell5: %v", err)
 	}
 	// Simple axis ray along +W from origin
 	O := Point4{0, 0, 0, 0}
 	D := Vector4{0, 0, 0, 1}
-	h, ok := intersectRaySimplex5(O, D, sx)
+	h, ok := intersectRayCell5(O, D, sx)
 	if !ok {
-		t.Fatalf("expected simplex hit")
+		t.Fatalf("expected cell5 hit")
 	}
 	if h.t <= 0 {
 		t.Fatalf("t must be positive, got %.12g", h.t)
@@ -34,14 +34,14 @@ func TestNewSimplex5AndIntersect(t *testing.T) {
 	// Start inside: shoot from (near) center outward
 	O2 := sx.Center
 	D2 := Vector4{0, 0, 0, 1}
-	h2, ok2 := intersectRaySimplex5(O2, D2, sx)
+	h2, ok2 := intersectRayCell5(O2, D2, sx)
 	if !ok2 || !h2.inv {
 		t.Fatalf("expected inside->exit hit; ok=%v inv=%v", ok2, h2.inv)
 	}
 }
 
-func TestSceneAABBWithSimplex(t *testing.T) {
-	sx, err := NewSimplex5(
+func TestSceneAABBWithCell5(t *testing.T) {
+	sx, err := NewCell5(
 		Point4{0.1, -0.2, 0.05, 0.3},
 		0.25,
 		Vector4{1.2, 0.9, 1.1, 0.8},

@@ -142,7 +142,7 @@ func (cp *cellPoly) materialFrom(color, refl, refr, ior RGB) {
 	}
 }
 
-// intersection by half-space clipping (like simplex)
+// intersection by half-space clipping (like cell5)
 func intersectRayCellPoly(O Point4, D Vector4, cp *cellPoly) (objectHit, bool) {
 	tEnter := -1e300
 	tExit := 1e300

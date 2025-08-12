@@ -36,7 +36,7 @@ type Config struct {
 	Lights       []LightCfg          `json:"lights"`
 	Hypercubes   []HypercubeCfg      `json:"hypercubes,omitempty"`
 	Hyperspheres []HyperSphereCfg    `json:"hyperspheres,omitempty"`
-	Simplexes    []Simplex5Cfg       `json:"simplexes,omitempty"`
+	Cells5       []Cell5Cfg          `json:"cells5,omitempty"`
 	Cells16      []SixteenCellCfg    `json:"cells16,omitempty"`
 	Cells24      []TwentyFourCellCfg `json:"cells24,omitempty"`
 	Cells120     []Cell120Cfg        `json:"cells120,omitempty"`
@@ -76,7 +76,7 @@ type HyperSphereCfg struct {
 	IOR     RGB `json:"ior"`
 }
 
-type Simplex5Cfg struct {
+type Cell5Cfg struct {
 	Center Point4  `json:"center"`
 	Side   Real    `json:"side"`            // edge length before per-axis Scale
 	Scale  Vector4 `json:"scale,omitempty"` // defaults 1 on each axis
@@ -182,7 +182,7 @@ func (hs HyperSphereCfg) Build() (*HyperSphere, error) {
 	return NewHyperSphere(hs.Center, radii, rad, hs.Color, hs.Reflect, hs.Refract, hs.IOR)
 }
 
-func (s Simplex5Cfg) Build() (*Simplex5, error) {
+func (s Cell5Cfg) Build() (*Cell5, error) {
 	rad := s.RotDeg.Radians()
 	sc := s.Scale
 	if sc.X == 0 {
@@ -197,7 +197,7 @@ func (s Simplex5Cfg) Build() (*Simplex5, error) {
 	if sc.W == 0 {
 		sc.W = 1
 	}
-	return NewSimplex5(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
+	return NewCell5(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
 }
 
 func (s SixteenCellCfg) Build() (*SixteenCell, error) {
