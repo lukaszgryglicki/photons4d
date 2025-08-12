@@ -48,6 +48,7 @@ func Run(cfgPath string) error {
 	for i, L := range lights {
 		p := estimateHitProb(L, scene, cfg.ProbeRays)
 		if p < 1e-7 {
+			DebugLog("Light #%d, hit probability too low: %.12f, setting to 1e-7", i, p)
 			p = 1e-7
 		}
 		need := int(3 * Real(cfg.Spp) * Real(Nvox) / p)
@@ -56,7 +57,7 @@ func Run(cfgPath string) error {
 		}
 		needRays[i] = need
 		totalRays += need
-		DebugLog("Light #%d, needs: %d rays", i, need)
+		DebugLog("Light #%d, needs: %d rays, scene hit probability %.12f", i, need, p)
 	}
 	DebugLog("Total rays needed: %d", totalRays)
 
