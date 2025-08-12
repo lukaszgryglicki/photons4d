@@ -141,21 +141,24 @@ func (r Rot4Deg) Radians() Rot4 {
 // Build validates and constructs the runtime object (no defaults).
 func (hc Cell8Cfg) Build() (*Cell8, error) {
 	rad := hc.RotDeg.Radians()
-
 	if math.Abs(rad.XY)+math.Abs(rad.XZ)+math.Abs(rad.XW)+
 		math.Abs(rad.YZ)+math.Abs(rad.YW)+math.Abs(rad.ZW) < 1e-12 {
 		// DebugLog("Cell8 rotation is ~zero; check JSON 'rotDeg' keys (xy,xz,xw,yz,yw,zw).")
 	}
-
-	return NewCell8(
-		hc.Center,
-		hc.Scale,
-		rad,
-		hc.Color,
-		hc.Reflect,
-		hc.Refract,
-		hc.IOR,
-	)
+	sc := hc.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	return NewCell8(hc.Center, sc, rad, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
 }
 
 func (hs HyperSphereCfg) Build() (*HyperSphere, error) {

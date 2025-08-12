@@ -24,12 +24,12 @@ func TestCell8CfgBuildAndValidation(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	// Invalid size
-	_, err = (Cell8Cfg{
+	h2, err := (Cell8Cfg{
 		Center: Point4{}, Scale: Vector4{0, 1, 1, 1},
 		RotDeg: Rot4Deg{}, Color: RGB{1, 1, 1}, Reflect: RGB{0, 0, 0}, Refract: RGB{1, 1, 1}, IOR: RGB{1.1, 1.1, 1.1},
 	}).Build()
-	if err == nil {
-		t.Fatal("expected error for zero size")
+	if h2.Half != (Vector4{.5, .5, .5, .5}) {
+		t.Fatalf("Scale defaults failed: %+v", h2.Half)
 	}
 }
 

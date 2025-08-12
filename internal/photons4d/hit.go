@@ -7,9 +7,9 @@ import (
 type objectHit struct {
 	t    Real
 	Nw   Vector4
-	hc   *Cell8
 	hs   *HyperSphere
 	s5   *Cell5
+	hc   *Cell8
 	c16  *Cell16
 	c24  *Cell24
 	poly *cellPoly // for 120/600 cells
