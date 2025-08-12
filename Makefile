@@ -25,4 +25,4 @@ profile: runprofile
 	go tool pprof -text cpu.out > cpu.out.txt && cat cpu.out.txt
 
 clean:
-	rm -f $(BIN) cpu.out out
+	rm -f $(BIN) cpu.out.txt cpu.out out
