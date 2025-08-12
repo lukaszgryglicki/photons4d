@@ -1,6 +1,5 @@
 package photons4d
 
-/*
 import (
 	"math"
 	"testing"
@@ -34,8 +33,11 @@ func anyTangent(N Vector4) Vector4 {
 
 func TestReflect4_Properties(t *testing.T) {
 	normals := []Vector4{
-		{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1},
-		{1, 2, 3, 4}.Norm(),
+		Vector4{1, 0, 0, 0},
+		Vector4{0, 1, 0, 0},
+		Vector4{0, 0, 1, 0},
+		Vector4{0, 0, 0, 1},
+		Vector4{1, 2, 3, 4}.Norm(),
 	}
 	angles := []Real{math.Pi / 6, math.Pi / 3} // 30°, 60°
 
@@ -144,10 +146,75 @@ func TestRefract4_TIR(t *testing.T) {
 	}
 }
 
+func TestReflect4_DoubleReflectionIdentity(t *testing.T) {
+	normals := []Vector4{
+		Vector4{1, 0, 0, 0},
+		Vector4{0, 1, 0, 0},
+		Vector4{0, 0, 1, 0},
+		Vector4{0, 0, 0, 1},
+		Vector4{1, 2, 3, 4}.Norm(),
+	}
+	angles := []Real{5 * math.Pi / 180, math.Pi / 6, math.Pi / 3, 3 * math.Pi / 4}
+
+	for _, N := range normals {
+		Tt := anyTangent(N)
+		for _, a := range angles {
+			I := N.Mul(-Real(math.Cos(a))).Add(Tt.Mul(Real(math.Sin(a))))
+			R1 := reflect4(I, N)
+			R2 := reflect4(R1, N)
+			if !vecAlmostEq(I, R2, 1e-12) {
+				t.Fatalf("double reflection not identity: |I-R2|=%.15g", vecLen(I.Sub(R2)))
+			}
+		}
+	}
+}
+
+func TestReflect4_NormalSignIrrelevant(t *testing.T) {
+	normals := []Vector4{
+		Vector4{1, 0, 0, 0},
+		Vector4{0, 1, 0, 0},
+		Vector4{0, 0, 1, 0},
+		Vector4{0, 0, 0, 1},
+		Vector4{-1, 2, -3, 4}.Norm(),
+	}
+	a := Real(37 * math.Pi / 180)
+
+	for _, N := range normals {
+		Tt := anyTangent(N)
+		I := N.Mul(-Real(math.Cos(a))).Add(Tt.Mul(Real(math.Sin(a))))
+		Rp := reflect4(I, N)
+		Rm := reflect4(I, N.Mul(-1))
+		if !vecAlmostEq(Rp, Rm, 1e-12) {
+			t.Fatalf("reflection depends on normal sign: |Rp-Rm|=%.15g", vecLen(Rp.Sub(Rm)))
+		}
+	}
+}
+
+func TestReflect4_GrazingIncidence(t *testing.T) {
+	// At ~90° incidence, only the normal component flips:
+	// I = T - cos(a)N, R = T + cos(a)N  ⇒  ||I-R|| = 2 cos(a)
+	N := Vector4{0, 0, 0, 1}
+	Tt := anyTangent(N)
+	a := Real(89.999 * math.Pi / 180)
+	I := N.Mul(-Real(math.Cos(a))).Add(Tt.Mul(Real(math.Sin(a)))).Norm()
+	R := reflect4(I, N)
+	got := vecLen(I.Sub(R))
+	ca := Real(math.Cos(float64(a)))
+	want := 2 * ca
+	tol := 1e-12 + 1e-9*want
+	if !nearly(got, want, tol) {
+		t.Fatalf("grazing incidence magnitude: ||I-R||=%.15g, want %.15g (2*cos a)", got, want)
+	}
+	// Equivalent dot-product check: I·R = 1 - 2 cos^2(a)
+	wantDot := 1 - 2*ca*ca
+	if !nearly(I.Dot(R), wantDot, 1e-12) {
+		t.Fatalf("grazing incidence dot: I·R=%.15g, want %.15g", I.Dot(R), wantDot)
+	}
+}
+
 func max(a, b Real) Real {
 	if a > b {
 		return a
 	}
 	return b
 }
-*/
