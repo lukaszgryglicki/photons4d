@@ -19,6 +19,7 @@ func Run(cfgPath string) error {
 			imax(cfg.SceneResZ>>2, 1),
 			imax(cfg.Spp>>2, 4),
 			imax(cfg.Scene.MaxBounces>>1, 8)
+		cfg.GIFOut = strings.Replace(cfg.GIFOut, ".gif", "_debug.gif", 1)
 		DebugLog("Debug mode: reduced resolution to %d x %d x %d, spp to %d and max bounces to %d", cfg.SceneResX, cfg.SceneResY, cfg.SceneResZ, cfg.Spp, cfg.Scene.MaxBounces)
 	}
 
