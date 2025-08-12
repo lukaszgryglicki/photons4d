@@ -1,7 +1,7 @@
 BIN := photons4d
 CMD := ./cmd/photons4d
 
-.PHONY: all build release run fmt runprofile profile clean
+.PHONY: all build release run fmt race runprofile profile clean
 
 all: build
 
@@ -20,6 +20,9 @@ runprofile: release
 
 fmt:
 	go fmt ./...
+
+race:
+	go build -race -tags debug -o $(BIN) $(CMD)
 
 profile: runprofile
 	go tool pprof -text cpu.out > cpu.out.txt && cat cpu.out.txt

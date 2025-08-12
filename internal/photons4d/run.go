@@ -16,20 +16,18 @@ func Run(cfgPath string) error {
 	scene := NewScene(cfg.Scene.Center, cfg.Scene.Width, cfg.Scene.Height, cfg.Scene.Depth, Nx, Ny, Nz, cfg.Scene.MaxBounces)
 
 	lights := make([]*Light, 0, len(cfg.Lights))
-	for i, Lc := range cfg.Lights {
+	for _, Lc := range cfg.Lights {
 		angle := Lc.AngleDeg * math.Pi / 180.0
 		L, err := NewLight(Lc.Origin, Lc.Direction, Lc.Color, angle, Lc.VoidLight)
 		if err != nil {
 			return err
 		}
-		_ = i
 		lights = append(lights, L)
 	}
 
-	for i, hc := range cfg.Hypercubes {
+	for _, hc := range cfg.Hypercubes {
 		h, err := hc.Build()
 		if err != nil {
-			_ = i // keep if you print debug
 			continue
 		}
 		scene.AddHypercube(h)
@@ -39,7 +37,6 @@ func Run(cfgPath string) error {
 	needRays := make([]int, len(lights))
 	totalRays := 0
 	for i, L := range lights {
-		_ = i
 		p := estimateHitProb(L, scene, cfg.ProbeRays)
 		if p < 1e-7 {
 			p = 1e-7
