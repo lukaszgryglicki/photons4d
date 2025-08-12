@@ -36,7 +36,7 @@ out
 *.log
 *.swp
 ._*
-photons4d
+/photons4d
 *-old.go
 cpu.out
 cpu.out.txt

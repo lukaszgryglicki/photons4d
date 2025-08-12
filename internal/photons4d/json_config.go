@@ -1,0 +1,130 @@
+package photons4d
+
+import (
+	"encoding/json"
+	"fmt"
+	"math"
+	"os"
+)
+
+type SceneCfg struct {
+	Center     Point4 `json:"center"`
+	Width      Real   `json:"width"`
+	Height     Real   `json:"height"`
+	Depth      Real   `json:"depth"`
+	MaxBounces int    `json:"maxBounces,omitempty"`
+}
+
+type LightCfg struct {
+	Origin    Point4  `json:"origin"`
+	Direction Vector4 `json:"direction"`
+	VoidLight bool    `json:"voidLight,omitempty"`
+	Color     RGB     `json:"color"`
+	AngleDeg  Real    `json:"angleDeg"`
+}
+
+type Config struct {
+	SceneResX  int            `json:"sceneResX"`
+	SceneResY  int            `json:"sceneResY"`
+	SceneResZ  int            `json:"sceneResZ"`
+	ProbeRays  int            `json:"probeRays"`
+	Spp        int            `json:"spp"`
+	GIFOut     string         `json:"gifOut"`
+	GIFDelay   int            `json:"gifDelay,omitempty"`
+	Gamma      Real           `json:"gamma,omitempty"`
+	Scene      SceneCfg       `json:"scene"`
+	Lights     []LightCfg     `json:"lights"`
+	Hypercubes []HypercubeCfg `json:"hypercubes,omitempty"`
+}
+
+// Rotation in degrees for JSON (friendlier than radians).
+type Rot4Deg struct {
+	XY Real `json:"xy"`
+	XZ Real `json:"xz"`
+	XW Real `json:"xw"`
+	YZ Real `json:"yz"`
+	YW Real `json:"yw"`
+	ZW Real `json:"zw"`
+}
+
+type HypercubeCfg struct {
+	Center Point4  `json:"center"`
+	Size   Vector4 `json:"size"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+// Build validates and constructs the runtime object (no defaults).
+func (hc HypercubeCfg) Build() (*HyperCube, error) {
+	rad := hc.RotDeg.Radians()
+
+	if math.Abs(rad.XY)+math.Abs(rad.XZ)+math.Abs(rad.XW)+
+		math.Abs(rad.YZ)+math.Abs(rad.YW)+math.Abs(rad.ZW) < 1e-12 {
+		DebugLog("Hypercube rotation is ~zero; check JSON 'rotDeg' keys (xy,xz,xw,yz,yw,zw).")
+	}
+
+	return NewHyperCube(
+		hc.Center,
+		hc.Size,
+		rad,
+		hc.Color,
+		hc.Reflect,
+		hc.Refract,
+		hc.IOR,
+	)
+}
+
+func (r Rot4Deg) Radians() Rot4 {
+	const k = math.Pi / 180
+	return Rot4{
+		XY: r.XY * k, XZ: r.XZ * k, XW: r.XW * k,
+		YZ: r.YZ * k, YW: r.YW * k, ZW: r.ZW * k,
+	}
+}
+
+func loadConfig(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+	// Defaults / validation
+	if cfg.SceneResX <= 0 {
+		cfg.SceneResX = SceneResX
+	}
+	if cfg.SceneResY <= 0 {
+		cfg.SceneResY = SceneResY
+	}
+	if cfg.SceneResZ <= 0 {
+		cfg.SceneResZ = SceneResZ
+	}
+	if cfg.ProbeRays <= 0 {
+		cfg.ProbeRays = ProbeRays
+	}
+	if cfg.Spp <= 0 {
+		cfg.Spp = Spp
+	}
+	if cfg.GIFOut == "" {
+		cfg.GIFOut = GIFOut
+	}
+	if cfg.GIFDelay <= 0 {
+		cfg.GIFDelay = GIFDelay
+	}
+	if cfg.Gamma <= 0 {
+		cfg.Gamma = Gamma
+	}
+	if len(cfg.Lights) == 0 {
+		return nil, fmt.Errorf("config has no lights")
+	}
+	if cfg.Scene.MaxBounces <= 0 {
+		cfg.Scene.MaxBounces = MaxBounces
+	}
+	return &cfg, nil
+}

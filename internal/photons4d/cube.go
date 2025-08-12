@@ -1,0 +1,257 @@
+package photons4d
+
+import (
+	"fmt"
+	"math"
+)
+
+// HyperCube: axis-aligned box in local space, then rotated about origin and translated to Center.
+// 'Half' are half-lengths along the local X,Y,Z,W axes.
+// pAbs = 1 - (reflect + refract) (per channel). That’s your absorption knob.
+// The non-absorption budget (avail = reflect + refract) gets split each hit by
+// Fresnel–Schlick (angle-dependent), biased by your reflect/refract to steer it.
+// color tints whatever survives (both reflected and refracted) per interaction.
+// ior (per channel) sets Fresnel strength and dispersion (B > G > R ⇒ stronger “prism”).
+
+type HyperCube struct {
+	Center Point4
+	Half   Vector4 // half-sizes: Lx/2, Ly/2, Lz/2, Lw/2
+	R      Mat4    // local->world rotation
+	RT     Mat4    // world->local rotation (R^T, since R is orthonormal)
+
+	// Material (per-channel):
+	Color   RGB // tint/filter applied to reflected & refracted energy
+	Reflect RGB // fraction reflected per channel (0..1)
+	Refract RGB // fraction refracted per channel (0..1)
+	IOR     RGB // index of refraction inside cube per channel
+
+	// cached
+	Normals  [4]Vector4 // world-space unit normals for +X,+Y,+Z,+W faces
+	AABBMin  Point4     // conservative 4D AABB (min)
+	AABBMax  Point4     // conservative 4D AABB (max)
+	refl     [3]Real    // [R,G,B]
+	refr     [3]Real    // [R,G,B]
+	colorArr [3]Real    // [R,G,B]
+	iorArr   [3]Real    // [R,G,B]
+	iorInv   [3]Real    // [1/R, 1/G, 1/B]
+	pAbs     [3]Real    // 1 - refl - refr (clamped ≥ 0)
+	f0       [3]Real    // Schlick F0 per channel = ((ior-1)/(ior+1))^2
+}
+
+// NewHyperCube constructs a hypercube and precomputes caches.
+func NewHyperCube(
+	center Point4,
+	size Vector4, // full edge lengths
+	angles Rot4, // radians
+	color, reflectivity, refractivity, ior RGB,
+) (*HyperCube, error) {
+	if !(size.X > 0 && size.Y > 0 && size.Z > 0 && size.W > 0) {
+		return nil, fmt.Errorf("hypercube size must be >0 on all axes, got %+v", size)
+	}
+	in01 := func(x Real) bool { return x >= 0 && x <= 1 }
+
+	type ch struct {
+		n    string
+		r, t Real
+	}
+	chk := []ch{
+		{"R", reflectivity.R, refractivity.R},
+		{"G", reflectivity.G, refractivity.G},
+		{"B", reflectivity.B, refractivity.B},
+	}
+	for _, c := range chk {
+		if !in01(c.r) || !in01(c.t) {
+			return nil, fmt.Errorf("reflect/refract must be in [0,1]; channel %s got reflect=%.6g refract=%.6g", c.n, c.r, c.t)
+		}
+		if c.r+c.t > 1+1e-12 {
+			return nil, fmt.Errorf("per-channel reflect+refract must be ≤1; channel %s got %.6g", c.n, c.r+c.t)
+		}
+	}
+	if !(ior.R > 0 && ior.G > 0 && ior.B > 0) {
+		return nil, fmt.Errorf("IOR must be > 0 per channel; got %+v", ior)
+	}
+
+	R := rotFromAngles(angles)
+	hc := HyperCube{
+		Center: center,
+		Half:   Vector4{size.X * 0.5, size.Y * 0.5, size.Z * 0.5, size.W * 0.5},
+		R:      R,
+		RT:     R.Transpose(),
+
+		Color:   color,
+		Reflect: reflectivity,
+		Refract: refractivity,
+		IOR:     ior,
+	}
+
+	// world normals = columns of R (already unit)
+	hc.Normals[0] = Vector4{R.M[0][0], R.M[1][0], R.M[2][0], R.M[3][0]}
+	hc.Normals[1] = Vector4{R.M[0][1], R.M[1][1], R.M[2][1], R.M[3][1]}
+	hc.Normals[2] = Vector4{R.M[0][2], R.M[1][2], R.M[2][2], R.M[3][2]}
+	hc.Normals[3] = Vector4{R.M[0][3], R.M[1][3], R.M[2][3], R.M[3][3]}
+
+	// precompute AABB by projecting extents
+	abs := func(x Real) Real {
+		if x < 0 {
+			return -x
+		}
+		return x
+	}
+	extent := func(row int) (min, max Real) {
+		off := abs(R.M[row][0])*hc.Half.X + abs(R.M[row][1])*hc.Half.Y + abs(R.M[row][2])*hc.Half.Z + abs(R.M[row][3])*hc.Half.W
+		var c Real
+		switch row {
+		case 0:
+			c = hc.Center.X
+		case 1:
+			c = hc.Center.Y
+		case 2:
+			c = hc.Center.Z
+		default:
+			c = hc.Center.W
+		}
+		return c - off, c + off
+	}
+	minX, maxX := extent(0)
+	minY, maxY := extent(1)
+	minZ, maxZ := extent(2)
+	minW, maxW := extent(3)
+	hc.AABBMin = Point4{minX, minY, minZ, minW}
+	hc.AABBMax = Point4{maxX, maxY, maxZ, maxW}
+
+	// material arrays
+	hc.refl = [3]Real{reflectivity.R, reflectivity.G, reflectivity.B}
+	hc.refr = [3]Real{refractivity.R, refractivity.G, refractivity.B}
+	hc.colorArr = [3]Real{color.R, color.G, color.B}
+	hc.iorArr = [3]Real{ior.R, ior.G, ior.B}
+	for i := 0; i < 3; i++ {
+		p := 1 - hc.refl[i] - hc.refr[i]
+		if p < 0 {
+			p = 0
+		}
+		hc.pAbs[i] = p
+		hc.iorInv[i] = 1 / hc.iorArr[i]
+		// Fresnel-Schlick F0 for air(1.0) <-> material(ior)
+		n := hc.iorArr[i]
+		r0 := (n - 1) / (n + 1)
+		hc.f0[i] = r0 * r0
+	}
+
+	// DebugLog("Created HyperCube: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
+	DebugLog("Created hypercube: %+v", &hc)
+	return &hc, nil
+}
+
+func intersectRayHypercube(O Point4, D Vector4, h *HyperCube) (hit cubeHit, ok bool) {
+	// world -> local
+	Op := Vector4{O.X - h.Center.X, O.Y - h.Center.Y, O.Z - h.Center.Z, O.W - h.Center.W}
+	Ol := h.RT.MulVec(Op)
+	Dl := h.RT.MulVec(D)
+
+	const inf = 1e300
+	tmin, tmax := -inf, inf
+	enterAxis, enterSign := -1, 0
+	exitAxis, exitSign := -1, 0
+
+	axis := func(o, d, half Real, ax int) (bool, Real, Real, int, int, int, int) {
+		const eps = 1e-12
+		if math.Abs(d) < eps {
+			if math.Abs(o) > half {
+				return false, 0, 0, 0, 0, 0, 0
+			}
+			return true, -inf, inf, 0, 0, 0, 0
+		}
+		t1 := (-half - o) / d
+		t2 := (half - o) / d
+		sgnEnter := -1
+		sgnExit := +1
+		if t1 > t2 {
+			t1, t2 = t2, t1
+			sgnEnter, sgnExit = +1, -1
+		}
+		return true, t1, t2, ax, sgnEnter, ax, sgnExit
+	}
+
+	okX, a1, a2, eAx1, eSg1, xAx1, xSg1 := axis(Ol.X, Dl.X, h.Half.X, 0)
+	if !okX {
+		return cubeHit{}, false
+	}
+	okY, b1, b2, eAx2, eSg2, xAx2, xSg2 := axis(Ol.Y, Dl.Y, h.Half.Y, 1)
+	if !okY {
+		return cubeHit{}, false
+	}
+	okZ, c1, c2, eAx3, eSg3, xAx3, xSg3 := axis(Ol.Z, Dl.Z, h.Half.Z, 2)
+	if !okZ {
+		return cubeHit{}, false
+	}
+	okW, d1, d2, eAx4, eSg4, xAx4, xSg4 := axis(Ol.W, Dl.W, h.Half.W, 3)
+	if !okW {
+		return cubeHit{}, false
+	}
+
+	type slab struct {
+		t1, t2             Real
+		eAx, eSg, xAx, xSg int
+	}
+	sl := []slab{
+		{a1, a2, eAx1, eSg1, xAx1, xSg1},
+		{b1, b2, eAx2, eSg2, xAx2, xSg2},
+		{c1, c2, eAx3, eSg3, xAx3, xSg3},
+		{d1, d2, eAx4, eSg4, xAx4, xSg4},
+	}
+	for _, s := range sl {
+		if s.t1 > tmin {
+			tmin, enterAxis, enterSign = s.t1, s.eAx, s.eSg
+		}
+		if s.t2 < tmax {
+			tmax, exitAxis, exitSign = s.t2, s.xAx, s.xSg
+		}
+	}
+	if tmax < 0 || tmin > tmax {
+		return cubeHit{}, false
+	}
+
+	inv := tmin < 0 && tmax > 0
+	var t Real
+	ax, sg := 0, 0
+	if !inv {
+		t, ax, sg = tmin, enterAxis, enterSign // entering
+	} else {
+		t, ax, sg = tmax, exitAxis, exitSign // exiting
+	}
+
+	// pick cached world normal (unit), flip by sign
+	Nw := h.Normals[ax]
+	if sg < 0 {
+		Nw = Nw.Mul(-1)
+	}
+
+	return cubeHit{t: t, Nw: Nw, hc: h, inv: inv}, true
+}
+
+func nearestCube(scene *Scene, O Point4, D Vector4, tMax Real) (cubeHit, bool) {
+	best := cubeHit{}
+	okAny := false
+	bestT := tMax
+	if !isFinite(bestT) {
+		bestT = 1e300
+	}
+
+	const eps = 1e-12
+	rr := rayRecips{
+		invX: 1 / D.X, invY: 1 / D.Y, invZ: 1 / D.Z, invW: 1 / D.W,
+		parX: math.Abs(D.X) < eps, parY: math.Abs(D.Y) < eps,
+		parZ: math.Abs(D.Z) < eps, parW: math.Abs(D.W) < eps,
+	}
+
+	for _, h := range scene.Hypercubes {
+		// early-out with tMax using the same AABB test
+		if ok, tNear := rayAABB(O, h.AABBMin, h.AABBMax, rr); !ok || tNear > bestT {
+			continue
+		}
+		if hit, ok := intersectRayHypercube(O, D, h); ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
+	return best, okAny
+}
