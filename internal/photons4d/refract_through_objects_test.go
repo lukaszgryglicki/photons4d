@@ -166,10 +166,10 @@ func TestRefractionThrough_Cell5(t *testing.T) {
 	}
 }
 
-func TestRefractionThrough_SixteenCell(t *testing.T) {
-	// Requires NewSixteenCell + intersectRaySixteen to be implemented.
+func TestRefractionThrough_Cell16(t *testing.T) {
+	// Requires NewCell16 + intersectRayCell16 to be implemented.
 	ior := Real(1.1)
-	c16, err := NewSixteenCell(
+	c16, err := NewCell16(
 		Point4{0, 0, 0, 0.6},
 		0.30,
 		Vector4{1, 1, 1, 1},
@@ -183,7 +183,7 @@ func TestRefractionThrough_SixteenCell(t *testing.T) {
 	O := Point4{0, 0, 0, 0}
 	D := Vector4{0, 0, 0, 1}
 
-	h1, ok := intersectRaySixteen(O, D, c16)
+	h1, ok := intersectRayCell16(O, D, c16)
 	if !ok || h1.inv {
 		t.Fatalf("expected entering 16-cell hit, ok=%v inv=%v", ok, h1.inv)
 	}
@@ -195,7 +195,7 @@ func TestRefractionThrough_SixteenCell(t *testing.T) {
 	T1 = T1.Norm()
 
 	O2 := bumpPoint(P1, T1, bumpShift)
-	h2, ok := intersectRaySixteen(O2, T1, c16)
+	h2, ok := intersectRayCell16(O2, T1, c16)
 	if !ok || !h2.inv {
 		t.Fatalf("expected inside->exit 16-cell hit, ok=%v inv=%v", ok, h2.inv)
 	}
@@ -211,7 +211,7 @@ func TestRefractionThrough_SixteenCell(t *testing.T) {
 		t.Fatalf("not exiting outward: N·T2=%.12g", h2.Nw.Dot(T2))
 	}
 	O3 := bumpPoint(P2, T2, bumpShift)
-	if h3, ok := intersectRaySixteen(O3, T2, c16); ok && h3.t < 1e-6 {
+	if h3, ok := intersectRayCell16(O3, T2, c16); ok && h3.t < 1e-6 {
 		t.Fatalf("ray re-entered immediately after exit")
 	}
 }

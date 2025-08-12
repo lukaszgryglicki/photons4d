@@ -5,11 +5,11 @@ import (
 	"math"
 )
 
-// SixteenCell: regular 4D cross-polytope (16 facets, 8 vertices).
+// Cell16: regular 4D cross-polytope (16 facets, 8 vertices).
 // Build: canonical ±e_i -> uniform edge scale -> per-axis scale -> rotate -> translate.
 // Facets are given by sign-vectors s∈{±1}^4 with planes s·x = 1 in canonical space.
 // We transform planes via A^{-T} with A = R * diag(scale), and set d by max over world verts.
-type SixteenCell struct {
+type Cell16 struct {
 	Center  Point4
 	Side    Real
 	Scale   Vector4
@@ -67,13 +67,13 @@ func signVectors16() [16]Vector4 {
 	return out
 }
 
-func NewSixteenCell(
+func NewCell16(
 	center Point4,
 	side Real,
 	scale Vector4,
 	angles Rot4,
 	color, reflectivity, refractivity, ior RGB,
-) (*SixteenCell, error) {
+) (*Cell16, error) {
 	if !(side > 0) {
 		return nil, fmt.Errorf("16-cell side must be > 0, got %.6g", side)
 	}
@@ -156,7 +156,7 @@ func NewSixteenCell(
 		}
 	}
 
-	c := &SixteenCell{
+	c := &Cell16{
 		Center:  center,
 		Side:    side,
 		Scale:   scale,
@@ -220,7 +220,7 @@ func NewSixteenCell(
 	return c, nil
 }
 
-func intersectRaySixteen(O Point4, D Vector4, c *SixteenCell) (hit objectHit, ok bool) {
+func intersectRayCell16(O Point4, D Vector4, c *Cell16) (hit objectHit, ok bool) {
 	// identical half-space clip as cell5
 	tEnter, tExit := -1e300, 1e300
 	enterIdx, exitIdx := -1, -1

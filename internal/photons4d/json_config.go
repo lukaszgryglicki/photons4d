@@ -37,7 +37,7 @@ type Config struct {
 	Hyperspheres []HyperSphereCfg    `json:"hyperspheres,omitempty"`
 	Cells5       []Cell5Cfg          `json:"cells5,omitempty"`
 	Cells8       []Cell8Cfg          `json:"cells8,omitempty"`
-	Cells16      []SixteenCellCfg    `json:"cells16,omitempty"`
+	Cells16      []Cell16Cfg         `json:"cells16,omitempty"`
 	Cells24      []TwentyFourCellCfg `json:"cells24,omitempty"`
 	Cells120     []Cell120Cfg        `json:"cells120,omitempty"`
 	Cells600     []Cell600Cfg        `json:"cells600,omitempty"`
@@ -88,7 +88,7 @@ type Cell5Cfg struct {
 	IOR     RGB `json:"ior"`
 }
 
-type SixteenCellCfg struct {
+type Cell16Cfg struct {
 	Center  Point4  `json:"center"`
 	Side    Real    `json:"side"`
 	Scale   Vector4 `json:"scale,omitempty"`
@@ -200,7 +200,7 @@ func (s Cell5Cfg) Build() (*Cell5, error) {
 	return NewCell5(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
 }
 
-func (s SixteenCellCfg) Build() (*SixteenCell, error) {
+func (s Cell16Cfg) Build() (*Cell16, error) {
 	rad := s.RotDeg.Radians()
 	sc := s.Scale
 	if sc.X == 0 {
@@ -215,7 +215,7 @@ func (s SixteenCellCfg) Build() (*SixteenCell, error) {
 	if sc.W == 0 {
 		sc.W = 1
 	}
-	return NewSixteenCell(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
+	return NewCell16(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
 }
 
 func (s TwentyFourCellCfg) Build() (*TwentyFourCell, error) {
