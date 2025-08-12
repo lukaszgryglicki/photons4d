@@ -41,16 +41,16 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		// Next plane hit (W == scene.Center.W)
 		tPlane := planeHit(scene, O, D)
 
-		// Next object hit (cube/ellipsoid) with AABB pre-cull
+		// Next object hit (cell/ellipsoid) with AABB pre-cull
 		hit, okObj := nearestHit(scene, O, D, tPlane)
 
-		// If no cube ahead or plane is closer → try to deposit on the plane.
+		// If no cell/ellipsoid ahead or plane is closer → try to deposit on the plane.
 		if !okObj || tPlane < hit.t {
 			if !isFinite(tPlane) {
 				if Debug && deposit {
 					logRay("parallel_to_scene", Miss, O, D, Point4{}, bounce, totalDist)
 				}
-				// parallel to plane and no cube to stop us
+				// parallel to plane and no object to stop us
 				return false
 			}
 
@@ -143,7 +143,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 			return false
 		}
 
-		// Survived → tint throughput by cube color.
+		// Survived → tint throughput by object color.
 		throughput *= hit.colorCh(ch)
 
 		if u < pAbs+pReflDyn {

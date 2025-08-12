@@ -29,14 +29,14 @@ func TestPlaneHit(t *testing.T) {
 
 func TestNearestHit_PrefersCloser(t *testing.T) {
 	scene := NewScene(Point4{0, 0, 0, 0}, 2, 2, 2, 4, 4, 1, 8)
-	c := newUnitCubeAtW0p5()
+	c := newUnitCell8AtW0p5()
 	scene.AddCell8(c)
 
 	O := Point4{0, 0, 0, 0}
 	D := Vector4{0, 0, 0, 1}
 	h, ok := nearestHit(scene, O, D, math.Inf(1))
 	if !ok {
-		t.Fatal("expected a cube hit")
+		t.Fatal("expected a cell8 hit")
 	}
 	if math.Abs(float64(h.t-0.4)) > 1e-9 {
 		t.Fatalf("nearest t wrong: %.12g", h.t)

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func newUnitCubeAtW0p5() *Cell8 {
+func newUnitCell8AtW0p5() *Cell8 {
 	h, err := NewCell8(
 		Point4{0, 0, 0, 0.5},
 		Vector4{0.2, 0.2, 0.2, 0.2}, // edges 0.2 ⇒ half 0.1
@@ -19,9 +19,9 @@ func newUnitCubeAtW0p5() *Cell8 {
 }
 
 func TestIntersectRayCell8_EnterExit(t *testing.T) {
-	h := newUnitCubeAtW0p5()
+	h := newUnitCell8AtW0p5()
 
-	// Outside, coming along +W axis towards cube center
+	// Outside, coming along +W axis towards cell8 center
 	O := Point4{0, 0, 0, 0}
 	D := Vector4{0, 0, 0, 1}
 	hit, ok := intersectRayCell8(O, D, h)
@@ -31,7 +31,7 @@ func TestIntersectRayCell8_EnterExit(t *testing.T) {
 	if hit.inv {
 		t.Fatal("expected entering, not inv")
 	}
-	// Cube spans W in [0.4, 0.6]. From W=0 along +W → first hit at t=0.4
+	// Cell8 spans W in [0.4, 0.6]. From W=0 along +W → first hit at t=0.4
 	if math.Abs(float64(hit.t-0.4)) > 1e-9 {
 		t.Fatalf("t wrong: %.12g", hit.t)
 	}
@@ -40,7 +40,7 @@ func TestIntersectRayCell8_EnterExit(t *testing.T) {
 		t.Fatalf("normal not -W: %+v", hit.Nw)
 	}
 
-	// Start inside the cube: O.W=0.5 (center), shoot +W, expect exit on +W face at t=+0.1
+	// Start inside the cell8: O.W=0.5 (center), shoot +W, expect exit on +W face at t=+0.1
 	O2 := Point4{0, 0, 0, 0.5}
 	D2 := Vector4{0, 0, 0, 1}
 	hit2, ok2 := intersectRayCell8(O2, D2, h)

@@ -183,7 +183,7 @@ func nearestHit(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) 
 		rr.invW = 1 / D.W
 	}
 
-	// cubes
+	// cells8
 	for _, h := range scene.Cells8 {
 		if ok, tNear := rayAABB(O, h.AABBMin, h.AABBMax, rr); !ok || tNear > bestT {
 			continue

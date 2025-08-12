@@ -1,6 +1,5 @@
 package photons4d
 
-// Precompute these once per bounce and pass into nearestCube
 type rayRecips struct {
 	invX, invY, invZ, invW Real
 	parX, parY, parZ, parW bool // parallel flags (|D| < eps)

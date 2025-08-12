@@ -23,7 +23,7 @@ type Cell8 struct {
 	Color   RGB // tint/filter applied to reflected & refracted energy
 	Reflect RGB // fraction reflected per channel (0..1)
 	Refract RGB // fraction refracted per channel (0..1)
-	IOR     RGB // index of refraction inside cube per channel
+	IOR     RGB // index of refraction inside cell8 per channel
 
 	// cached
 	Normals  [4]Vector4 // world-space unit normals for +X,+Y,+Z,+W faces
