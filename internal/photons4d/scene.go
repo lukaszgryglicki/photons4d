@@ -8,6 +8,7 @@ type Scene struct {
 	MaxBounces           int
 	Buf                  []Real // flat: (((i*Ny)+j)*Nz + k)*3 + c
 	Hypercubes           []*HyperCube
+	Hyperspheres         []*HyperSphere
 
 	// cached bounds & mapping
 	MinX, MaxX Real
@@ -105,4 +106,8 @@ func (s *Scene) idx(i, j, k, c int) int {
 
 func (s *Scene) AddHypercube(h *HyperCube) {
 	s.Hypercubes = append(s.Hypercubes, h)
+}
+
+func (s *Scene) AddHyperSphere(h *HyperSphere) {
+	s.Hyperspheres = append(s.Hyperspheres, h)
 }

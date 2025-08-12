@@ -24,17 +24,18 @@ type LightCfg struct {
 }
 
 type Config struct {
-	SceneResX  int            `json:"sceneResX"`
-	SceneResY  int            `json:"sceneResY"`
-	SceneResZ  int            `json:"sceneResZ"`
-	ProbeRays  int            `json:"probeRays"`
-	Spp        int            `json:"spp"`
-	GIFOut     string         `json:"gifOut"`
-	GIFDelay   int            `json:"gifDelay,omitempty"`
-	Gamma      Real           `json:"gamma,omitempty"`
-	Scene      SceneCfg       `json:"scene"`
-	Lights     []LightCfg     `json:"lights"`
-	Hypercubes []HypercubeCfg `json:"hypercubes,omitempty"`
+	SceneResX    int              `json:"sceneResX"`
+	SceneResY    int              `json:"sceneResY"`
+	SceneResZ    int              `json:"sceneResZ"`
+	ProbeRays    int              `json:"probeRays"`
+	Spp          int              `json:"spp"`
+	GIFOut       string           `json:"gifOut"`
+	GIFDelay     int              `json:"gifDelay,omitempty"`
+	Gamma        Real             `json:"gamma,omitempty"`
+	Scene        SceneCfg         `json:"scene"`
+	Lights       []LightCfg       `json:"lights"`
+	Hypercubes   []HypercubeCfg   `json:"hypercubes,omitempty"`
+	Hyperspheres []HyperSphereCfg `json:"hyperspheres,omitempty"`
 }
 
 // Rotation in degrees for JSON (friendlier than radians).
@@ -58,6 +59,26 @@ type HypercubeCfg struct {
 	IOR     RGB `json:"ior"`
 }
 
+type HyperSphereCfg struct {
+	Center Point4  `json:"center"`
+	Radius Real    `json:"radius"`          // base radius
+	Scale  Vector4 `json:"scale,omitempty"` // optional per-axis scale; defaults 1
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+func (r Rot4Deg) Radians() Rot4 {
+	const k = math.Pi / 180
+	return Rot4{
+		XY: r.XY * k, XZ: r.XZ * k, XW: r.XW * k,
+		YZ: r.YZ * k, YW: r.YW * k, ZW: r.ZW * k,
+	}
+}
+
 // Build validates and constructs the runtime object (no defaults).
 func (hc HypercubeCfg) Build() (*HyperCube, error) {
 	rad := hc.RotDeg.Radians()
@@ -78,12 +99,26 @@ func (hc HypercubeCfg) Build() (*HyperCube, error) {
 	)
 }
 
-func (r Rot4Deg) Radians() Rot4 {
-	const k = math.Pi / 180
-	return Rot4{
-		XY: r.XY * k, XZ: r.XZ * k, XW: r.XW * k,
-		YZ: r.YZ * k, YW: r.YW * k, ZW: r.ZW * k,
+func (hs HyperSphereCfg) Build() (*HyperSphere, error) {
+	rad := hs.RotDeg.Radians()
+	sc := hs.Scale
+	if sc.X == 0 {
+		sc.X = 1
 	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	if sc.X <= 0 || sc.Y <= 0 || sc.Z <= 0 || sc.W <= 0 {
+		return nil, fmt.Errorf("scale must be > 0 on all axes, got %+v", sc)
+	}
+	radii := Vector4{hs.Radius * sc.X, hs.Radius * sc.Y, hs.Radius * sc.Z, hs.Radius * sc.W}
+	return NewHyperSphere(hs.Center, radii, rad, hs.Color, hs.Reflect, hs.Refract, hs.IOR)
 }
 
 func loadConfig(path string) (*Config, error) {

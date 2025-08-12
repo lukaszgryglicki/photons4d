@@ -33,6 +33,15 @@ func Run(cfgPath string) error {
 		scene.AddHypercube(h)
 	}
 
+	for i, scfg := range cfg.Hyperspheres {
+		h, err := scfg.Build()
+		if err != nil {
+			_ = i // keep if you log
+			continue
+		}
+		scene.AddHyperSphere(h)
+	}
+
 	Nvox := Nx * Ny * Nz
 	needRays := make([]int, len(lights))
 	totalRays := 0
@@ -47,7 +56,9 @@ func Run(cfgPath string) error {
 		}
 		needRays[i] = need
 		totalRays += need
+		DebugLog("Light #%d, needs: %d rays", i, need)
 	}
+	DebugLog("Total rays needed: %d", totalRays)
 
 	start := time.Now()
 	castRays(lights, scene, needRays)

@@ -41,7 +41,7 @@ func SaveAnimatedGIF(scene *Scene, path string, delay int, gamma Real) error {
 	for k := 0; k < Nz; k++ {
 		// Progress logging
 		// (relies on max(int,int) from your debug helpers)
-		if k%max(1, Nz/100) == 0 { // ~1% steps
+		if k%imax(1, Nz/100) == 0 { // ~1% steps
 			percent := Real(k+1) * 100 / Real(Nz)
 			fmt.Printf("[GIF] %.2f%%\n", percent)
 		}

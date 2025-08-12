@@ -142,7 +142,7 @@ func NewHyperCube(
 	return &hc, nil
 }
 
-func intersectRayHypercube(O Point4, D Vector4, h *HyperCube) (hit cubeHit, ok bool) {
+func intersectRayHypercube(O Point4, D Vector4, h *HyperCube) (hit objectHit, ok bool) {
 	// world -> local
 	Op := Vector4{O.X - h.Center.X, O.Y - h.Center.Y, O.Z - h.Center.Z, O.W - h.Center.W}
 	Ol := h.RT.MulVec(Op)
@@ -174,19 +174,19 @@ func intersectRayHypercube(O Point4, D Vector4, h *HyperCube) (hit cubeHit, ok b
 
 	okX, a1, a2, eAx1, eSg1, xAx1, xSg1 := axis(Ol.X, Dl.X, h.Half.X, 0)
 	if !okX {
-		return cubeHit{}, false
+		return objectHit{}, false
 	}
 	okY, b1, b2, eAx2, eSg2, xAx2, xSg2 := axis(Ol.Y, Dl.Y, h.Half.Y, 1)
 	if !okY {
-		return cubeHit{}, false
+		return objectHit{}, false
 	}
 	okZ, c1, c2, eAx3, eSg3, xAx3, xSg3 := axis(Ol.Z, Dl.Z, h.Half.Z, 2)
 	if !okZ {
-		return cubeHit{}, false
+		return objectHit{}, false
 	}
 	okW, d1, d2, eAx4, eSg4, xAx4, xSg4 := axis(Ol.W, Dl.W, h.Half.W, 3)
 	if !okW {
-		return cubeHit{}, false
+		return objectHit{}, false
 	}
 
 	type slab struct {
@@ -208,7 +208,7 @@ func intersectRayHypercube(O Point4, D Vector4, h *HyperCube) (hit cubeHit, ok b
 		}
 	}
 	if tmax < 0 || tmin > tmax {
-		return cubeHit{}, false
+		return objectHit{}, false
 	}
 
 	inv := tmin < 0 && tmax > 0
@@ -226,11 +226,11 @@ func intersectRayHypercube(O Point4, D Vector4, h *HyperCube) (hit cubeHit, ok b
 		Nw = Nw.Mul(-1)
 	}
 
-	return cubeHit{t: t, Nw: Nw, hc: h, inv: inv}, true
+	return objectHit{t: t, Nw: Nw, hc: h, inv: inv}, true
 }
 
-func nearestCube(scene *Scene, O Point4, D Vector4, tMax Real) (cubeHit, bool) {
-	best := cubeHit{}
+func nearestHit(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) {
+	best := objectHit{}
 	okAny := false
 	bestT := tMax
 	if !isFinite(bestT) {
@@ -244,8 +244,8 @@ func nearestCube(scene *Scene, O Point4, D Vector4, tMax Real) (cubeHit, bool) {
 		parZ: math.Abs(D.Z) < eps, parW: math.Abs(D.W) < eps,
 	}
 
+	// cubes
 	for _, h := range scene.Hypercubes {
-		// early-out with tMax using the same AABB test
 		if ok, tNear := rayAABB(O, h.AABBMin, h.AABBMax, rr); !ok || tNear > bestT {
 			continue
 		}
@@ -253,5 +253,16 @@ func nearestCube(scene *Scene, O Point4, D Vector4, tMax Real) (cubeHit, bool) {
 			bestT, best, okAny = hit.t, hit, true
 		}
 	}
+
+	// hyperspheres (ellipsoids)
+	for _, s := range scene.Hyperspheres {
+		if ok, tNear := rayAABB(O, s.AABBMin, s.AABBMax, rr); !ok || tNear > bestT {
+			continue
+		}
+		if hit, ok := intersectRayHyperSphere(O, D, s); ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
+
 	return best, okAny
 }

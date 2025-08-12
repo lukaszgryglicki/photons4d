@@ -41,11 +41,11 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		// Next plane hit (W == scene.Center.W)
 		tPlane := planeHit(scene, O, D)
 
-		// Next hypercube hit (with AABB pre-cull)
-		hit, okCube := nearestCube(scene, O, D, tPlane)
+		// Next object hit (cube/ellipsoid) with AABB pre-cull
+		hit, okObj := nearestHit(scene, O, D, tPlane)
 
 		// If no cube ahead or plane is closer → try to deposit on the plane.
-		if !okCube || tPlane < hit.t {
+		if !okObj || tPlane < hit.t {
 			if !isFinite(tPlane) {
 				if Debug {
 					logRay("parallel_to_scene", Miss, O, D, Point4{}, bounce, totalDist)
@@ -91,14 +91,12 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		P := O.Add(D.Mul(hit.t))
 		totalDist += hit.t
 
-		hc := hit.hc
-
 		// Outward normal (unit)
 		N := hit.Nw
 
 		// --- Absorption & Fresnel split (per channel) ---
-		pAbs := hc.pAbs[ch] // your explicit absorption knob
-		avail := 1 - pAbs   // budget to split between reflection/refraction
+		pAbs := hit.pAbsCh(ch) // object's absorption knob
+		avail := 1 - pAbs      // budget to split between reflection/refraction
 		if avail <= 0 {
 			if Debug {
 				logRay("absorbed", Absorb, O, D, P, bounce, totalDist)
@@ -120,15 +118,15 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		}
 
 		// Schlick Fresnel using cached F0 (air ↔ material)
-		F0 := hc.f0[ch]
+		F0 := hit.f0Ch(ch)
 		x := 1 - cosTheta
 		x2 := x * x
 		x5 := x2 * x2 * x
 		F := F0 + (1-F0)*x5
 
 		// Bias Fresnel by your reflect/refract knobs to control the split.
-		rW := hc.refl[ch] * F
-		tW := hc.refr[ch] * (1 - F)
+		rW := hit.reflCh(ch) * F
+		tW := hit.refrCh(ch) * (1 - F)
 		f := F
 		if sum := rW + tW; sum > 0 {
 			f = rW / sum
@@ -146,7 +144,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		}
 
 		// Survived → tint throughput by cube color.
-		throughput *= hc.colorArr[ch]
+		throughput *= hit.colorCh(ch)
 
 		if u < pAbs+pReflDyn {
 			// Reflect
@@ -167,12 +165,11 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		var eta Real
 		if hit.inv {
 			// exiting: inside -> outside
-			eta = hc.iorArr[ch]
+			eta = hit.iorCh(ch)
 		} else {
 			// entering: outside -> inside
-			eta = hc.iorInv[ch]
+			eta = hit.iorInvCh(ch)
 		}
-
 		if T, ok := refract4(D, N, eta); ok {
 			D = T
 			O = Point4{
