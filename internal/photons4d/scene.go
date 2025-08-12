@@ -11,7 +11,7 @@ type Scene struct {
 	Hyperspheres         []*HyperSphere
 	Cells5               []*Cell5
 	Cells16              []*Cell16
-	Cells24              []*TwentyFourCell
+	Cells24              []*Cell24
 	Cells120             []*Cell120
 	Cells600             []*Cell600
 
@@ -124,7 +124,7 @@ func (s *Scene) AddCell5(h *Cell5) {
 func (s *Scene) AddCell16(h *Cell16) {
 	s.Cells16 = append(s.Cells16, h)
 }
-func (s *Scene) AddTwentyFourCell(h *TwentyFourCell) {
+func (s *Scene) AddCell24(h *Cell24) {
 	s.Cells24 = append(s.Cells24, h)
 }
 

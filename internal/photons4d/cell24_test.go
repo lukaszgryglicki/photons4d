@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestNewTwentyFourCellAndIntersect(t *testing.T) {
-	c24, err := NewTwentyFourCell(
+func TestNewCell24AndIntersect(t *testing.T) {
+	c24, err := NewCell24(
 		Point4{0, 0, 0, 0.6}, // clearly in front of W=0 plane
 		0.3,                  // edge length
 		Vector4{1, 1, 1, 1},  // no anisotropic scale
@@ -14,12 +14,12 @@ func TestNewTwentyFourCellAndIntersect(t *testing.T) {
 		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{1.3, 1.3, 1.3},
 	)
 	if err != nil {
-		t.Fatalf("NewTwentyFourCell: %v", err)
+		t.Fatalf("NewCell24: %v", err)
 	}
 
 	O := Point4{0, 0, 0, 0}
 	D := Vector4{0, 0, 0, 1}
-	h, ok := intersectRayTwentyFour(O, D, c24)
+	h, ok := intersectRayCell24(O, D, c24)
 	if !ok {
 		t.Fatalf("expected 24-cell hit")
 	}
@@ -33,14 +33,14 @@ func TestNewTwentyFourCellAndIntersect(t *testing.T) {
 	// Start inside: shoot from center outward
 	O2 := c24.Center
 	D2 := Vector4{0, 0, 0, 1}
-	h2, ok2 := intersectRayTwentyFour(O2, D2, c24)
+	h2, ok2 := intersectRayCell24(O2, D2, c24)
 	if !ok2 || !h2.inv {
 		t.Fatalf("expected inside->exit hit; ok=%v inv=%v", ok2, h2.inv)
 	}
 }
 
-func TestSceneAABBWithTwentyFourCell(t *testing.T) {
-	c24, err := NewTwentyFourCell(
+func TestSceneAABBWithCell24(t *testing.T) {
+	c24, err := NewCell24(
 		Point4{-0.15, 0.2, -0.05, 0.35},
 		0.22,
 		Vector4{1.0, 1.2, 0.9, 0.85},

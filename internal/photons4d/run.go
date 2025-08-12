@@ -72,7 +72,7 @@ func Run(cfgPath string) error {
 		if err != nil {
 			continue
 		}
-		scene.AddTwentyFourCell(obj)
+		scene.AddCell24(obj)
 	}
 
 	for _, cc := range cfg.Cells120 {

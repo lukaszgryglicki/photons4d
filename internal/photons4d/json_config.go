@@ -24,23 +24,23 @@ type LightCfg struct {
 }
 
 type Config struct {
-	SceneResX    int                 `json:"sceneResX"`
-	SceneResY    int                 `json:"sceneResY"`
-	SceneResZ    int                 `json:"sceneResZ"`
-	ProbeRays    int                 `json:"probeRays"`
-	Spp          int                 `json:"spp"`
-	GIFOut       string              `json:"gifOut"`
-	GIFDelay     int                 `json:"gifDelay,omitempty"`
-	Gamma        Real                `json:"gamma,omitempty"`
-	Scene        SceneCfg            `json:"scene"`
-	Lights       []LightCfg          `json:"lights"`
-	Hyperspheres []HyperSphereCfg    `json:"hyperspheres,omitempty"`
-	Cells5       []Cell5Cfg          `json:"cells5,omitempty"`
-	Cells8       []Cell8Cfg          `json:"cells8,omitempty"`
-	Cells16      []Cell16Cfg         `json:"cells16,omitempty"`
-	Cells24      []TwentyFourCellCfg `json:"cells24,omitempty"`
-	Cells120     []Cell120Cfg        `json:"cells120,omitempty"`
-	Cells600     []Cell600Cfg        `json:"cells600,omitempty"`
+	SceneResX    int              `json:"sceneResX"`
+	SceneResY    int              `json:"sceneResY"`
+	SceneResZ    int              `json:"sceneResZ"`
+	ProbeRays    int              `json:"probeRays"`
+	Spp          int              `json:"spp"`
+	GIFOut       string           `json:"gifOut"`
+	GIFDelay     int              `json:"gifDelay,omitempty"`
+	Gamma        Real             `json:"gamma,omitempty"`
+	Scene        SceneCfg         `json:"scene"`
+	Lights       []LightCfg       `json:"lights"`
+	Hyperspheres []HyperSphereCfg `json:"hyperspheres,omitempty"`
+	Cells5       []Cell5Cfg       `json:"cells5,omitempty"`
+	Cells8       []Cell8Cfg       `json:"cells8,omitempty"`
+	Cells16      []Cell16Cfg      `json:"cells16,omitempty"`
+	Cells24      []Cell24Cfg      `json:"cells24,omitempty"`
+	Cells120     []Cell120Cfg     `json:"cells120,omitempty"`
+	Cells600     []Cell600Cfg     `json:"cells600,omitempty"`
 }
 
 // Rotation in degrees for JSON (friendlier than radians).
@@ -99,7 +99,7 @@ type Cell16Cfg struct {
 	IOR     RGB     `json:"ior"`
 }
 
-type TwentyFourCellCfg struct {
+type Cell24Cfg struct {
 	Center  Point4  `json:"center"`
 	Side    Real    `json:"side"`
 	Scale   Vector4 `json:"scale,omitempty"`
@@ -218,7 +218,7 @@ func (s Cell16Cfg) Build() (*Cell16, error) {
 	return NewCell16(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
 }
 
-func (s TwentyFourCellCfg) Build() (*TwentyFourCell, error) {
+func (s Cell24Cfg) Build() (*Cell24, error) {
 	rad := s.RotDeg.Radians()
 	sc := s.Scale
 	if sc.X == 0 {
@@ -233,7 +233,7 @@ func (s TwentyFourCellCfg) Build() (*TwentyFourCell, error) {
 	if sc.W == 0 {
 		sc.W = 1
 	}
-	return NewTwentyFourCell(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
+	return NewCell24(s.Center, s.Side, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
 }
 
 func (c Cell120Cfg) Build() (*Cell120, error) {

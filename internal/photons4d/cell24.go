@@ -5,11 +5,11 @@ import (
 	"math"
 )
 
-// TwentyFourCell: regular 24-cell (self-dual). We'll use the D4 root set:
+// Cell24: regular 24-cell (self-dual). We'll use the D4 root set:
 // all permutations of (±1, ±1, 0, 0). That’s 24 canonical vertices.
 // Planes are also 24 in number (self-dual). For each canonical normal seed n_l (same set),
 // world-space normal n_w = (R*S^{-1}) n_l (scale cancels in d via support).
-type TwentyFourCell struct {
+type Cell24 struct {
 	Center  Point4
 	Side    Real
 	Scale   Vector4
@@ -57,13 +57,13 @@ func canonical24Verts() [24]Vector4 {
 	return out
 }
 
-func NewTwentyFourCell(
+func NewCell24(
 	center Point4,
 	side Real,
 	scale Vector4,
 	angles Rot4,
 	color, reflectivity, refractivity, ior RGB,
-) (*TwentyFourCell, error) {
+) (*Cell24, error) {
 	if !(side > 0) {
 		return nil, fmt.Errorf("24-cell side must be > 0, got %.6g", side)
 	}
@@ -144,7 +144,7 @@ func NewTwentyFourCell(
 		}
 	}
 
-	c := &TwentyFourCell{
+	c := &Cell24{
 		Center:  center,
 		Side:    side,
 		Scale:   scale,
@@ -207,7 +207,7 @@ func NewTwentyFourCell(
 	return c, nil
 }
 
-func intersectRayTwentyFour(O Point4, D Vector4, c *TwentyFourCell) (hit objectHit, ok bool) {
+func intersectRayCell24(O Point4, D Vector4, c *Cell24) (hit objectHit, ok bool) {
 	tEnter, tExit := -1e300, 1e300
 	enterIdx, exitIdx := -1, -1
 	for i := 0; i < 24; i++ {
