@@ -8,8 +8,7 @@ import (
 func TestNewCell600AndIntersect(t *testing.T) {
 	obj, err := NewCell600(
 		Point4{0, 0, 0, 0.25},
-		0.20,
-		Vector4{1, 1, 1, 1},
+		Vector4{.2, .2, .2, .2},
 		Rot4{},
 		RGB{1, 1, 1},
 		RGB{0, 0, 0},
@@ -34,8 +33,7 @@ func TestNewCell600AndIntersect(t *testing.T) {
 func TestSceneAABBWithCell600(t *testing.T) {
 	obj, err := NewCell600(
 		Point4{0.1, -0.2, 0.05, 0.3},
-		0.15,
-		Vector4{1.05, 0.95, 1.1, 0.85},
+		Vector4{1.05 * .15, 0.95 * .15, 1.1 * .15, 0.85 * .15},
 		Rot4{XY: 0.15, XZ: -0.2, ZW: 0.25},
 		RGB{1, 1, 1}, RGB{0.1, 0.1, 0.1}, RGB{0.8, 0.8, 0.8},
 		RGB{1.2, 1.2, 1.2},

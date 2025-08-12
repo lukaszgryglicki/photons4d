@@ -36,8 +36,7 @@ func TestCell8CfgBuildAndValidation(t *testing.T) {
 func TestHyperSphereCfgScaleDefaults(t *testing.T) {
 	hs, err := (HyperSphereCfg{
 		Center: Point4{0, 0, 0, 1},
-		Radius: 0.5,
-		Scale:  Vector4{}, // defaults to 1
+		Scale:  Vector4{.5, .5, .5, .5},
 		RotDeg: Rot4Deg{},
 		Color:  RGB{1, 1, 1}, Reflect: RGB{0, 0, 0}, Refract: RGB{1, 1, 1}, IOR: RGB{1.4, 1.4, 1.4},
 	}).Build()

@@ -55,7 +55,6 @@ type Rot4Deg struct {
 
 type HyperSphereCfg struct {
 	Center Point4  `json:"center"`
-	Radius Real    `json:"radius"`          // base radius
 	Scale  Vector4 `json:"scale,omitempty"` // optional per-axis scale; defaults 1
 	RotDeg Rot4Deg `json:"rotDeg"`
 
@@ -111,7 +110,6 @@ type Cell24Cfg struct {
 
 type Cell120Cfg struct {
 	Center Point4  `json:"center"`
-	Radius Real    `json:"radius"`
 	Scale  Vector4 `json:"scale,omitempty"`
 	RotDeg Rot4Deg `json:"rotDeg"`
 
@@ -123,7 +121,6 @@ type Cell120Cfg struct {
 
 type Cell600Cfg struct {
 	Center Point4  `json:"center"`
-	Radius Real    `json:"radius"`
 	Scale  Vector4 `json:"scale,omitempty"`
 	RotDeg Rot4Deg `json:"rotDeg"`
 
@@ -179,7 +176,7 @@ func (hs HyperSphereCfg) Build() (*HyperSphere, error) {
 	if sc.X <= 0 || sc.Y <= 0 || sc.Z <= 0 || sc.W <= 0 {
 		return nil, fmt.Errorf("scale must be > 0 on all axes, got %+v", sc)
 	}
-	radii := Vector4{hs.Radius * sc.X, hs.Radius * sc.Y, hs.Radius * sc.Z, hs.Radius * sc.W}
+	radii := Vector4{sc.X, sc.Y, sc.Z, sc.W}
 	return NewHyperSphere(hs.Center, radii, rad, hs.Color, hs.Reflect, hs.Refract, hs.IOR)
 }
 
@@ -251,7 +248,7 @@ func (c Cell120Cfg) Build() (*Cell120, error) {
 	if sc.W == 0 {
 		sc.W = 1
 	}
-	return NewCell120(c.Center, c.Radius, sc, c.RotDeg.Radians(), c.Color, c.Reflect, c.Refract, c.IOR)
+	return NewCell120(c.Center, sc, c.RotDeg.Radians(), c.Color, c.Reflect, c.Refract, c.IOR)
 }
 func (c Cell600Cfg) Build() (*Cell600, error) {
 	sc := c.Scale
@@ -267,7 +264,7 @@ func (c Cell600Cfg) Build() (*Cell600, error) {
 	if sc.W == 0 {
 		sc.W = 1
 	}
-	return NewCell600(c.Center, c.Radius, sc, c.RotDeg.Radians(), c.Color, c.Reflect, c.Refract, c.IOR)
+	return NewCell600(c.Center, sc, c.RotDeg.Radians(), c.Color, c.Reflect, c.Refract, c.IOR)
 }
 
 func loadConfig(path string) (*Config, error) {

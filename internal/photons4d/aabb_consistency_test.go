@@ -40,7 +40,7 @@ func TestAABB_RayConsistency_CellPolys(t *testing.T) {
 	}
 
 	// 120-cell
-	cell120, err := NewCell120(Point4{0.12, -0.2, 0.05, 0.33}, 0.18, Vector4{1, 1, 1, 1}, Rot4{},
+	cell120, err := NewCell120(Point4{0.12, -0.2, 0.05, 0.33}, Vector4{.18, .18, .18, .18}, Rot4{},
 		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{1.1, 1.1, 1.1})
 	if err != nil {
 		t.Fatal(err)
@@ -48,7 +48,7 @@ func TestAABB_RayConsistency_CellPolys(t *testing.T) {
 	check("120-cell", cell120.AABBMin, cell120.AABBMax)
 
 	// 600-cell
-	cell600, err := NewCell600(Point4{-0.15, 0.22, -0.07, 0.25}, 0.18, Vector4{1, 1, 1, 1}, Rot4{},
+	cell600, err := NewCell600(Point4{-0.15, 0.22, -0.07, 0.25}, Vector4{.18, .18, .18, .18}, Rot4{},
 		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{1.1, 1.1, 1.1})
 	if err != nil {
 		t.Fatal(err)

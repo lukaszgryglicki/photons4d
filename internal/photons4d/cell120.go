@@ -5,10 +5,7 @@ import "fmt"
 // 120-cell as intersection of 120 planes whose normals are the 120 vertices of the dual (600-cell).
 type Cell120 struct{ cellPoly }
 
-func NewCell120(center Point4, radius Real, scale Vector4, angles Rot4, color, reflectivity, refractivity, ior RGB) (*Cell120, error) {
-	if !(radius > 0) {
-		return nil, fmt.Errorf("radius must be > 0, got %.6g", radius)
-	}
+func NewCell120(center Point4, scale Vector4, angles Rot4, color, reflectivity, refractivity, ior RGB) (*Cell120, error) {
 	if !(scale.X > 0 && scale.Y > 0 && scale.Z > 0 && scale.W > 0) {
 		return nil, fmt.Errorf("scale must be > 0 on all axes, got %+v", scale)
 	}
@@ -37,8 +34,8 @@ func NewCell120(center Point4, radius Real, scale Vector4, angles Rot4, color, r
 		RT:     R.Transpose(),
 	}
 	cp.materialFrom(color, reflectivity, refractivity, ior)
-	cp.buildPlanes(verts600Unit(), radius)
+	cp.buildPlanes(verts600Unit(), 1.0)
 
-	DebugLog("Created 120-cell: center=%+v, radius=%.6g, scale=%+v, AABB=[%+v..%+v]", center, radius, scale, cp.AABBMin, cp.AABBMax)
+	DebugLog("Created 120-cell: center=%+v, scale=%+v, AABB=[%+v..%+v]", center, scale, cp.AABBMin, cp.AABBMax)
 	return &Cell120{cp}, nil
 }

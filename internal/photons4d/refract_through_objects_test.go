@@ -273,8 +273,7 @@ func TestRefractionThrough_Cell120(t *testing.T) {
 	ior := Real(1.05)
 	obj, err := NewCell120(
 		Point4{0, 0, 0, 0.6},
-		0.20,
-		Vector4{1, 1, 1, 1},
+		Vector4{.2, .2, .2, .2},
 		Rot4{},
 		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
 	)
@@ -320,8 +319,7 @@ func TestRefractionThrough_Cell600(t *testing.T) {
 	ior := Real(1.05)
 	obj, err := NewCell600(
 		Point4{0, 0, 0, 0.6},
-		0.20,
-		Vector4{1, 1, 1, 1},
+		Vector4{.2, .2, .2, .2},
 		Rot4{},
 		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
 	)

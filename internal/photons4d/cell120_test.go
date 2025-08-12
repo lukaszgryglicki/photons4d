@@ -7,10 +7,9 @@ import (
 
 func TestNewCell120AndIntersect(t *testing.T) {
 	obj, err := NewCell120(
-		Point4{0, 0, 0, 0.25}, // a bit in front of the W=0 plane
-		0.20,                  // radius
-		Vector4{1, 1, 1, 1},   // no anisotropic scale
-		Rot4{},                // identity rotation
+		Point4{0, 0, 0, 0.25},   // a bit in front of the W=0 plane
+		Vector4{.2, .2, .2, .2}, // no anisotropic scale
+		Rot4{},                  // identity rotation
 		RGB{1, 1, 1},
 		RGB{0, 0, 0},
 		RGB{1, 1, 1},
@@ -35,8 +34,7 @@ func TestNewCell120AndIntersect(t *testing.T) {
 func TestSceneAABBWithCell120(t *testing.T) {
 	obj, err := NewCell120(
 		Point4{0.1, -0.2, 0.05, 0.3},
-		0.15,
-		Vector4{1.1, 0.9, 1.05, 0.8},
+		Vector4{1.1 * .15, 0.9 * .15, 1.05 * .15, 0.8 * .15},
 		Rot4{XY: 0.2, XZ: -0.1, ZW: 0.3},
 		RGB{1, 1, 1}, RGB{0.1, 0.1, 0.1}, RGB{0.8, 0.8, 0.8},
 		RGB{1.2, 1.2, 1.2},
