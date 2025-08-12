@@ -12,6 +12,11 @@ func Run(cfgPath string) error {
 		return err
 	}
 
+	if Debug {
+		cfg.SceneResX, cfg.SceneResY, cfg.SceneResZ, cfg.Spp, cfg.Scene.MaxBounces = imax(cfg.SceneResX>>3, 4), imax(cfg.SceneResY>>3, 4), imax(cfg.SceneResZ>>2, 1), imax(cfg.Spp>>2, 4), imax(cfg.Scene.MaxBounces>>1, 8)
+		DebugLog("Debug mode: reduced resolution to %d x %d x %d, spp to %d and max bounces to %d", cfg.SceneResX, cfg.SceneResY, cfg.SceneResZ, cfg.Spp, cfg.Scene.MaxBounces)
+	}
+
 	Nx, Ny, Nz := cfg.SceneResX, cfg.SceneResY, cfg.SceneResZ
 	scene := NewScene(cfg.Scene.Center, cfg.Scene.Width, cfg.Scene.Height, cfg.Scene.Depth, Nx, Ny, Nz, cfg.Scene.MaxBounces)
 

@@ -47,7 +47,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		// If no cube ahead or plane is closer → try to deposit on the plane.
 		if !okObj || tPlane < hit.t {
 			if !isFinite(tPlane) {
-				if Debug {
+				if Debug && deposit {
 					logRay("parallel_to_scene", Miss, O, D, Point4{}, bounce, totalDist)
 				}
 				// parallel to plane and no cube to stop us
@@ -76,12 +76,12 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 					base := scene.idx(i, j, k, ChR)
 					scene.Buf[base+ch] += Real(throughput * w * light.voidCoeff)
 				}
-				if Debug {
+				if Debug && deposit {
 					logRay("hit_scene", Hit, O, D, P, bounce, totalDist)
 				}
 				return true
 			}
-			if Debug {
+			if Debug && deposit {
 				logRay("miss_scene", Miss, O, D, P, bounce, totalDist)
 			}
 			return false
@@ -98,7 +98,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		pAbs := hit.pAbsCh(ch) // object's absorption knob
 		avail := 1 - pAbs      // budget to split between reflection/refraction
 		if avail <= 0 {
-			if Debug {
+			if Debug && deposit {
 				logRay("absorbed", Absorb, O, D, P, bounce, totalDist)
 			}
 			return false
@@ -137,7 +137,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		// --- Russian roulette ---
 		u := rng.Float64()
 		if u < pAbs {
-			if Debug {
+			if Debug && deposit {
 				logRay("absorbed", Absorb, O, D, P, bounce, totalDist)
 			}
 			return false
@@ -159,22 +159,25 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 				P.Z + D.Z*bumpShift,
 				P.W + D.W*bumpShift,
 			}
-			if Debug {
+			if Debug && deposit {
 				logRay("reflected", Reflect, O, D, P, bounce, totalDist)
 			}
 			continue
 		}
 
-		// Refract
+		// Refract: orient normal toward the incident medium and choose correct eta = n_in/n_out
+		Nn := N
 		var eta Real
-		if hit.inv {
-			// exiting: inside -> outside
-			eta = hit.iorCh(ch)
+		if D.Dot(N) < 0 {
+			// entering: air (1.0) -> material (ior)
+			eta = hit.iorInvCh(ch) // 1/ior
 		} else {
-			// entering: outside -> inside
-			eta = hit.iorInvCh(ch)
+			// exiting: material (ior) -> air (1.0)
+			Nn = N.Mul(-1)
+			eta = hit.iorCh(ch) // ior
 		}
-		if T, ok := refract4(D, N, eta); ok {
+
+		if T, ok := refract4(D, Nn, eta); ok {
 			D = T
 			// keep direction unit-length
 			if l2 := D.Dot(D); l2 > 0 {
@@ -186,7 +189,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 				P.Z + D.Z*bumpShift,
 				P.W + D.W*bumpShift,
 			}
-			if Debug {
+			if Debug && deposit {
 				logRay("refracted", Refract, O, D, P, bounce, totalDist)
 			}
 			continue
@@ -203,12 +206,12 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 			P.Z + D.Z*bumpShift,
 			P.W + D.W*bumpShift,
 		}
-		if Debug {
+		if Debug && deposit {
 			logRay("total_internal_refraction", TIR, O, D, P, bounce, totalDist)
 		}
 	}
 
-	if Debug {
+	if Debug && deposit {
 		logRay("too_complex", RecurenceLimit, O, D, Point4{}, scene.MaxBounces, totalDist)
 	}
 	return false

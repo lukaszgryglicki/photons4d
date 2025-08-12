@@ -27,5 +27,8 @@ race:
 profile: runprofile
 	go tool pprof -text cpu.out > cpu.out.txt && cat cpu.out.txt
 
+test:
+	go test ./internal/photons4d -v
+
 clean:
 	rm -f $(BIN) cpu.out.txt cpu.out out
