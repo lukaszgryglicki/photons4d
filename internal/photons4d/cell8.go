@@ -41,12 +41,12 @@ type Cell8 struct {
 // NewCell8 constructs a cell8 and precomputes caches.
 func NewCell8(
 	center Point4,
-	size Vector4, // full edge lengths
+	scale Vector4, // full edge lengths
 	angles Rot4, // radians
 	color, reflectivity, refractivity, ior RGB,
 ) (*Cell8, error) {
-	if !(size.X > 0 && size.Y > 0 && size.Z > 0 && size.W > 0) {
-		return nil, fmt.Errorf("cell8 size must be >0 on all axes, got %+v", size)
+	if !(scale.X > 0 && scale.Y > 0 && scale.Z > 0 && scale.W > 0) {
+		return nil, fmt.Errorf("cell8 scale must be >0 on all axes, got %+v", scale)
 	}
 	in01 := func(x Real) bool { return x >= 0 && x <= 1 }
 
@@ -74,7 +74,7 @@ func NewCell8(
 	R := rotFromAngles(angles)
 	hc := Cell8{
 		Center: center,
-		Half:   Vector4{size.X * 0.5, size.Y * 0.5, size.Z * 0.5, size.W * 0.5},
+		Half:   Vector4{scale.X * 0.5, scale.Y * 0.5, scale.Z * 0.5, scale.W * 0.5},
 		R:      R,
 		RT:     R.Transpose(),
 

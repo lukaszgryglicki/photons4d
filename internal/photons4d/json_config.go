@@ -77,7 +77,7 @@ type Cell5Cfg struct {
 
 type Cell8Cfg struct {
 	Center Point4  `json:"center"`
-	Size   Vector4 `json:"size"`
+	Scale  Vector4 `json:"scale,omitempty"`
 	RotDeg Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
@@ -149,7 +149,7 @@ func (hc Cell8Cfg) Build() (*Cell8, error) {
 
 	return NewCell8(
 		hc.Center,
-		hc.Size,
+		hc.Scale,
 		rad,
 		hc.Color,
 		hc.Reflect,

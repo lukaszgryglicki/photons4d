@@ -16,7 +16,7 @@ func TestCell8CfgBuildAndValidation(t *testing.T) {
 	// Valid
 	h, err := (Cell8Cfg{
 		Center: Point4{0, 0, 0, 0.5},
-		Size:   Vector4{1, 1, 1, 1},
+		Scale:  Vector4{1, 1, 1, 1},
 		RotDeg: Rot4Deg{},
 		Color:  RGB{1, 1, 1}, Reflect: RGB{0, 0, 0}, Refract: RGB{1, 1, 1}, IOR: RGB{1.2, 1.2, 1.2},
 	}).Build()
@@ -25,7 +25,7 @@ func TestCell8CfgBuildAndValidation(t *testing.T) {
 	}
 	// Invalid size
 	_, err = (Cell8Cfg{
-		Center: Point4{}, Size: Vector4{0, 1, 1, 1},
+		Center: Point4{}, Scale: Vector4{0, 1, 1, 1},
 		RotDeg: Rot4Deg{}, Color: RGB{1, 1, 1}, Reflect: RGB{0, 0, 0}, Refract: RGB{1, 1, 1}, IOR: RGB{1.1, 1.1, 1.1},
 	}).Build()
 	if err == nil {
