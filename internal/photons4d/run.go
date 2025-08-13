@@ -120,6 +120,10 @@ func Run(cfgPath string) error {
 		raysStats()
 	}
 
+	if err := SaveAnimatedGIF(scene, cfg.GIFOut, cfg.GIFDelay, cfg.Gamma); err != nil {
+		panic(err)
+	}
+	DebugLog("Saved animated GIF: %s", cfg.GIFOut)
 	if PNG {
 		prefix := strings.Replace(cfg.GIFOut, ".gif", "", 1)
 		prefix = strings.Replace(prefix, "gifs/", "pngs/", 1)
@@ -127,11 +131,15 @@ func Run(cfgPath string) error {
 			panic(err)
 		}
 		DebugLog("Saved PNG sequence with prefix: %s", prefix)
-	} else {
-		if err := SaveAnimatedGIF(scene, cfg.GIFOut, cfg.GIFDelay, cfg.Gamma); err != nil {
+	}
+
+	if RAW {
+		fn := strings.Replace(cfg.GIFOut, ".gif", ".raw", 1)
+		fn = strings.Replace(fn, "gifs/", "raws/", 1)
+		if err := scene.SaveRawRGB64(fn); err != nil {
 			panic(err)
 		}
-		DebugLog("Saved animated GIF: %s", cfg.GIFOut)
+		DebugLog("Saved RAW scene: %s", fn)
 	}
 	return nil
 }
