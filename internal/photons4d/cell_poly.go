@@ -2,7 +2,6 @@ package photons4d
 
 import "math"
 
-
 // Polytope										Vertices		Edges		Faces (2D)			Cells (3D)
 // 5-cell 	(simplex)					5						10			10 triangles		5 tetrahedra
 // 8-cell 	(tesseract)				16					32			24 squares			8 cubes

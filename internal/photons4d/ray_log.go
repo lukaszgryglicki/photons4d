@@ -51,8 +51,12 @@ func logRay(name string, category Category, origin Point4, direction Vector4, po
 }
 
 func raysStats() {
+	allRays := 0
+	for _, v := range cache.rays {
+		allRays += len(v)
+	}
 	for k, v := range cache.rays {
-		fmt.Printf("Ray type %s: %d logs\n", k, len(v))
+		fmt.Printf("Ray type %s: %d logs (%f%%)\n", k, len(v), float64(len(v))/float64(allRays)*100)
 		//for _, log := range v {
 		//	fmt.Printf("  Bounce %d: Category=%d, Origin=%+v, Direction=%+v, Point=%+v, Distance=%.6f\n",
 		//		log.Bounce, log.Category, log.Origin, log.Direction, log.Point, log.Distance)
