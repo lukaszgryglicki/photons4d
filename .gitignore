@@ -36,6 +36,9 @@ out
 *.log
 *.swp
 *.raw
+*.xz
+*.png
+*.mp4
 ._*
 /photons4d
 *-old.go
