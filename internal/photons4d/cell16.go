@@ -210,7 +210,8 @@ func NewCell16(
 		c.N[i], c.D[i] = nw, d
 	}
 
-	DebugLog("Created 16-cell: center=%+v, scale=%+v, AABB=[%+v .. %+v]", center, scale, c.AABBMin, c.AABBMax)
+	// DebugLog("Created 16-cell: center=%+v, scale=%+v, AABB=[%+v .. %+v]", center, scale, c.AABBMin, c.AABBMax)
+	DebugLog("Created 16-cell: %+v", c)
 	return c, nil
 }
 

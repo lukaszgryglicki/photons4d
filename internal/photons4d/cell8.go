@@ -138,7 +138,7 @@ func NewCell8(
 	}
 
 	// DebugLog("Created Cell8: Center=%+v, Half=%+v, R=%+v, Color=%+v, Reflectivity=%+v, Refractivity=%+v, IOR=%+v", hc.Center, hc.Half, hc.R, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
-	DebugLog("Created cell8: %+v", &hc)
+	DebugLog("Created 8-cell: %+v", hc)
 	return &hc, nil
 }
 

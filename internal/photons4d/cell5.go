@@ -235,7 +235,8 @@ func NewCell5(
 		sx4.N[i], sx4.D[i] = n, d
 	}
 
-	DebugLog("Created 5-cell: center=%+v, scale=%+v, AABB=[%+v .. %+v]", center, scale, sx4.AABBMin, sx4.AABBMax)
+	// DebugLog("Created 5-cell: center=%+v, scale=%+v, AABB=[%+v .. %+v]", center, scale, sx4.AABBMin, sx4.AABBMax)
+	DebugLog("Created 5-cell: %+v", sx4)
 	return sx4, nil
 }
 

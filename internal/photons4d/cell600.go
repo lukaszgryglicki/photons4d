@@ -36,6 +36,7 @@ func NewCell600(center Point4, scale Vector4, angles Rot4, color, reflectivity, 
 	cp.materialFrom(color, reflectivity, refractivity, ior)
 	cp.buildPlanes(verts120Unit(), 1.0)
 
-	DebugLog("Created 600-cell: center=%+v, scale=%+v, AABB=[%+v..%+v]", center, scale, cp.AABBMin, cp.AABBMax)
+	// DebugLog("Created 600-cell: center=%+v, scale=%+v, AABB=[%+v..%+v]", center, scale, cp.AABBMin, cp.AABBMax)
+	DebugLog("Created 600-cell: %+v", cp)
 	return &Cell600{cp}, nil
 }
