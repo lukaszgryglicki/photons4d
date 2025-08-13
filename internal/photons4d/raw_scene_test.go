@@ -110,3 +110,15 @@ func TestSceneSaveRawRGB64_Errors(t *testing.T) {
 		}
 	})
 }
+
+func TestSceneSaveRawRGB64_Zero(t *testing.T) {
+	s := &Scene{Nx: 0, Ny: 0, Nz: 0, Buf: nil}
+	path := filepath.Join(t.TempDir(), "zero.raw")
+	if err := s.SaveRawRGB64(path); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	st, _ := os.Stat(path)
+	if st.Size() != 12 { // header only
+		t.Fatalf("want 12 bytes, got %d", st.Size())
+	}
+}

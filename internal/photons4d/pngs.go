@@ -41,7 +41,7 @@ func SavePNGSequence16(scene *Scene, prefix string, gamma Real) error {
 	// Zero-padding width based on number of slices.
 	width := 1
 	if Nz > 1 {
-		width = int(math.Log10(float64(Nz-1))) + 1
+		width = int(math.Log10(Real(Nz-1))) + 1
 	}
 
 	// Progress print step (~1%).
