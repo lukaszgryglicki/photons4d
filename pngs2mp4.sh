@@ -3,6 +3,7 @@
 if [ -z "$1" ]
 then
   echo "Usage: $0 <prefix>"
+  echo "Example: $0 120-cell-flat"
   exit 1
 fi
 prefix="$1"
