@@ -2,6 +2,15 @@ package photons4d
 
 import "math"
 
+
+// Polytope										Vertices		Edges		Faces (2D)			Cells (3D)
+// 5-cell 	(simplex)					5						10			10 triangles		5 tetrahedra
+// 8-cell 	(tesseract)				16					32			24 squares			8 cubes
+// 16-cell 	(cross-polytope)	8						24			32 triangles		16 tetrahedra
+// 24-cell										24					96			96 triangles		24 octahedra
+// 120-cell										600					1200		720 pentagons		120 dodecahedra
+// 600-cell										120					720			1200 triangles	600 tetrahedra
+
 // Convex 4D polytope expressed as intersection of planes N[i]·x <= D[i] (N need not be unit).
 // Built by taking unit-radius local normals 'nl[i]' and an offset 'Radius' (scalar), then
 // transforming by Scale (anisotropic), Rotation, and Center translation.
