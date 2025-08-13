@@ -31,28 +31,37 @@ func allPerms4Distinct(a [4]Real) [][4]Real {
 }
 
 func signVariants(vals [4]Real, maskNonZero [4]bool, requireEvenMinus bool) [][4]Real {
-	// Flip signs of the entries marked true in maskNonZero.
-	// If requireEvenMinus, keep only even number of minus signs (among masked).
 	out := make([][4]Real, 0, 16)
 	for s := 0; s < 16; s++ {
 		v := vals
+
+		// start with how many masked entries are already negative
 		minus := 0
-		ok := true
+		for i := 0; i < 4; i++ {
+			if maskNonZero[i] && v[i] < 0 {
+				minus++
+			}
+		}
+
+		// apply flips; each flip toggles sign ⇒ toggles minus parity
 		for i := 0; i < 4; i++ {
 			if !maskNonZero[i] {
 				continue
 			}
 			if (s>>i)&1 == 1 {
 				v[i] = -v[i]
-				minus++
+				if v[i] < 0 {
+					minus++
+				} else {
+					minus--
+				}
 			}
 		}
-		if requireEvenMinus && (minus&1) == 1 {
-			ok = false
+
+		if requireEvenMinus && (minus&1) != 0 {
+			continue
 		}
-		if ok {
-			out = append(out, v)
-		}
+		out = append(out, v)
 	}
 	return out
 }
@@ -73,10 +82,6 @@ func pushUnique(set map[[4]int64]struct{}, out *[]Vector4, v [4]Real) {
 	*out = append(*out, Vector4{v[0], v[1], v[2], v[3]}.Norm())
 }
 
-// ---- 600-cell vertices (unit-radius) ----
-// From Wikipedia 600-cell "Unit radius Cartesian coordinates":
-// 8 of (0,0,0,±1) permuted; 16 of (±1/2,±1/2,±1/2,±1/2); and
-// 96 even permutations of (0, ±1/2, ±φ/2, ±1/(2φ)) with an even number of minus signs.
 func verts600Unit() []Vector4 {
 	phi := (1 + math.Sqrt(5)) / 2
 	inv := 1 / phi
@@ -84,7 +89,7 @@ func verts600Unit() []Vector4 {
 	set := make(map[[4]int64]struct{}, 128)
 	out := make([]Vector4, 0, 120)
 
-	// A: 8 axis points
+	// 8 axes
 	for a := 0; a < 4; a++ {
 		for s := -1; s <= 1; s += 2 {
 			v := [4]Real{0, 0, 0, 0}
@@ -93,7 +98,7 @@ func verts600Unit() []Vector4 {
 		}
 	}
 
-	// B: 16 cell8-like
+	// 16 of (±1/2, ±1/2, ±1/2, ±1/2)
 	b := Real(0.5)
 	for sx := -1; sx <= 1; sx += 2 {
 		for sy := -1; sy <= 1; sy += 2 {
@@ -105,62 +110,32 @@ func verts600Unit() []Vector4 {
 		}
 	}
 
-	// C: 96 even perms of (0, 1/2, φ/2, 1/(2φ)) with even minus signs on the three nonzeros.
-	a0 := Real(0)
-	a1 := Real(0.5)
-	a2 := Real(0.5 * phi)
-	a3 := Real(0.5 * inv)
-	base := [4]Real{a0, a1, a2, a3}
-	eps := evenPerms4()
-	for _, p := range eps {
-		v := [4]Real{base[p[0]], base[p[1]], base[p[2]], base[p[3]]}
+	// 96: all 24 perms of (0, 1/2, φ/2, 1/(2φ)) with even minus on the 3 nonzeros
+	base := [4]Real{0, Real(0.5), Real(0.5 * phi), Real(0.5 * inv)}
+	for _, p := range allPerms4Distinct(base) {
+		v := [4]Real{p[0], p[1], p[2], p[3]}
 		mask := [4]bool{v[0] != 0, v[1] != 0, v[2] != 0, v[3] != 0}
 		for _, vv := range signVariants(v, mask, true) {
 			pushUnique(set, &out, vv)
 		}
 	}
 
-	// sanity
 	if len(out) != 120 {
 		DebugLog("verts600Unit: expected 120, got %d", len(out))
 	}
 	return out
 }
 
-// ---- 120-cell vertices (unit-radius) ----
-// From Wikipedia 120-cell "Unit radius coordinates" left column:
-// 8 ({±1,0,0,0})
-// 16 ({±1,±1,±1,±1}) / 2
-// 96 ([0, ±(φ−1), ±1, ±φ]) / 2
-// 32 ([±1, ±1, ±1, ±√5]) / √8
-// 32 ([±(φ−1), ±(φ−1), ±(φ−1), ±φ^2]) / √8
-// 96 ([0, ±(φ−1), ±φ, ±√5]) / √8
-// 96 ([0, ±(φ−2), ±1, ±φ^2]) / √8
-// 192 ([±(φ−1), ±1, ±φ, ±2]) / √8
 func verts120Unit() []Vector4 {
 	phi := (1 + math.Sqrt(5)) / 2
 	inv := 1 / phi
 	rt5 := math.Sqrt(5)
 	rt8 := math.Sqrt(8)
 
-	add := func(vals [][4]Real, out *[]Vector4, set map[[4]int64]struct{}) {
-		for _, v := range vals {
-			pushUnique(set, out, v)
-		}
-	}
-
 	set := make(map[[4]int64]struct{}, 640)
 	out := make([]Vector4, 0, 600)
 
 	// 8 axes
-	for a := 0; a < 4; a++ {
-		for s := -1; s <= 1; s += 2 {
-			add([][4]Real{{Real(s), 0, 0, 0}}, &out, set)
-			out[len(out)-1] = Vector4{0, 0, 0, 0} // fixed below by pushUnique normalization trick, leave as is
-		}
-	}
-	// overwrite properly (axis set above used to reserve; do directly):
-	out = out[:0]
 	for a := 0; a < 4; a++ {
 		for s := -1; s <= 1; s += 2 {
 			v := [4]Real{0, 0, 0, 0}
@@ -169,7 +144,7 @@ func verts120Unit() []Vector4 {
 		}
 	}
 
-	// 16: (±1/2, ±1/2, ±1/2, ±1/2)
+	// 16: (±1/2,±1/2,±1/2,±1/2)
 	for sx := -1; sx <= 1; sx += 2 {
 		for sy := -1; sy <= 1; sy += 2 {
 			for sz := -1; sz <= 1; sz += 2 {
@@ -182,10 +157,9 @@ func verts120Unit() []Vector4 {
 		}
 	}
 
-	// 96: (0, ±(φ−1)/2, ±1/2, ±φ/2), even minus on nonzeros, all perms of positions (not parity-restricted)
+	// 96: (0, ±(φ−1)/2, ±1/2, ±φ/2), even minus on the 3 nonzeros, all 24 perms
 	c3 := [3]Real{Real(inv * 0.5), 0.5, Real(phi * 0.5)}
 	for zero := 0; zero < 4; zero++ {
-		// permutations of the other 3 distinct values = 6
 		p3 := [][]int{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}}
 		for _, p := range p3 {
 			val := [4]Real{}
@@ -205,12 +179,11 @@ func verts120Unit() []Vector4 {
 		}
 	}
 
-	// 32: ([±1, ±1, ±1, ±√5]) / √8 with even minus parity
+	// 32: ([±1, ±1, ±1, ±√5]) / √8, even minus
 	for pos := 0; pos < 4; pos++ {
 		val := [4]Real{Real(1 / rt8), Real(1 / rt8), Real(1 / rt8), Real(1 / rt8)}
 		val[pos] = Real(rt5 / rt8)
-		mask := [4]bool{true, true, true, true}
-		for _, vv := range signVariants(val, mask, true) {
+		for _, vv := range signVariants(val, [4]bool{true, true, true, true}, true) {
 			pushUnique(set, &out, vv)
 		}
 	}
@@ -219,8 +192,16 @@ func verts120Unit() []Vector4 {
 	for pos := 0; pos < 4; pos++ {
 		val := [4]Real{Real(inv / rt8), Real(inv / rt8), Real(inv / rt8), Real(inv / rt8)}
 		val[pos] = Real((phi * phi) / rt8)
-		mask := [4]bool{true, true, true, true}
-		for _, vv := range signVariants(val, mask, true) {
+		for _, vv := range signVariants(val, [4]bool{true, true, true, true}, true) {
+			pushUnique(set, &out, vv)
+		}
+	}
+
+	// 32: ([±φ, ±φ, ±φ, ±(2−φ)]) / √8, even minus  ← missing family added
+	for pos := 0; pos < 4; pos++ {
+		val := [4]Real{Real(phi / rt8), Real(phi / rt8), Real(phi / rt8), Real(phi / rt8)}
+		val[pos] = Real((2 - phi) / rt8) // = 1/φ² / √8
+		for _, vv := range signVariants(val, [4]bool{true, true, true, true}, true) {
 			pushUnique(set, &out, vv)
 		}
 	}
@@ -248,7 +229,7 @@ func verts120Unit() []Vector4 {
 	}
 
 	// 96: ([0, ±(φ−2), ±1, ±φ^2]) / √8, even minus on the 3 nonzeros
-	phim2 := phi - 2 // negative number
+	phim2 := phi - 2 // negative
 	c3c := [3]Real{Real(phim2 / rt8), Real(1 / rt8), Real((phi * phi) / rt8)}
 	for zero := 0; zero < 4; zero++ {
 		p3 := [][]int{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}}
@@ -273,8 +254,7 @@ func verts120Unit() []Vector4 {
 	// 192: ([±(φ−1), ±1, ±φ, ±2]) / √8, even minus on all 4
 	base := [4]Real{Real(inv / rt8), Real(1 / rt8), Real(phi / rt8), Real(2 / rt8)}
 	for _, p := range allPerms4Distinct(base) {
-		mask := [4]bool{true, true, true, true}
-		for _, vv := range signVariants(p, mask, true) {
+		for _, vv := range signVariants(p, [4]bool{true, true, true, true}, true) {
 			pushUnique(set, &out, vv)
 		}
 	}
