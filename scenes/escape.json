@@ -1,0 +1,27 @@
+{
+  "sceneResX": 512,
+  "sceneResY": 512,
+  "sceneResZ": 1,
+  "probeRays": 65535,
+  "spp": 16,
+  "gifOut": "./gifs/escape.gif",
+  "gifDelay": 10,
+  "gamma": 0.8,
+  "scene": {
+    "center": { "X": 0, "Y": 0, "Z": 0, "W": 0 },
+    "width": 2.0,
+    "height": 2.0,
+    "depth": 2.0,
+    "maxBounces": 32,
+    "escape": true
+  },
+  "lights": [
+    {
+      "origin":    { "X": 0.0,  "Y": 0.0,  "Z": 0.0,  "W": 1.0 },
+      "direction": { "X": 0.0,  "Y": 0.0,  "Z": 0.0,  "W": -1.0 },
+      "color":     { "R": 1.0,  "G": 1.0,  "B": 1.0 },
+      "angleDeg":  60.0,
+      "intensity": 1.0
+    }
+  ]
+}

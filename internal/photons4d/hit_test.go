@@ -6,7 +6,7 @@ import (
 )
 
 func TestPlaneHit(t *testing.T) {
-	scene := NewScene(Point4{0, 0, 0, 0.25}, 2, 2, 2, 2, 2, 1, 4)
+	scene := NewScene(Point4{0, 0, 0, 0.25}, 2, 2, 2, 2, 2, 1, 4, false)
 
 	// Parallel to plane
 	tp := planeHit(scene, Point4{0, 0, 0, 0}, Vector4{1, 0, 0, 0})
@@ -28,7 +28,7 @@ func TestPlaneHit(t *testing.T) {
 }
 
 func TestNearestHit_PrefersCloser(t *testing.T) {
-	scene := NewScene(Point4{0, 0, 0, 0}, 2, 2, 2, 4, 4, 1, 8)
+	scene := NewScene(Point4{0, 0, 0, 0}, 2, 2, 2, 4, 4, 1, 8, false)
 	c := newUnitCell8AtW0p5()
 	scene.AddCell8(c)
 

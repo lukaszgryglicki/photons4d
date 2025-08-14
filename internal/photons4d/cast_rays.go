@@ -39,16 +39,40 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		}
 
 		// Next plane hit (W == scene.Center.W)
-		tPlane := planeHit(scene, O, D)
+		var tPlane Real
+		if scene.EnvHypersphere {
+			tPlane = math.Inf(1)
+		} else {
+			tPlane = planeHit(scene, O, D)
+		}
 
 		// Next object hit (cell/ellipsoid) with AABB pre-cull
 		hit, okObj := NearestHitFunc(scene, O, D, tPlane)
 
 		// If no cell/ellipsoid ahead or plane is closer → try to deposit on the plane.
 		if !okObj || tPlane < hit.t {
+			if scene.EnvHypersphere {
+				// Escape → deposit into angular voxel (α,β,γ of current D)
+				i, j, k, _, _, _ := scene.AngleIndexOf(D)
+
+				if deposit {
+					base := scene.idx(i, j, k, ChR)
+					if UseLocks && locks != nil {
+						locks.lock(base)
+						scene.Buf[base+ch] += Real(throughput) // no distance falloff at infinity
+						locks.unlock(base)
+					} else {
+						scene.Buf[base+ch] += Real(throughput)
+					}
+				}
+				if Debug && deposit {
+					logRay("escape_env", Hit, O, D, Point4{}, bounce, totalDist)
+				}
+				return true
+			}
 			if !isFinite(tPlane) {
 				if Debug && deposit {
-					logRay("parallel_to_scene", Miss, O, D, Point4{}, bounce, totalDist)
+					logRay("parallel_to_scene", Escape, O, D, Point4{}, bounce, totalDist)
 				}
 				// parallel to plane and no object to stop us
 				return false

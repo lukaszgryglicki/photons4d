@@ -7,7 +7,7 @@ import (
 )
 
 func tinyScene() *Scene {
-	s := NewScene(Point4{0, 0, 0, 0}, 2, 2, 2, 2, 2, 1, 4)
+	s := NewScene(Point4{0, 0, 0, 0}, 2, 2, 2, 2, 2, 1, 4, false)
 	// Put a single bright voxel so files are not empty/black
 	i, j, k := 1, 1, 0
 	base := s.idx(i, j, k, ChR)

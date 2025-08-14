@@ -1,11 +1,14 @@
 package photons4d
 
+import "math"
+
 // Scene stores a 3D volume (axis-aligned in X,Y,Z) embedded at W=Center.W.
 type Scene struct {
 	Center               Point4
 	Width, Height, Depth Real
 	Nx, Ny, Nz           int
 	MaxBounces           int
+	EnvHypersphere       bool
 	Buf                  []Real // flat: (((i*Ny)+j)*Nz + k)*3 + c
 	Cells8               []*Cell8
 	Hyperspheres         []*HyperSphere
@@ -27,7 +30,7 @@ type Scene struct {
 }
 
 // NewScene allocates a zero-initialized flat voxel grid and precomputes bounds & strides.
-func NewScene(center Point4, width, height, depth Real, nx, ny, nz, maxBounces int) *Scene {
+func NewScene(center Point4, width, height, depth Real, nx, ny, nz, maxBounces int, escape bool) *Scene {
 	if nx <= 0 || ny <= 0 || nz <= 0 {
 		panic("voxel resolution must be positive")
 	}
@@ -48,15 +51,16 @@ func NewScene(center Point4, width, height, depth Real, nx, ny, nz, maxBounces i
 	strideX := ny * strideY
 
 	s := &Scene{
-		Center:     center,
-		Width:      width,
-		Height:     height,
-		Depth:      depth,
-		Nx:         nx,
-		Ny:         ny,
-		Nz:         nz,
-		Buf:        make([]Real, total),
-		MaxBounces: maxBounces,
+		Center:         center,
+		Width:          width,
+		Height:         height,
+		Depth:          depth,
+		Nx:             nx,
+		Ny:             ny,
+		Nz:             nz,
+		Buf:            make([]Real, total),
+		MaxBounces:     maxBounces,
+		EnvHypersphere: escape,
 
 		MinX:     minX,
 		MaxX:     maxX,
@@ -70,7 +74,7 @@ func NewScene(center Point4, width, height, depth Real, nx, ny, nz, maxBounces i
 		StrideX:  strideX,
 		StrideY:  strideY,
 	}
-	DebugLog("Created scene center=%+v, size=(%.2f, %.2f, %.2f), resolution=(%d, %d, %d), maxBounces=%d", center, width, height, depth, nx, ny, nz, maxBounces)
+	DebugLog("Created scene center=%+v, size=(%.2f, %.2f, %.2f), resolution=(%d, %d, %d), maxBounces=%d, escape=%v", center, width, height, depth, nx, ny, nz, maxBounces, escape)
 	return s
 }
 
@@ -102,6 +106,48 @@ func (s *Scene) VoxelIndexOf(p Point4) (ok bool, i, j, k int, ux, uy, uz Real) {
 		k = s.Nz - 1
 	}
 	return true, i, j, k, ux, uy, uz
+}
+
+// AngleIndexOf bins a *direction* (unit-ish Vector4) into (i,j,k)
+// with i over α∈[0,π], j over β∈[0,π], k over γ∈[0,2π).
+func (s *Scene) AngleIndexOf(d Vector4) (i, j, k int, alpha, beta, gamma Real) {
+	// Normalize defensively (fast enough and done rarely on escape)
+	l2 := d.Dot(d)
+	if l2 > 0 && l2 != 1 {
+		inv := 1 / Real(math.Sqrt(float64(l2)))
+		d = d.Mul(inv)
+	}
+	x, y, z, w := d.X, d.Y, d.Z, d.W
+
+	// Robust radii
+	r3 := Real(math.Sqrt(float64(y*y + z*z + w*w)))
+	r2 := Real(math.Sqrt(float64(z*z + w*w)))
+
+	alpha = Real(math.Atan2(float64(r3), float64(x))) // [0,π]
+	beta = Real(math.Atan2(float64(r2), float64(y)))  // [0,π]
+	gamma = Real(math.Atan2(float64(w), float64(z)))  // (-π,π]
+	if gamma < 0 {
+		gamma += 2 * Real(math.Pi) // [0,2π)
+	}
+
+	ua := alpha / Real(math.Pi)
+	ub := beta / Real(math.Pi)
+	ug := gamma / Real(2*math.Pi)
+
+	i = int(ua * Real(s.Nx))
+	j = int(ub * Real(s.Ny))
+	k = int(ug * Real(s.Nz))
+
+	if i == s.Nx {
+		i = s.Nx - 1
+	}
+	if j == s.Ny {
+		j = s.Ny - 1
+	}
+	if k == s.Nz {
+		k = s.Nz - 1
+	}
+	return
 }
 
 func (s *Scene) NObjects() int {

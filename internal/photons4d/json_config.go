@@ -13,6 +13,10 @@ type SceneCfg struct {
 	Height     Real   `json:"height"`
 	Depth      Real   `json:"depth"`
 	MaxBounces int    `json:"maxBounces,omitempty"`
+	// When true, the "scene" is an infinite hypersphere (environment).
+	// Rays that do not hit any object "escape" and deposit into angle bins
+	// derived from their canonical 4D direction (α,β,γ).
+	EnvHypersphere bool `json:"escape,omitempty"`
 }
 
 type LightCfg struct {
@@ -317,5 +321,6 @@ func loadConfig(path string) (*Config, error) {
 	if cfg.Scene.MaxBounces <= 0 {
 		cfg.Scene.MaxBounces = MaxBounces
 	}
+	DebugLog("Loaded config from %s: size=(%d, %d, %d), probe=%d, SPP=%d, gamma=%f", path, cfg.SceneResX, cfg.SceneResY, cfg.SceneResZ, cfg.ProbeRays, cfg.Spp, cfg.Gamma)
 	return &cfg, nil
 }

@@ -24,7 +24,7 @@ func Run(cfgPath string) error {
 	}
 
 	Nx, Ny, Nz := cfg.SceneResX, cfg.SceneResY, cfg.SceneResZ
-	scene := NewScene(cfg.Scene.Center, cfg.Scene.Width, cfg.Scene.Height, cfg.Scene.Depth, Nx, Ny, Nz, cfg.Scene.MaxBounces)
+	scene := NewScene(cfg.Scene.Center, cfg.Scene.Width, cfg.Scene.Height, cfg.Scene.Depth, Nx, Ny, Nz, cfg.Scene.MaxBounces, cfg.Scene.EnvHypersphere)
 
 	lights := make([]*Light, 0, len(cfg.Lights))
 	for _, Lc := range cfg.Lights {

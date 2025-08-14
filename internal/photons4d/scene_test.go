@@ -3,7 +3,7 @@ package photons4d
 import "testing"
 
 func TestSceneMapping(t *testing.T) {
-	s := NewScene(Point4{0, 0, 0, 0}, 2, 4, 6, 10, 20, 30, 8)
+	s := NewScene(Point4{0, 0, 0, 0}, 2, 4, 6, 10, 20, 30, 8, false)
 	if s.StrideY != s.Nz*3 {
 		t.Fatalf("StrideY wrong: %d", s.StrideY)
 	}
@@ -18,7 +18,7 @@ func TestSceneMapping(t *testing.T) {
 }
 
 func TestIdxAndVoxelSize(t *testing.T) {
-	s := NewScene(Point4{0, 0, 0, 0}, 2, 2, 2, 4, 4, 4, 4)
+	s := NewScene(Point4{0, 0, 0, 0}, 2, 2, 2, 4, 4, 4, 4, false)
 	dx, dy, dz := s.VoxelSize()
 	if dx != 0.5 || dy != 0.5 || dz != 0.5 {
 		t.Fatalf("voxel size wrong: %.3f %.3f %.3f", dx, dy, dz)

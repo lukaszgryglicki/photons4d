@@ -9,7 +9,7 @@ build: fmt
 	go build -tags debug -o $(BIN) $(CMD)
 
 release: fmt
-	go build -o $(BIN) $(CMD)
+	GOAMD64=v4 go build -o $(BIN) $(CMD)
 	strip $(BIN)
 
 run: build

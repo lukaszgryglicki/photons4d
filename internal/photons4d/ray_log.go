@@ -15,6 +15,7 @@ const (
 	Reflect                        // ray reflected
 	Refract                        // ray refracted
 	TIR                            // total internal reflection (ray did not exit object)
+	Escape                         // ray escaped the scene (in hypersphere alpha, beta, gamma mode)
 	RecurenceLimit                 // ray hit a recurrence limit (e.g. max bounces exceeded)
 )
 
