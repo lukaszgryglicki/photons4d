@@ -59,6 +59,7 @@ type HyperSphereCfg struct {
 	RotDeg Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
 	Reflect RGB `json:"reflect"`
 	Refract RGB `json:"refract"`
 	IOR     RGB `json:"ior"`
@@ -70,6 +71,7 @@ type Cell5Cfg struct {
 	RotDeg Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
 	Reflect RGB `json:"reflect"`
 	Refract RGB `json:"refract"`
 	IOR     RGB `json:"ior"`
@@ -81,6 +83,7 @@ type Cell8Cfg struct {
 	RotDeg Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
 	Reflect RGB `json:"reflect"`
 	Refract RGB `json:"refract"`
 	IOR     RGB `json:"ior"`
@@ -92,6 +95,7 @@ type Cell16Cfg struct {
 	RotDeg Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
 	Reflect RGB `json:"reflect"`
 	Refract RGB `json:"refract"`
 	IOR     RGB `json:"ior"`
@@ -103,6 +107,7 @@ type Cell24Cfg struct {
 	RotDeg Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
 	Reflect RGB `json:"reflect"`
 	Refract RGB `json:"refract"`
 	IOR     RGB `json:"ior"`
@@ -114,6 +119,7 @@ type Cell120Cfg struct {
 	RotDeg Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
 	Reflect RGB `json:"reflect"`
 	Refract RGB `json:"refract"`
 	IOR     RGB `json:"ior"`
@@ -125,6 +131,7 @@ type Cell600Cfg struct {
 	RotDeg Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
 	Reflect RGB `json:"reflect"`
 	Refract RGB `json:"refract"`
 	IOR     RGB `json:"ior"`
@@ -158,7 +165,7 @@ func (hc Cell8Cfg) Build() (*Cell8, error) {
 	if sc.W == 0 {
 		sc.W = 1
 	}
-	return NewCell8(hc.Center, sc, rad, hc.Color, hc.Reflect, hc.Refract, hc.IOR)
+	return NewCell8(hc.Center, sc, rad, hc.Color, hc.Diffuse, hc.Reflect, hc.Refract, hc.IOR)
 }
 
 func (hs HyperSphereCfg) Build() (*HyperSphere, error) {
@@ -180,7 +187,7 @@ func (hs HyperSphereCfg) Build() (*HyperSphere, error) {
 		return nil, fmt.Errorf("scale must be > 0 on all axes, got %+v", sc)
 	}
 	radii := Vector4{sc.X, sc.Y, sc.Z, sc.W}
-	return NewHyperSphere(hs.Center, radii, rad, hs.Color, hs.Reflect, hs.Refract, hs.IOR)
+	return NewHyperSphere(hs.Center, radii, rad, hs.Color, hs.Diffuse, hs.Reflect, hs.Refract, hs.IOR)
 }
 
 func (s Cell5Cfg) Build() (*Cell5, error) {
@@ -198,7 +205,7 @@ func (s Cell5Cfg) Build() (*Cell5, error) {
 	if sc.W == 0 {
 		sc.W = 1
 	}
-	return NewCell5(s.Center, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
+	return NewCell5(s.Center, sc, rad, s.Color, s.Diffuse, s.Reflect, s.Refract, s.IOR)
 }
 
 func (s Cell16Cfg) Build() (*Cell16, error) {
@@ -216,7 +223,7 @@ func (s Cell16Cfg) Build() (*Cell16, error) {
 	if sc.W == 0 {
 		sc.W = 1
 	}
-	return NewCell16(s.Center, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
+	return NewCell16(s.Center, sc, rad, s.Color, s.Diffuse, s.Reflect, s.Refract, s.IOR)
 }
 
 func (s Cell24Cfg) Build() (*Cell24, error) {
@@ -234,7 +241,7 @@ func (s Cell24Cfg) Build() (*Cell24, error) {
 	if sc.W == 0 {
 		sc.W = 1
 	}
-	return NewCell24(s.Center, sc, rad, s.Color, s.Reflect, s.Refract, s.IOR)
+	return NewCell24(s.Center, sc, rad, s.Color, s.Diffuse, s.Reflect, s.Refract, s.IOR)
 }
 
 func (c Cell120Cfg) Build() (*Cell120, error) {
@@ -251,7 +258,7 @@ func (c Cell120Cfg) Build() (*Cell120, error) {
 	if sc.W == 0 {
 		sc.W = 1
 	}
-	return NewCell120(c.Center, sc, c.RotDeg.Radians(), c.Color, c.Reflect, c.Refract, c.IOR)
+	return NewCell120(c.Center, sc, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
 }
 func (c Cell600Cfg) Build() (*Cell600, error) {
 	sc := c.Scale
@@ -267,7 +274,7 @@ func (c Cell600Cfg) Build() (*Cell600, error) {
 	if sc.W == 0 {
 		sc.W = 1
 	}
-	return NewCell600(c.Center, sc, c.RotDeg.Radians(), c.Color, c.Reflect, c.Refract, c.IOR)
+	return NewCell600(c.Center, sc, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
 }
 
 func loadConfig(path string) (*Config, error) {

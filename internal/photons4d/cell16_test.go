@@ -10,7 +10,7 @@ func TestNewCell16AndIntersect(t *testing.T) {
 		Point4{0, 0, 0, 0.6},    // clearly in front of W=0 plane
 		Vector4{.3, .3, .3, .3}, // no anisotropic scale
 		Rot4{},                  // identity rotation
-		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{1.3, 1.3, 1.3},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{1.3, 1.3, 1.3},
 	)
 	if err != nil {
 		t.Fatalf("NewCell16: %v", err)
@@ -44,7 +44,7 @@ func TestSceneAABBWithCell16(t *testing.T) {
 		Point4{0.1, -0.2, 0.05, 0.4},
 		Vector4{.275, 0.225, .25, 0.2},
 		Rot4{XY: 0.2, XZ: -0.15, ZW: 0.3},
-		RGB{1, 1, 1}, RGB{0.1, 0.1, 0.1}, RGB{0.8, 0.8, 0.8}, RGB{1.3, 1.3, 1.3},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0.1, 0.1, 0.1}, RGB{0.8, 0.8, 0.8}, RGB{1.3, 1.3, 1.3},
 	)
 	if err != nil {
 		t.Fatal(err)

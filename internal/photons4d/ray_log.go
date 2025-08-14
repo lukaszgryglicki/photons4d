@@ -10,6 +10,7 @@ type Category uint8
 const (
 	Hit            Category = iota // ray hit
 	Miss                           // ray missed
+	Diffuse                        // ray scattered diffusely
 	Absorb                         // ray absorbed
 	Reflect                        // ray reflected
 	Refract                        // ray refracted

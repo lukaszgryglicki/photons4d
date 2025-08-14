@@ -10,7 +10,7 @@ func newUnitCell8AtW0p5() *Cell8 {
 		Point4{0, 0, 0, 0.5},
 		Vector4{0.2, 0.2, 0.2, 0.2}, // edges 0.2 ⇒ half 0.1
 		Rot4{},                      // identity
-		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{1.2, 1.2, 1.2},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{1.2, 1.2, 1.2},
 	)
 	if err != nil {
 		panic(err)

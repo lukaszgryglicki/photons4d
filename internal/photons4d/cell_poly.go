@@ -20,6 +20,7 @@ type cellPoly struct {
 	RT     Mat4
 
 	Color   RGB
+	Diffuse RGB
 	Reflect RGB
 	Refract RGB
 	IOR     RGB
@@ -37,6 +38,7 @@ type cellPoly struct {
 	refl     [3]Real
 	refr     [3]Real
 	colorArr [3]Real
+	diff     [3]Real
 	iorArr   [3]Real
 	iorInv   [3]Real
 	pAbs     [3]Real
@@ -131,14 +133,15 @@ func (cp *cellPoly) computeAABB() {
 	cp.AABBMax = Point4{maxV[0], maxV[1], maxV[2], maxV[3]}
 }
 
-func (cp *cellPoly) materialFrom(color, refl, refr, ior RGB) {
-	cp.Color, cp.Reflect, cp.Refract, cp.IOR = color, refl, refr, ior
+func (cp *cellPoly) materialFrom(color, diff, refl, refr, ior RGB) {
+	cp.Color, cp.Diffuse, cp.Reflect, cp.Refract, cp.IOR = color, diff, refl, refr, ior
 	cp.refl = [3]Real{refl.R, refl.G, refl.B}
 	cp.refr = [3]Real{refr.R, refr.G, refr.B}
 	cp.colorArr = [3]Real{color.R, color.G, color.B}
+	cp.diff = [3]Real{diff.R, diff.G, diff.B}
 	cp.iorArr = [3]Real{ior.R, ior.G, ior.B}
 	for i := 0; i < 3; i++ {
-		p := 1 - cp.refl[i] - cp.refr[i]
+		p := 1 - cp.refl[i] - cp.refr[i] - cp.diff[i]
 		if p < 0 {
 			p = 0
 		}

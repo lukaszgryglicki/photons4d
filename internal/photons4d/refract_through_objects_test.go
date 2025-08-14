@@ -16,7 +16,7 @@ func TestRefractionThrough_Cell8(t *testing.T) {
 		Point4{0, 0, 0, 0.6},
 		Vector4{0.3, 0.3, 0.3, 0.3},
 		Rot4{},
-		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +70,7 @@ func TestRefractionThrough_HyperSphere(t *testing.T) {
 		Point4{0, 0, 0, 0.6},
 		Vector4{0.25, 0.25, 0.25, 0.25},
 		Rot4{},
-		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -123,7 +123,7 @@ func TestRefractionThrough_Cell5(t *testing.T) {
 		Point4{0, 0, 0, 0.6},
 		Vector4{.3, .3, .3, .3},
 		Rot4{},
-		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -172,7 +172,7 @@ func TestRefractionThrough_Cell16(t *testing.T) {
 		Point4{0, 0, 0, 0.6},
 		Vector4{.3, .3, .3, .3},
 		Rot4{},
-		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -221,7 +221,7 @@ func TestRefractionThrough_Cell24(t *testing.T) {
 		Point4{0, 0, 0, 0.6},
 		Vector4{.3, .3, .3, .3},
 		Rot4{},
-		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -275,7 +275,7 @@ func TestRefractionThrough_Cell120(t *testing.T) {
 		Point4{0, 0, 0, 0.6},
 		Vector4{.2, .2, .2, .2},
 		Rot4{},
-		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
 	)
 	if err != nil {
 		t.Fatalf("NewCell120: %v", err)
@@ -321,7 +321,7 @@ func TestRefractionThrough_Cell600(t *testing.T) {
 		Point4{0, 0, 0, 0.6},
 		Vector4{.2, .2, .2, .2},
 		Rot4{},
-		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
 	)
 	if err != nil {
 		t.Fatalf("NewCell600: %v", err)

@@ -10,7 +10,7 @@ func TestIntersectRayHyperSphere_AxisCase(t *testing.T) {
 	hs, err := NewHyperSphere(
 		Point4{0, 0, 0, 2},
 		Vector4{1, 1, 1, 1}, Rot4{},
-		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{1.5, 1.5, 1.5},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{1.5, 1.5, 1.5},
 	)
 	if err != nil {
 		t.Fatal(err)

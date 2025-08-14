@@ -12,6 +12,7 @@ func TestNewCell120AndIntersect(t *testing.T) {
 		Rot4{},                  // identity rotation
 		RGB{1, 1, 1},
 		RGB{0, 0, 0},
+		RGB{0, 0, 0},
 		RGB{1, 1, 1},
 		RGB{1.05, 1.05, 1.05},
 	)
@@ -36,7 +37,7 @@ func TestSceneAABBWithCell120(t *testing.T) {
 		Point4{0.1, -0.2, 0.05, 0.3},
 		Vector4{1.1 * .15, 0.9 * .15, 1.05 * .15, 0.8 * .15},
 		Rot4{XY: 0.2, XZ: -0.1, ZW: 0.3},
-		RGB{1, 1, 1}, RGB{0.1, 0.1, 0.1}, RGB{0.8, 0.8, 0.8},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0.1, 0.1, 0.1}, RGB{0.8, 0.8, 0.8},
 		RGB{1.2, 1.2, 1.2},
 	)
 	if err != nil {

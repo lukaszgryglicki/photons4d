@@ -16,6 +16,7 @@ type HyperSphere struct {
 
 	// Material (per-channel):
 	Color   RGB
+	Diffuse RGB
 	Reflect RGB
 	Refract RGB
 	IOR     RGB
@@ -26,6 +27,7 @@ type HyperSphere struct {
 	refl     [3]Real
 	refr     [3]Real
 	colorArr [3]Real
+	diff     [3]Real
 	iorArr   [3]Real
 	iorInv   [3]Real
 	pAbs     [3]Real
@@ -36,27 +38,27 @@ func NewHyperSphere(
 	center Point4,
 	radii Vector4, // semi-axes after scaling (≥0)
 	angles Rot4,
-	color, reflectivity, refractivity, ior RGB,
+	color, diffuse, reflectivity, refractivity, ior RGB,
 ) (*HyperSphere, error) {
 	if !(radii.X > 0 && radii.Y > 0 && radii.Z > 0 && radii.W > 0) {
 		return nil, fmt.Errorf("hypersphere radii must be >0 on all axes, got %+v", radii)
 	}
 	in01 := func(x Real) bool { return x >= 0 && x <= 1 }
 	type ch struct {
-		n    string
-		r, t Real
+		n       string
+		r, t, d Real
 	}
 	chk := []ch{
-		{"R", reflectivity.R, refractivity.R},
-		{"G", reflectivity.G, refractivity.G},
-		{"B", reflectivity.B, refractivity.B},
+		{"R", reflectivity.R, refractivity.R, diffuse.R},
+		{"G", reflectivity.G, refractivity.G, diffuse.G},
+		{"B", reflectivity.B, refractivity.B, diffuse.B},
 	}
 	for _, c := range chk {
-		if !in01(c.r) || !in01(c.t) {
-			return nil, fmt.Errorf("reflect/refract must be in [0,1]; channel %s got reflect=%.6g refract=%.6g", c.n, c.r, c.t)
+		if !in01(c.r) || !in01(c.t) || !in01(c.d) {
+			return nil, fmt.Errorf("reflect/refract/diffuse must be in [0,1]; channel %s got reflect=%.6g refract=%.6g diffuse=%.6g", c.n, c.r, c.t, c.d)
 		}
-		if c.r+c.t > 1+1e-12 {
-			return nil, fmt.Errorf("per-channel reflect+refract must be ≤1; channel %s got %.6g", c.n, c.r+c.t)
+		if c.r+c.t+c.d > 1+1e-12 {
+			return nil, fmt.Errorf("per-channel reflect+refract+diffuse must be ≤1; channel %s got %.6g", c.n, c.r+c.t+c.d)
 		}
 	}
 	if !(ior.R > 0 && ior.G > 0 && ior.B > 0) {
@@ -71,6 +73,7 @@ func NewHyperSphere(
 		Radii:  radii,
 
 		Color:   color,
+		Diffuse: diffuse,
 		Reflect: reflectivity,
 		Refract: refractivity,
 		IOR:     ior,
@@ -110,9 +113,10 @@ func NewHyperSphere(
 	hs.refl = [3]Real{reflectivity.R, reflectivity.G, reflectivity.B}
 	hs.refr = [3]Real{refractivity.R, refractivity.G, refractivity.B}
 	hs.colorArr = [3]Real{color.R, color.G, color.B}
+	hs.diff = [3]Real{diffuse.R, diffuse.G, diffuse.B}
 	hs.iorArr = [3]Real{ior.R, ior.G, ior.B}
 	for i := 0; i < 3; i++ {
-		p := 1 - hs.refl[i] - hs.refr[i]
+		p := 1 - hs.refl[i] - hs.refr[i] - hs.diff[i]
 		if p < 0 {
 			p = 0
 		}

@@ -15,6 +15,7 @@ type Cell16 struct {
 	R       Mat4
 	RT      Mat4
 	Color   RGB
+	Diffuse RGB
 	Reflect RGB
 	Refract RGB
 	IOR     RGB
@@ -30,6 +31,7 @@ type Cell16 struct {
 	refl     [3]Real
 	refr     [3]Real
 	colorArr [3]Real
+	diff     [3]Real
 	iorArr   [3]Real
 	iorInv   [3]Real
 	pAbs     [3]Real
@@ -70,25 +72,25 @@ func NewCell16(
 	center Point4,
 	scale Vector4,
 	angles Rot4,
-	color, reflectivity, refractivity, ior RGB,
+	color, diffuse, reflectivity, refractivity, ior RGB,
 ) (*Cell16, error) {
 	if !(scale.X > 0 && scale.Y > 0 && scale.Z > 0 && scale.W > 0) {
 		return nil, fmt.Errorf("16-cell per-axis scale must be > 0 on all axes, got %+v", scale)
 	}
 	in01 := func(x Real) bool { return x >= 0 && x <= 1 }
 	for _, p := range []struct {
-		n    string
-		r, t Real
+		n       string
+		r, t, d Real
 	}{
-		{"R", reflectivity.R, refractivity.R},
-		{"G", reflectivity.G, refractivity.G},
-		{"B", reflectivity.B, refractivity.B},
+		{"R", reflectivity.R, refractivity.R, diffuse.R},
+		{"G", reflectivity.G, refractivity.G, diffuse.G},
+		{"B", reflectivity.B, refractivity.B, diffuse.B},
 	} {
-		if !in01(p.r) || !in01(p.t) {
-			return nil, fmt.Errorf("reflect/refract must be in [0,1]; channel %s got reflect=%.6g refract=%.6g", p.n, p.r, p.t)
+		if !in01(p.r) || !in01(p.t) || !in01(p.d) {
+			return nil, fmt.Errorf("reflect/refract/diffuse must be in [0,1]; channel %s got reflect=%.6g refract=%.6g diffuse=%.6g", p.n, p.r, p.t, p.d)
 		}
-		if p.r+p.t > 1+1e-12 {
-			return nil, fmt.Errorf("per-channel reflect+refract must be ≤1; channel %s got %.6g", p.n, p.r+p.t)
+		if p.r+p.t+p.d > 1+1e-12 {
+			return nil, fmt.Errorf("per-channel reflect+refract+diffuse must be ≤1; channel %s got %.6g", p.n, p.r+p.t+p.d)
 		}
 	}
 	if !(ior.R > 0 && ior.G > 0 && ior.B > 0) {
@@ -157,6 +159,7 @@ func NewCell16(
 		R:       R,
 		RT:      R.Transpose(),
 		Color:   color,
+		Diffuse: diffuse,
 		Reflect: reflectivity,
 		Refract: refractivity,
 		IOR:     ior,
@@ -169,9 +172,10 @@ func NewCell16(
 	c.refl = [3]Real{reflectivity.R, reflectivity.G, reflectivity.B}
 	c.refr = [3]Real{refractivity.R, refractivity.G, refractivity.B}
 	c.colorArr = [3]Real{color.R, color.G, color.B}
+	c.diff = [3]Real{diffuse.R, diffuse.G, diffuse.B}
 	c.iorArr = [3]Real{ior.R, ior.G, ior.B}
 	for i := 0; i < 3; i++ {
-		p := 1 - c.refl[i] - c.refr[i]
+		p := 1 - c.refl[i] - c.refr[i] - c.diff[i]
 		if p < 0 {
 			p = 0
 		}

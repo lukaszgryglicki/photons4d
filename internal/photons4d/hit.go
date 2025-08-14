@@ -34,6 +34,26 @@ func (h objectHit) pAbsCh(c int) Real {
 	}
 	return h.poly.pAbs[c]
 }
+
+func (h objectHit) diffCh(ch int) Real {
+	switch {
+	case h.hc != nil:
+		return h.hc.diff[ch]
+	case h.hs != nil:
+		return h.hs.diff[ch]
+	case h.s5 != nil:
+		return h.s5.diff[ch]
+	case h.c16 != nil:
+		return h.c16.diff[ch]
+	case h.c24 != nil:
+		return h.c24.diff[ch]
+	case h.poly != nil:
+		return h.poly.diff[ch]
+	default:
+		return 0
+	}
+}
+
 func (h objectHit) colorCh(c int) Real {
 	if h.hc != nil {
 		return h.hc.colorArr[c]
@@ -52,6 +72,7 @@ func (h objectHit) colorCh(c int) Real {
 	}
 	return h.poly.colorArr[c]
 }
+
 func (h objectHit) f0Ch(c int) Real {
 	if h.hc != nil {
 		return h.hc.f0[c]
@@ -70,6 +91,7 @@ func (h objectHit) f0Ch(c int) Real {
 	}
 	return h.poly.f0[c]
 }
+
 func (h objectHit) reflCh(c int) Real {
 	if h.hc != nil {
 		return h.hc.refl[c]
@@ -88,6 +110,7 @@ func (h objectHit) reflCh(c int) Real {
 	}
 	return h.poly.refl[c]
 }
+
 func (h objectHit) refrCh(c int) Real {
 	if h.hc != nil {
 		return h.hc.refr[c]
@@ -106,6 +129,7 @@ func (h objectHit) refrCh(c int) Real {
 	}
 	return h.poly.refr[c]
 }
+
 func (h objectHit) iorCh(c int) Real {
 	if h.hc != nil {
 		return h.hc.iorArr[c]
@@ -124,6 +148,7 @@ func (h objectHit) iorCh(c int) Real {
 	}
 	return h.poly.iorArr[c]
 }
+
 func (h objectHit) iorInvCh(c int) Real {
 	if h.hc != nil {
 		return h.hc.iorInv[c]

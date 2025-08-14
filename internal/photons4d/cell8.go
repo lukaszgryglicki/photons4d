@@ -21,6 +21,7 @@ type Cell8 struct {
 
 	// Material (per-channel):
 	Color   RGB // tint/filter applied to reflected & refracted energy
+	Diffuse RGB // Lambertian probability mass per channel
 	Reflect RGB // fraction reflected per channel (0..1)
 	Refract RGB // fraction refracted per channel (0..1)
 	IOR     RGB // index of refraction inside cell8 per channel
@@ -32,6 +33,7 @@ type Cell8 struct {
 	refl     [3]Real    // [R,G,B]
 	refr     [3]Real    // [R,G,B]
 	colorArr [3]Real    // [R,G,B]
+	diff     [3]Real    // [R,G,B]
 	iorArr   [3]Real    // [R,G,B]
 	iorInv   [3]Real    // [1/R, 1/G, 1/B]
 	pAbs     [3]Real    // 1 - refl - refr (clamped ≥ 0)
@@ -43,7 +45,7 @@ func NewCell8(
 	center Point4,
 	scale Vector4, // full edge lengths
 	angles Rot4, // radians
-	color, reflectivity, refractivity, ior RGB,
+	color, diffuse, reflectivity, refractivity, ior RGB,
 ) (*Cell8, error) {
 	if !(scale.X > 0 && scale.Y > 0 && scale.Z > 0 && scale.W > 0) {
 		return nil, fmt.Errorf("cell8 scale must be >0 on all axes, got %+v", scale)
@@ -51,20 +53,20 @@ func NewCell8(
 	in01 := func(x Real) bool { return x >= 0 && x <= 1 }
 
 	type ch struct {
-		n    string
-		r, t Real
+		n       string
+		r, t, d Real
 	}
 	chk := []ch{
-		{"R", reflectivity.R, refractivity.R},
-		{"G", reflectivity.G, refractivity.G},
-		{"B", reflectivity.B, refractivity.B},
+		{"R", reflectivity.R, refractivity.R, diffuse.R},
+		{"G", reflectivity.G, refractivity.G, diffuse.G},
+		{"B", reflectivity.B, refractivity.B, diffuse.B},
 	}
 	for _, c := range chk {
-		if !in01(c.r) || !in01(c.t) {
-			return nil, fmt.Errorf("reflect/refract must be in [0,1]; channel %s got reflect=%.6g refract=%.6g", c.n, c.r, c.t)
+		if !in01(c.r) || !in01(c.t) || !in01(c.d) {
+			return nil, fmt.Errorf("reflect/refract/diffuse must be in [0,1]; channel %s got reflect=%.6g refract=%.6g diffuse=%.6g", c.n, c.r, c.t, c.d)
 		}
-		if c.r+c.t > 1+1e-12 {
-			return nil, fmt.Errorf("per-channel reflect+refract must be ≤1; channel %s got %.6g", c.n, c.r+c.t)
+		if c.r+c.t+c.d > 1+1e-12 {
+			return nil, fmt.Errorf("per-channel reflect+refract+diffuse must be ≤1; channel %s got %.6g", c.n, c.r+c.t+c.d)
 		}
 	}
 	if !(ior.R > 0 && ior.G > 0 && ior.B > 0) {
@@ -79,6 +81,7 @@ func NewCell8(
 		RT:     R.Transpose(),
 
 		Color:   color,
+		Diffuse: diffuse,
 		Reflect: reflectivity,
 		Refract: refractivity,
 		IOR:     ior,
@@ -122,10 +125,11 @@ func NewCell8(
 	// material arrays
 	hc.refl = [3]Real{reflectivity.R, reflectivity.G, reflectivity.B}
 	hc.refr = [3]Real{refractivity.R, refractivity.G, refractivity.B}
+	hc.diff = [3]Real{diffuse.R, diffuse.G, diffuse.B}
 	hc.colorArr = [3]Real{color.R, color.G, color.B}
 	hc.iorArr = [3]Real{ior.R, ior.G, ior.B}
 	for i := 0; i < 3; i++ {
-		p := 1 - hc.refl[i] - hc.refr[i]
+		p := 1 - hc.refl[i] - hc.refr[i] - hc.diff[i]
 		if p < 0 {
 			p = 0
 		}

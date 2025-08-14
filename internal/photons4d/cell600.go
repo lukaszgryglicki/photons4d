@@ -5,21 +5,21 @@ import "fmt"
 // 600-cell as intersection of 600 planes whose normals are the 600 vertices of the dual (120-cell).
 type Cell600 struct{ cellPoly }
 
-func NewCell600(center Point4, scale Vector4, angles Rot4, color, reflectivity, refractivity, ior RGB) (*Cell600, error) {
+func NewCell600(center Point4, scale Vector4, angles Rot4, color, diffuse, reflectivity, refractivity, ior RGB) (*Cell600, error) {
 	if !(scale.X > 0 && scale.Y > 0 && scale.Z > 0 && scale.W > 0) {
 		return nil, fmt.Errorf("scale must be > 0 on all axes, got %+v", scale)
 	}
 	in01 := func(x Real) bool { return x >= 0 && x <= 1 }
 	for _, c := range []struct {
-		n    string
-		r, t Real
+		n       string
+		r, t, d Real
 	}{
-		{"R", reflectivity.R, refractivity.R},
-		{"G", reflectivity.G, refractivity.G},
-		{"B", reflectivity.B, refractivity.B},
+		{"R", reflectivity.R, refractivity.R, diffuse.R},
+		{"G", reflectivity.G, refractivity.G, diffuse.G},
+		{"B", reflectivity.B, refractivity.B, diffuse.B},
 	} {
-		if !in01(c.r) || !in01(c.t) || c.r+c.t > 1+1e-12 {
-			return nil, fmt.Errorf("reflect/refract invalid (channel %s)", c.n)
+		if !in01(c.r) || !in01(c.t) || !in01(c.d) || c.r+c.t+c.d > 1+1e-12 {
+			return nil, fmt.Errorf("diffuse/reflect/refract invalid (channel %s)", c.n)
 		}
 	}
 	if !(ior.R > 0 && ior.G > 0 && ior.B > 0) {
@@ -33,7 +33,7 @@ func NewCell600(center Point4, scale Vector4, angles Rot4, color, reflectivity, 
 		R:      R,
 		RT:     R.Transpose(),
 	}
-	cp.materialFrom(color, reflectivity, refractivity, ior)
+	cp.materialFrom(color, diffuse, reflectivity, refractivity, ior)
 	cp.buildPlanes(verts120Unit(), 1.0)
 
 	// DebugLog("Created 600-cell: center=%+v, scale=%+v, AABB=[%+v..%+v]", center, scale, cp.AABBMin, cp.AABBMax)

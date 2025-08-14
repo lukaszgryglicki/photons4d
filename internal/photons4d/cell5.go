@@ -16,10 +16,12 @@ import (
 // We compute world-space facet planes (outward normals) from transformed vertices,
 // so normals are correct even under anisotropic scaling.
 type Cell5 struct {
-	Center  Point4
-	Scale   Vector4 // per-axis scaling
-	R       Mat4    // local->world rotation
-	RT      Mat4    // world->local (R^T)
+	Center Point4
+	Scale  Vector4 // per-axis scaling
+	R      Mat4    // local->world rotation
+	RT     Mat4    // world->local (R^T)
+
+	Diffuse RGB
 	Color   RGB
 	Reflect RGB
 	Refract RGB
@@ -38,6 +40,7 @@ type Cell5 struct {
 	refl     [3]Real
 	refr     [3]Real
 	colorArr [3]Real
+	diff     [3]Real
 	iorArr   [3]Real
 	iorInv   [3]Real
 	pAbs     [3]Real
@@ -100,7 +103,7 @@ func NewCell5(
 	center Point4,
 	scale Vector4,
 	angles Rot4, // radians
-	color, reflectivity, refractivity, ior RGB,
+	color, diffuse, reflectivity, refractivity, ior RGB,
 ) (*Cell5, error) {
 	// validate scale
 	if !(scale.X > 0 && scale.Y > 0 && scale.Z > 0 && scale.W > 0) {
@@ -108,19 +111,19 @@ func NewCell5(
 	}
 	in01 := func(x Real) bool { return x >= 0 && x <= 1 }
 	type ch struct {
-		n    string
-		r, t Real
+		n       string
+		r, t, d Real
 	}
 	for _, c := range []ch{
-		{"R", reflectivity.R, refractivity.R},
-		{"G", reflectivity.G, refractivity.G},
-		{"B", reflectivity.B, refractivity.B},
+		{"R", reflectivity.R, refractivity.R, diffuse.R},
+		{"G", reflectivity.G, refractivity.G, diffuse.G},
+		{"B", reflectivity.B, refractivity.B, diffuse.B},
 	} {
-		if !in01(c.r) || !in01(c.t) {
-			return nil, fmt.Errorf("reflect/refract must be in [0,1]; channel %s got reflect=%.6g refract=%.6g", c.n, c.r, c.t)
+		if !in01(c.r) || !in01(c.t) || !in01(c.d) {
+			return nil, fmt.Errorf("reflect/refract/diffuse must be in [0,1]; channel %s got reflect=%.6g refract=%.6g diffuse=%.6g", c.n, c.r, c.t, c.d)
 		}
-		if c.r+c.t > 1+1e-12 {
-			return nil, fmt.Errorf("per-channel reflect+refract must be ≤1; channel %s got %.6g", c.n, c.r+c.t)
+		if c.r+c.t+c.d > 1+1e-12 {
+			return nil, fmt.Errorf("per-channel reflect+refract+diffuse must be ≤1; channel %s got %.6g", c.n, c.r+c.t+c.d)
 		}
 	}
 	if !(ior.R > 0 && ior.G > 0 && ior.B > 0) {
@@ -167,6 +170,7 @@ func NewCell5(
 		R:       R,
 		RT:      R.Transpose(),
 		Color:   color,
+		Diffuse: diffuse,
 		Reflect: reflectivity,
 		Refract: refractivity,
 		IOR:     ior,
@@ -180,9 +184,10 @@ func NewCell5(
 	sx4.refl = [3]Real{reflectivity.R, reflectivity.G, reflectivity.B}
 	sx4.refr = [3]Real{refractivity.R, refractivity.G, refractivity.B}
 	sx4.colorArr = [3]Real{color.R, color.G, color.B}
+	sx4.diff = [3]Real{diffuse.R, diffuse.G, diffuse.B}
 	sx4.iorArr = [3]Real{ior.R, ior.G, ior.B}
 	for i := 0; i < 3; i++ {
-		p := 1 - sx4.refl[i] - sx4.refr[i]
+		p := 1 - sx4.refl[i] - sx4.refr[i] - sx4.diff[i]
 		if p < 0 {
 			p = 0
 		}

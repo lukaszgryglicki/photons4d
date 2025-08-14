@@ -96,7 +96,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 
 		// --- Absorption & Fresnel split (per channel) ---
 		pAbs := hit.pAbsCh(ch) // object's absorption knob
-		avail := 1 - pAbs      // budget to split between reflection/refraction
+		avail := 1 - pAbs      // budget to split among reflection/refraction/diffuse
 		if avail <= 0 {
 			if Debug && deposit {
 				logRay("absorbed", Absorb, O, D, P, bounce, totalDist)
@@ -124,18 +124,12 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		x5 := x2 * x2 * x
 		F := F0 + (1-F0)*x5
 
-		// Bias Fresnel by your reflect/refract knobs to control the split.
-		rW := hit.reflCh(ch) * F
-		tW := hit.refrCh(ch) * (1 - F)
-		f := F
-		if sum := rW + tW; sum > 0 {
-			f = rW / sum
-		}
-
-		pReflDyn := avail * f // final reflect probability this hit
+		// Bias Fresnel by reflect/refract knobs; diffuse is angle-independent.
+		pReflDyn, pRefrDyn, pDiffDyn := splitEventWeights(hit.reflCh(ch), hit.refrCh(ch), hit.diffCh(ch), F, pAbs)
 
 		// --- Russian roulette ---
 		u := rng.Float64()
+		// Note: thresholds are explicit and use all three dynamic probabilities.
 		if u < pAbs {
 			if Debug && deposit {
 				logRay("absorbed", Absorb, O, D, P, bounce, totalDist)
@@ -164,51 +158,49 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 			}
 			continue
 		}
-
-		// Refract: orient normal toward the incident medium and choose correct eta = n_in/n_out
-		Nn := N
-		var eta Real
-		if D.Dot(N) < 0 {
-			// entering: air (1.0) -> material (ior)
-			eta = hit.iorInvCh(ch) // 1/ior
-		} else {
-			// exiting: material (ior) -> air (1.0)
-			Nn = N.Mul(-1)
-			eta = hit.iorCh(ch) // ior
-		}
-
-		if T, ok := refract4(D, Nn, eta); ok {
-			D = T
-			// keep direction unit-length
+		if u < pAbs+pReflDyn+pRefrDyn {
+			// Refract
+			Nn := N
+			var eta Real
+			if D.Dot(N) < 0 {
+				eta = hit.iorInvCh(ch) // air -> material
+			} else {
+				Nn = N.Mul(-1)
+				eta = hit.iorCh(ch) // material -> air
+			}
+			if T, ok := refract4(D, Nn, eta); ok {
+				D = T
+				if l2 := D.Dot(D); l2 > 0 {
+					D = D.Mul(1 / math.Sqrt(l2))
+				}
+				O = Point4{P.X + D.X*bumpShift, P.Y + D.Y*bumpShift, P.Z + D.Z*bumpShift, P.W + D.W*bumpShift}
+				if Debug && deposit {
+					logRay("refracted", Refract, O, D, P, bounce, totalDist)
+				}
+				continue
+			}
+			// TIR → fall through to specular reflection
+			D = reflect4(D, N)
 			if l2 := D.Dot(D); l2 > 0 {
 				D = D.Mul(1 / math.Sqrt(l2))
 			}
-			O = Point4{
-				P.X + D.X*bumpShift,
-				P.Y + D.Y*bumpShift,
-				P.Z + D.Z*bumpShift,
-				P.W + D.W*bumpShift,
-			}
+			O = Point4{P.X + D.X*bumpShift, P.Y + D.Y*bumpShift, P.Z + D.Z*bumpShift, P.W + D.W*bumpShift}
 			if Debug && deposit {
-				logRay("refracted", Refract, O, D, P, bounce, totalDist)
+				logRay("total_internal_refraction", TIR, O, D, P, bounce, totalDist)
 			}
 			continue
 		}
-
-		// Total internal reflection fallback.
-		D = reflect4(D, N)
-		if l2 := D.Dot(D); l2 > 0 {
-			D = D.Mul(1 / math.Sqrt(l2))
+		if u < pAbs+pReflDyn+pRefrDyn+pDiffDyn {
+			// Diffuse scatter (Lambertian-style on S^3 hemisphere around N)
+			D = sampleDiffuseDir(N, rng)
+			O = Point4{P.X + D.X*bumpShift, P.Y + D.Y*bumpShift, P.Z + D.Z*bumpShift, P.W + D.W*bumpShift}
+			if Debug && deposit {
+				logRay("diffuse", Diffuse, O, D, P, bounce, totalDist)
+			}
+			continue
 		}
-		O = Point4{
-			P.X + D.X*bumpShift,
-			P.Y + D.Y*bumpShift,
-			P.Z + D.Z*bumpShift,
-			P.W + D.W*bumpShift,
-		}
-		if Debug && deposit {
-			logRay("total_internal_refraction", TIR, O, D, P, bounce, totalDist)
-		}
+		// Should not happen (u in [0,1)), but keep safe fallback.
+		return false
 	}
 
 	if Debug && deposit {
