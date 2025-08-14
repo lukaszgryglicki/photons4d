@@ -20,7 +20,7 @@
       "direction": { "X": 0.0,  "Y": 0.0,  "Z": 0.0,  "W": -1.0 },
       "color":     { "R": 1.0,  "G": 1.0,  "B": 1.0 },
       "angleDeg":  45.0,
-      "voidLight": false
+      "intensity": 1.0
     }
   ],
   "cells5": [
