@@ -15,5 +15,5 @@ func nearestHitBVH(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, boo
 
 // (Optional helper): a convenience that searches unbounded.
 func nearestHitBVHAll(scene *Scene, O Point4, D Vector4) (objectHit, bool) {
-	return nearestHit(scene, O, D, Real(math.Inf(1)))
+	return nearestHitBVH(scene, O, D, Real(math.Inf(1)))
 }

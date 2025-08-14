@@ -103,7 +103,8 @@ func NewLight(origin Point4, dir Vector4, color RGB, angle, intensity Real) (*Li
 	if angle <= 0 || angle > math.Pi {
 		return nil, errors.New("angle must be in (0, π]")
 	}
-	if intensity == 0.0 {
+	if math.Abs(Real(intensity)) < 1e-9 {
+		DebugLog("Light intensity is zero (or very close to zero), setting to 1.0")
 		intensity = 1.0
 	}
 	n := dir.Norm()

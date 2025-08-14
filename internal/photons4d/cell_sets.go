@@ -70,10 +70,10 @@ func pushUnique(set map[[4]int64]struct{}, out *[]Vector4, v [4]Real) {
 	// key with 1e-12 quantization
 	const q = 1e12
 	k := [4]int64{
-		int64(math.Round(float64(v[0] * q))),
-		int64(math.Round(float64(v[1] * q))),
-		int64(math.Round(float64(v[2] * q))),
-		int64(math.Round(float64(v[3] * q))),
+		int64(math.Round(Real(v[0] * q))),
+		int64(math.Round(Real(v[1] * q))),
+		int64(math.Round(Real(v[2] * q))),
+		int64(math.Round(Real(v[3] * q))),
 	}
 	if _, ok := set[k]; ok {
 		return

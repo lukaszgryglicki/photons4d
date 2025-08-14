@@ -7,22 +7,22 @@ import (
 )
 
 func TestNewLightValidation(t *testing.T) {
-	_, err := NewLight(Point4{}, Vector4{}, RGB{1, 1, 1}, 0.1, false)
+	_, err := NewLight(Point4{}, Vector4{}, RGB{1, 1, 1}, 0.1, 1.0)
 	if err == nil {
 		t.Fatal("expected error for zero dir")
 	}
-	_, err = NewLight(Point4{}, Vector4{1, 0, 0, 0}, RGB{0, 0, 0}, math.Pi/4, false)
+	_, err = NewLight(Point4{}, Vector4{1, 0, 0, 0}, RGB{0, 0, 0}, math.Pi/4, 0.5)
 	if err == nil {
 		t.Fatal("expected error for zero color sum")
 	}
-	_, err = NewLight(Point4{}, Vector4{1, 0, 0, 0}, RGB{1, 1, 1}, 0, false)
+	_, err = NewLight(Point4{}, Vector4{1, 0, 0, 0}, RGB{1, 1, 1}, 0, 0.0)
 	if err == nil {
 		t.Fatal("expected error for angle out of range")
 	}
 }
 
 func TestSampleDirInsideConeUnit(t *testing.T) {
-	L, err := NewLight(Point4{}, Vector4{0, 0, 0, 1}, RGB{1, 0, 0}, math.Pi/6, false)
+	L, err := NewLight(Point4{}, Vector4{0, 0, 0, 1}, RGB{1, 0, 0}, math.Pi/6, -1.0)
 	if err != nil {
 		t.Fatal(err)
 	}

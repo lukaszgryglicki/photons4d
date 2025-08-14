@@ -97,6 +97,7 @@ func Run(cfgPath string) error {
 		NearestHitFunc = nearestHit
 		DebugLog("Using nearestHit function (instead of BVH of AABB) for %d objects", nObjects)
 	} else {
+		NearestHitFunc = nearestHitBVH
 		DebugLog("Using BVH of AABBs for %d objects", nObjects)
 	}
 

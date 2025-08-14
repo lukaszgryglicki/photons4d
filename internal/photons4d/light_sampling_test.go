@@ -62,7 +62,7 @@ func checkGeom(t *testing.T, v Vector4, a Vector4, cosTheta Real) {
 
 func runOneKSTest(t *testing.T, angle Real, n int, seed int64) {
 	a := testAxis()
-	L, err := NewLight(Point4{}, a, RGB{1, 0.7, 0.4}, angle, false)
+	L, err := NewLight(Point4{}, a, RGB{1, 0.7, 0.4}, angle, 1.0)
 	if err != nil {
 		t.Fatalf("NewLight failed: %v", err)
 	}
