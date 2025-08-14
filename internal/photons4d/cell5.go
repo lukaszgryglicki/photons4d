@@ -262,7 +262,7 @@ func intersectRayCell5(O Point4, D Vector4, s *Cell5) (hit objectHit, ok bool) {
 		rhs := d - nO
 
 		const eps = 1e-12
-		if math.Abs(nD) < eps {
+		if nD > -eps && nD < eps {
 			// parallel to plane
 			if rhs < -1e-12 {
 				return objectHit{}, false // outside and never entering

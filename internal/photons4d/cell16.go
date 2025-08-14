@@ -230,7 +230,7 @@ func intersectRayCell16(O Point4, D Vector4, c *Cell16) (hit objectHit, ok bool)
 		nD := n.X*D.X + n.Y*D.Y + n.Z*D.Z + n.W*D.W
 		rhs := d - nO
 		const eps = 1e-12
-		if math.Abs(nD) < eps {
+		if nD > -eps && nD < eps {
 			if rhs < -1e-12 {
 				return objectHit{}, false
 			}

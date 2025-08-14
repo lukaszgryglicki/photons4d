@@ -1,7 +1,5 @@
 package photons4d
 
-import "math"
-
 // Polytope										Vertices		Edges		Faces (2D)			Cells (3D)
 // 5-cell 	(simplex)					5						10			10 triangles		5 tetrahedra
 // 8-cell 	(tesseract)				16					32			24 squares			8 cubes
@@ -168,7 +166,7 @@ func intersectRayCellPoly(O Point4, D Vector4, cp *cellPoly) (objectHit, bool) {
 		rhs := d - nO
 
 		const eps = 1e-12
-		if math.Abs(nD) < eps {
+		if nD > -eps && nD < eps {
 			if rhs < -1e-12 {
 				return objectHit{}, false
 			}
