@@ -244,11 +244,88 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 		}
 	}
 
-	var counter int64
-	nextPrint := int64(1)
-	if totalRays >= 100 {
-		nextPrint = int64(totalRays / 100) // ~1%
+	// before launching workers
+	start := time.Now()
+
+	var counter int64 // incremented by workers
+	// Zero-padding width based on number of slices.
+	width := 1
+	if totalRays > 1 {
+		width = int(math.Log10(Real(totalRays-1))) + 1
 	}
+	fmt.Printf("[PROGRESS] %5.2f%% | rays=%*d/%*d | ETA=—\n", 0.0, width, 0, width, totalRays)
+
+	// progress monitor (tick every 1s)
+	done := make(chan struct{})
+	monitorDone := make(chan struct{})
+	go func() {
+		defer close(monitorDone)
+		if totalRays == 0 {
+			return
+		}
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+
+		lastPrintedAt := time.Now()
+		lastPctBucketPrinted := -1 // 0..10 (for 0..100%), -1 means none yet
+
+		for {
+			select {
+			case <-ticker.C:
+				fired := atomic.LoadInt64(&counter)
+				if fired >= int64(totalRays) {
+					// Final line
+					elapsed := time.Since(start)
+					rate := float64(fired) / elapsed.Seconds()
+					if rate < 1e-9 {
+						rate = 0
+					}
+					fmt.Printf("[PROGRESS] 100.00%% | rays=%*d/%*d | rate=%.0f/s | elapsed=%s\n",
+						width, fired, width, totalRays, rate, elapsed.Truncate(time.Millisecond))
+					return
+				}
+
+				// Compute stats
+				elapsed := time.Since(start)
+				pct := float64(fired) * 100.0 / float64(totalRays)
+				rate := float64(fired) / math.Max(elapsed.Seconds(), 1e-9)
+				eta := time.Duration(0)
+				if rate > 0 {
+					rem := float64(totalRays-int(fired)) / rate
+					eta = time.Duration(rem * float64(time.Second))
+				}
+
+				// Print if 10s since last print OR we crossed another 10% bucket
+				tenSecPassed := time.Since(lastPrintedAt) >= 10*time.Second
+				currentBucket := int(pct / 10.0) // 0..10
+				crossed10pct := currentBucket != lastPctBucketPrinted
+
+				if tenSecPassed || crossed10pct {
+					// When printing due to bucket crossing, update the bucket.
+					// When printing due to time, do NOT update the bucket so we still
+					// get a message exactly at 10%, 20%, ... later.
+					line := fmt.Sprintf("[PROGRESS] %5.2f%% | rays=%*d/%*d | rate=%.0f/s | ETA=%02d:%02d:%02d\n",
+						pct, width, fired, width, totalRays, rate,
+						int(eta.Hours()), int(eta.Minutes())%60, int(eta.Seconds())%60)
+					fmt.Print(line)
+					lastPrintedAt = time.Now()
+					if crossed10pct {
+						lastPctBucketPrinted = currentBucket
+					}
+				}
+
+			case <-done:
+				// One last summary before exiting (in case we didn’t hit 100% in the ticker loop)
+				fired := atomic.LoadInt64(&counter)
+				elapsed := time.Since(start)
+				pct := float64(fired) * 100.0 / float64(totalRays)
+				rate := float64(fired) / math.Max(elapsed.Seconds(), 1e-9)
+				fmt.Printf("[PROGRESS] %5.2f%% | rays=%*d/%*d | rate=%.0f/s | elapsed=%s\n",
+					pct, width, fired, width, totalRays, rate, elapsed.Truncate(time.Millisecond))
+				return
+			}
+		}
+	}()
 
 	locks := &shardLocks{}
 	var wg sync.WaitGroup
@@ -264,14 +341,14 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 				n := per[li][wid]
 				for s := 0; s < n; s++ {
 					_ = castSingleRay(L, scene, rng, locks, true)
-					fired := atomic.AddInt64(&counter, 1)
-					if fired%nextPrint == 0 {
-						fmt.Printf("[PROGRESS] %.2f%%\n", Real(fired)*100/Real(totalRays))
-					}
+					atomic.AddInt64(&counter, 1)
 				}
 			}
 		}()
 	}
 
 	wg.Wait()
+	close(done)   // stop the monitor
+	<-monitorDone // wait for final progress line
+
 }

@@ -119,6 +119,9 @@ func Run(cfgPath string) error {
 		DebugLog("Light #%d, needs: %d rays, scene hit probability %.12f", i, need, p)
 	}
 	DebugLog("Total rays needed: %d", totalRays)
+	if nObjects >= AABBBVHFromNObjects {
+		DumpAABBBVH(scene, false)
+	}
 
 	start := time.Now()
 	castRays(lights, scene, needRays)
@@ -127,6 +130,10 @@ func Run(cfgPath string) error {
 
 	if Debug {
 		raysStats()
+		if !DumpAABBBVH(scene, false) {
+			DebugLog("Current scene does not use AABB BVH, here is what it will look like if used:")
+			DumpAABBBVH(scene, true)
+		}
 	}
 
 	if err := SaveAnimatedGIF(scene, cfg.GIFOut, cfg.GIFDelay, cfg.Gamma); err != nil {

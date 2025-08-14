@@ -2,7 +2,7 @@ package photons4d
 
 import "math"
 
-// nearestHit returns the closest positive t hit among all scene objects.
+// nearestHitBVH returns the closest positive t hit among all scene objects.
 // It uses the BVH (AABB tree) above. tMax can be +Inf to search everything.
 func nearestHitBVH(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) {
 	root := getOrBuildBVH(scene)

@@ -34,7 +34,7 @@ func TestNearestHit_PrefersCloser(t *testing.T) {
 
 	O := Point4{0, 0, 0, 0}
 	D := Vector4{0, 0, 0, 1}
-	h, ok := nearestHit(scene, O, D, math.Inf(1))
+	h, ok := NearestHitFunc(scene, O, D, math.Inf(1))
 	if !ok {
 		t.Fatal("expected a cell8 hit")
 	}
