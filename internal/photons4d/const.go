@@ -18,8 +18,8 @@ const (
 	AttenuateD2         = false // if true, attenuate light by 1/d^2 (distance squared) for each bounce (not needed in radiance model)
 	LUTRejectThreshold  = 0.1   // threshold for using rejection sampling vs. LUT inverse-CDF sampling for cone light S^3 cap sampling
 	LutN                = 256
-	AABBBVHMaxLeafSize  = 8
-	AABBBVHFromNObjects = 16 // minimum number of objects to use BVH of AABBs, otherwise just iterate all objects on the scene
+	AABBBVHMaxLeafSize  = 6
+	AABBBVHFromNObjects = 14 // minimum number of objects to use BVH of AABBs, otherwise just iterate all objects on the scene
 	// hot-loop constants reused across bounces
 	epsDist   = 1e-6
 	bumpShift = 1e-6

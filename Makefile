@@ -24,7 +24,9 @@ fmt:
 race:
 	go build -race -tags debug -o $(BIN) $(CMD)
 
-profile: runprofile
+profile: runprofile getprofile
+
+getprofile:
 	go tool pprof -text cpu.out > cpu.out.txt && cat cpu.out.txt
 
 test: fmt
