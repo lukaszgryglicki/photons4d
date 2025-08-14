@@ -93,12 +93,25 @@ func Run(cfgPath string) error {
 	}
 	nObjects := scene.NObjects()
 	DebugLog("Scene created with %d objects", nObjects)
-	if nObjects < AABBBVHFromNObjects {
-		NearestHitFunc = nearestHit
-		DebugLog("Using nearestHit function (instead of BVH of AABB) for %d objects", nObjects)
-	} else {
+	if AlwaysBVH && NeverBVH {
+		// Prefer explicit “always on” if both are set
+		DebugLog("Both ALWAYS_BVH and NEVER_BVH are set; ALWAYS_BVH wins")
+		NeverBVH = false
+	}
+	if AlwaysBVH {
+		DebugLog("AlwaysBVH is set, using BVH of AABBs")
 		NearestHitFunc = nearestHitBVH
-		DebugLog("Using BVH of AABBs for %d objects", nObjects)
+	} else if NeverBVH {
+		DebugLog("NeverBVH is set, using nearestHit function")
+		NearestHitFunc = nearestHit
+	} else {
+		if nObjects < AABBBVHFromNObjects {
+			NearestHitFunc = nearestHit
+			DebugLog("Using nearestHit function (instead of BVH of AABB) for %d objects", nObjects)
+		} else {
+			NearestHitFunc = nearestHitBVH
+			DebugLog("Using BVH of AABBs for %d objects", nObjects)
+		}
 	}
 
 	Nvox := Nx * Ny * Nz
@@ -119,7 +132,7 @@ func Run(cfgPath string) error {
 		DebugLog("Light #%d, needs: %d rays, scene hit probability %.12f", i, need, p)
 	}
 	DebugLog("Total rays needed: %d", totalRays)
-	if nObjects >= AABBBVHFromNObjects {
+	if AlwaysBVH || nObjects >= AABBBVHFromNObjects {
 		DumpAABBBVH(scene, false)
 	}
 

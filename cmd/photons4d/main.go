@@ -17,6 +17,8 @@ func main() {
 	photons4d.UseLocks = os.Getenv("SKIP_LOCKS") == ""
 	photons4d.PNG = os.Getenv("PNG") != ""
 	photons4d.RAW = os.Getenv("RAW") != ""
+	photons4d.AlwaysBVH = os.Getenv("ALWAYS_BVH") != ""
+	photons4d.NeverBVH = os.Getenv("NEVER_BVH") != ""
 	profile := os.Getenv("PROFILE") != ""
 	if profile {
 		f, err := os.Create("cpu.out")

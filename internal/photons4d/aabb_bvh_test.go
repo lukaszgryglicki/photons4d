@@ -77,21 +77,32 @@ func TestComputeRayRecips_AllZero(t *testing.T) {
 }
 
 func TestBuildBVH_LeafAndInternalNodes(t *testing.T) {
-	// <= AABBBVHMaxLeafSize (2) ⇒ single leaf
-	leaf2 := buildBVH([]bvhLeaf{
-		mkLeaf(p4(1, 0, 0, 0), p4(2, 1, 1, 1), r(3)),
-		mkLeaf(p4(4, 0, 0, 0), p4(5, 1, 1, 1), r(4)),
-	})
-	if leaf2 == nil || leaf2.leafObjs == nil || len(leaf2.leafObjs) != 2 {
-		t.Fatalf("expected leaf node of size 2, got %+v", leaf2)
+	// ≤ AABBBVHMaxLeafSize ⇒ single leaf
+	makeLeaf := func(i int) bvhLeaf {
+		x0 := float64(1 + 3*i)
+		// non-overlapping boxes along X so splits are deterministic enough
+		return mkLeaf(
+			p4(x0, 0, 0, 0),
+			p4(x0+1, 1, 1, 1),
+			r(float64(i+1)),
+		)
+	}
+
+	small := make([]bvhLeaf, 0, AABBBVHMaxLeafSize)
+	for i := 0; i < AABBBVHMaxLeafSize; i++ {
+		small = append(small, makeLeaf(i))
+	}
+	leaf := buildBVH(small)
+	if leaf == nil || leaf.leafObjs == nil || len(leaf.leafObjs) != AABBBVHMaxLeafSize {
+		t.Fatalf("expected leaf node of size %d, got %+v", AABBBVHMaxLeafSize, leaf)
 	}
 
 	// > AABBBVHMaxLeafSize ⇒ internal split
-	root := buildBVH([]bvhLeaf{
-		mkLeaf(p4(1, 0, 0, 0), p4(2, 1, 1, 1), r(2)),
-		mkLeaf(p4(4, 0, 0, 0), p4(5, 1, 1, 1), r(5)),
-		mkLeaf(p4(7, 0, 0, 0), p4(8, 1, 1, 1), r(8)),
-	})
+	large := make([]bvhLeaf, 0, AABBBVHMaxLeafSize+1)
+	for i := 0; i < AABBBVHMaxLeafSize+1; i++ {
+		large = append(large, makeLeaf(i))
+	}
+	root := buildBVH(large)
 	if root == nil || root.leafObjs != nil {
 		t.Fatalf("expected internal root, got %+v", root)
 	}

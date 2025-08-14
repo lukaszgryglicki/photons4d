@@ -287,7 +287,8 @@ func traverseNearest(root *AABBNode, O Point4, D Vector4, tMax Real) (objectHit,
 		n    *AABBNode
 		tmin Real
 	}
-	stack := []entry{{n: root, tmin: 0}}
+	stack := make([]entry, 0, 64) // enough for deep BVHs; grows rarely
+	stack = append(stack, entry{n: root, tmin: 0})
 
 	for len(stack) > 0 {
 		// pop
