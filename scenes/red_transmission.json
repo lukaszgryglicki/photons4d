@@ -1,0 +1,40 @@
+{
+  "sceneResX": 256,
+  "sceneResY": 256,
+  "sceneResZ": 31,
+  "probeRays": 30000,
+  "spp": 512,
+  "gifOut": "./gifs/red_transmission.gif",
+  "gifDelay": 10,
+  "gamma": 0.8,
+  "scene": {
+    "center": { "X": 0, "Y": 0, "Z": 0, "W": 0 },
+    "width": 2.0,
+    "height": 2.0,
+    "depth": 2.0,
+    "maxBounces": 24
+  },
+  "lights": [
+    {
+      "origin":    { "X": 0.0, "Y": 0.0, "Z": 0.0, "W": 1.0 },
+      "direction": { "X": 0.0, "Y": 0.0, "Z": 0.0, "W": -1.0 },
+      "color":     { "R": 1.0, "G": 1.0, "B": 1.0 },
+      "angleDeg":  60.0,
+      "voidLight": false
+    }
+  ],
+  "cells8": [
+    {
+      "center": { "X": 0.2, "Y": 0.0, "Z": 0.0, "W": 0.3 },
+      "scale":  { "X": 0.22, "Y": 0.22, "Z": 0.22, "W": 0.22 },
+      "rotDeg": { "xy": 12, "xz": -7, "xw": 9, "yz": 3, "yw": -10, "zw": 8 },
+
+      "color":   { "R": 1.0, "G": 0.0, "B": 0.0 },
+      "diffuse": { "R": 0.05, "G": 0.00, "B": 0.00 },
+      "reflect": { "R": 0.02, "G": 0.02, "B": 0.02 },
+      "refract": { "R": 0.93, "G": 0.03, "B": 0.03 },
+      "ior":     { "R": 1.20, "G": 1.20, "B": 1.20 }
+    }
+  ]
+}
+
