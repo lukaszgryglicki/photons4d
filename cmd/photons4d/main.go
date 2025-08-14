@@ -26,7 +26,10 @@ func main() {
 		if err := pprof.StartCPUProfile(f); err != nil {
 			panic(err)
 		}
-		defer pprof.StopCPUProfile()
+		defer func() {
+			pprof.StopCPUProfile()
+			_ = f.Close()
+		}()
 	}
 
 	cfg := "scenes/config.json"
@@ -35,5 +38,6 @@ func main() {
 	}
 	if err := photons4d.Run(cfg); err != nil {
 		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
 	}
 }
