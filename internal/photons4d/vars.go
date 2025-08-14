@@ -8,6 +8,7 @@ var (
 	AlwaysBVH       = false // set to true to always use BVH for nearest hit calculations
 	NeverBVH        = false // set to true to never use BVH for nearest hit calculations
 	EscapeSPPAdjust = false // set to true to adjust the scene SPP for environmental 4D sphere scene shape
+	ForceEscape     = false // set to true to force escape from the scene, even if the scene is not a 4D sphere
 	NearestHitFunc  = nearestHitBVH
 	// Compile time checks to ensure that the material interface is implemented by all required types
 	_ material = (*Cell8)(nil)

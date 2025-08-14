@@ -20,6 +20,7 @@ func main() {
 	photons4d.AlwaysBVH = os.Getenv("ALWAYS_BVH") != ""
 	photons4d.NeverBVH = os.Getenv("NEVER_BVH") != ""
 	photons4d.EscapeSPPAdjust = os.Getenv("SPP_ADJUST") != ""
+	photons4d.ForceEscape = os.Getenv("FORCE_ESCAPE") != ""
 	profile := os.Getenv("PROFILE") != ""
 	if profile {
 		f, err := os.Create("cpu.out")

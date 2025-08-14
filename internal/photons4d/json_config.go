@@ -321,6 +321,9 @@ func loadConfig(path string) (*Config, error) {
 	if cfg.Scene.MaxBounces <= 0 {
 		cfg.Scene.MaxBounces = MaxBounces
 	}
+	if ForceEscape {
+		cfg.Scene.EnvHypersphere = true
+	}
 	if EscapeSPPAdjust && cfg.Scene.EnvHypersphere {
 		cfg.Spp *= EscapeSppFactor
 	}
