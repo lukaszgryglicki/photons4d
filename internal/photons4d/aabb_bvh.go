@@ -275,7 +275,6 @@ func computeRayRecips(d Vector4) rayRecips {
 	return rr
 }
 
-// Nearest-hit traversal (iterative, stack-based). Prunes by current best t.
 func traverseNearest(root *AABBNode, O Point4, D Vector4, tMax Real) (objectHit, bool) {
 	if root == nil {
 		return objectHit{}, false
@@ -289,13 +288,15 @@ func traverseNearest(root *AABBNode, O Point4, D Vector4, tMax Real) (objectHit,
 		tmin Real
 	}
 	stack := []entry{{n: root, tmin: 0}}
+
 	for len(stack) > 0 {
 		// pop
 		e := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
 
 		ok, tmin := rayAABB(O, e.n.min, e.n.max, rr)
-		if !ok || tmin > bestT || tmin < 0 {
+		// Do NOT cull on tmin < 0; rays that start inside the node are valid.
+		if !ok || tmin > bestT {
 			continue
 		}
 
@@ -309,19 +310,31 @@ func traverseNearest(root *AABBNode, O Point4, D Vector4, tMax Real) (objectHit,
 			continue
 		}
 
-		// order children near→far (push far first so near is processed next)
+		// Order children near→far. Clamp negative entry times to 0 so ordering works
+		// even when the ray origin is inside a child's box.
 		var lOK bool
 		var lT Real
 		if e.n.left != nil {
 			lOK, lT = rayAABB(O, e.n.left.min, e.n.left.max, rr)
-			lOK = lOK && lT <= bestT
+			if lOK {
+				if lT < 0 {
+					lT = 0
+				}
+				lOK = lT <= bestT
+			}
 		}
 		var rOK bool
 		var rT Real
 		if e.n.right != nil {
 			rOK, rT = rayAABB(O, e.n.right.min, e.n.right.max, rr)
-			rOK = rOK && rT <= bestT
+			if rOK {
+				if rT < 0 {
+					rT = 0
+				}
+				rOK = rT <= bestT
+			}
 		}
+
 		if lOK && rOK {
 			if lT < rT {
 				stack = append(stack, entry{e.n.right, rT}, entry{e.n.left, lT})

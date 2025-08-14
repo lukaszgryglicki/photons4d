@@ -311,5 +311,14 @@ func intersectRayCell5(O Point4, D Vector4, s *Cell5) (hit objectHit, ok bool) {
 	}
 	Nw := s.N[idx] // outward normal of the hit facet
 
-	return objectHit{t: t, Nw: Nw, s5: s, inv: inv}, true
+	return objectHit{t: t, Nw: Nw, mat: s, inv: inv}, true
 }
+
+func (c *Cell5) PAbsCh(i int) Real   { return c.pAbs[i] }
+func (c *Cell5) DiffCh(i int) Real   { return c.diff[i] }
+func (c *Cell5) ColorCh(i int) Real  { return c.colorArr[i] }
+func (c *Cell5) F0Ch(i int) Real     { return c.f0[i] }
+func (c *Cell5) ReflCh(i int) Real   { return c.refl[i] }
+func (c *Cell5) RefrCh(i int) Real   { return c.refr[i] }
+func (c *Cell5) IORCh(i int) Real    { return c.iorArr[i] }
+func (c *Cell5) IORInvCh(i int) Real { return c.iorInv[i] }

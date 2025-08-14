@@ -253,5 +253,14 @@ func intersectRayCell24(O Point4, D Vector4, c *Cell24) (hit objectHit, ok bool)
 	if t <= 1e-12 || idx < 0 {
 		return objectHit{}, false
 	}
-	return objectHit{t: t, Nw: c.N[idx], c24: c, inv: inv}, true
+	return objectHit{t: t, Nw: c.N[idx], mat: c, inv: inv}, true
 }
+
+func (c *Cell24) PAbsCh(i int) Real   { return c.pAbs[i] }
+func (c *Cell24) DiffCh(i int) Real   { return c.diff[i] }
+func (c *Cell24) ColorCh(i int) Real  { return c.colorArr[i] }
+func (c *Cell24) F0Ch(i int) Real     { return c.f0[i] }
+func (c *Cell24) ReflCh(i int) Real   { return c.refl[i] }
+func (c *Cell24) RefrCh(i int) Real   { return c.refr[i] }
+func (c *Cell24) IORCh(i int) Real    { return c.iorArr[i] }
+func (c *Cell24) IORInvCh(i int) Real { return c.iorInv[i] }

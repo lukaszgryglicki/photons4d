@@ -9,6 +9,17 @@ type RGB struct {
 	R, G, B Real
 }
 
+type material interface {
+	PAbsCh(int) Real
+	DiffCh(int) Real
+	ColorCh(int) Real
+	F0Ch(int) Real
+	ReflCh(int) Real
+	RefrCh(int) Real
+	IORCh(int) Real
+	IORInvCh(int) Real
+}
+
 // clamp01 clamps each channel to [0,1].
 func (c RGB) clamp01() RGB {
 	cl := func(x Real) Real {

@@ -207,5 +207,14 @@ func intersectRayCellPoly(O Point4, D Vector4, cp *cellPoly) (objectHit, bool) {
 		return objectHit{}, false
 	}
 	Nw := cp.U[idx]
-	return objectHit{t: t, Nw: Nw, poly: cp, inv: inv}, true
+	return objectHit{t: t, Nw: Nw, mat: cp, inv: inv}, true
 }
+
+func (c *cellPoly) PAbsCh(i int) Real   { return c.pAbs[i] }
+func (c *cellPoly) DiffCh(i int) Real   { return c.diff[i] }
+func (c *cellPoly) ColorCh(i int) Real  { return c.colorArr[i] }
+func (c *cellPoly) F0Ch(i int) Real     { return c.f0[i] }
+func (c *cellPoly) ReflCh(i int) Real   { return c.refl[i] }
+func (c *cellPoly) RefrCh(i int) Real   { return c.refr[i] }
+func (c *cellPoly) IORCh(i int) Real    { return c.iorArr[i] }
+func (c *cellPoly) IORInvCh(i int) Real { return c.iorInv[i] }

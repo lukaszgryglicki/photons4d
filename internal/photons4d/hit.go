@@ -5,167 +5,59 @@ import (
 )
 
 type objectHit struct {
-	t    Real
-	Nw   Vector4
-	hs   *HyperSphere
-	s5   *Cell5
-	hc   *Cell8
-	c16  *Cell16
-	c24  *Cell24
-	poly *cellPoly // for 120/600 cells
-	inv  bool
+	t   Real
+	Nw  Vector4
+	mat material // the only thing you need for channels
+	inv bool
 }
 
 func (h objectHit) pAbsCh(c int) Real {
-	if h.hc != nil {
-		return h.hc.pAbs[c]
-	}
-	if h.hs != nil {
-		return h.hs.pAbs[c]
-	}
-	if h.s5 != nil {
-		return h.s5.pAbs[c]
-	}
-	if h.c16 != nil {
-		return h.c16.pAbs[c]
-	}
-	if h.c24 != nil {
-		return h.c24.pAbs[c]
-	}
-	return h.poly.pAbs[c]
-}
-
-func (h objectHit) diffCh(ch int) Real {
-	switch {
-	case h.hc != nil:
-		return h.hc.diff[ch]
-	case h.hs != nil:
-		return h.hs.diff[ch]
-	case h.s5 != nil:
-		return h.s5.diff[ch]
-	case h.c16 != nil:
-		return h.c16.diff[ch]
-	case h.c24 != nil:
-		return h.c24.diff[ch]
-	case h.poly != nil:
-		return h.poly.diff[ch]
-	default:
+	if h.mat == nil {
 		return 0
 	}
+	return h.mat.PAbsCh(c)
 }
-
+func (h objectHit) diffCh(c int) Real {
+	if h.mat == nil {
+		return 0
+	}
+	return h.mat.DiffCh(c)
+}
 func (h objectHit) colorCh(c int) Real {
-	if h.hc != nil {
-		return h.hc.colorArr[c]
+	if h.mat == nil {
+		return 0
 	}
-	if h.hs != nil {
-		return h.hs.colorArr[c]
-	}
-	if h.s5 != nil {
-		return h.s5.colorArr[c]
-	}
-	if h.c16 != nil {
-		return h.c16.colorArr[c]
-	}
-	if h.c24 != nil {
-		return h.c24.colorArr[c]
-	}
-	return h.poly.colorArr[c]
+	return h.mat.ColorCh(c)
 }
-
 func (h objectHit) f0Ch(c int) Real {
-	if h.hc != nil {
-		return h.hc.f0[c]
+	if h.mat == nil {
+		return 0
 	}
-	if h.hs != nil {
-		return h.hs.f0[c]
-	}
-	if h.s5 != nil {
-		return h.s5.f0[c]
-	}
-	if h.c16 != nil {
-		return h.c16.f0[c]
-	}
-	if h.c24 != nil {
-		return h.c24.f0[c]
-	}
-	return h.poly.f0[c]
+	return h.mat.F0Ch(c)
 }
-
 func (h objectHit) reflCh(c int) Real {
-	if h.hc != nil {
-		return h.hc.refl[c]
+	if h.mat == nil {
+		return 0
 	}
-	if h.hs != nil {
-		return h.hs.refl[c]
-	}
-	if h.s5 != nil {
-		return h.s5.refl[c]
-	}
-	if h.c16 != nil {
-		return h.c16.refl[c]
-	}
-	if h.c24 != nil {
-		return h.c24.refl[c]
-	}
-	return h.poly.refl[c]
+	return h.mat.ReflCh(c)
 }
-
 func (h objectHit) refrCh(c int) Real {
-	if h.hc != nil {
-		return h.hc.refr[c]
+	if h.mat == nil {
+		return 0
 	}
-	if h.hs != nil {
-		return h.hs.refr[c]
-	}
-	if h.s5 != nil {
-		return h.s5.refr[c]
-	}
-	if h.c16 != nil {
-		return h.c16.refr[c]
-	}
-	if h.c24 != nil {
-		return h.c24.refr[c]
-	}
-	return h.poly.refr[c]
+	return h.mat.RefrCh(c)
 }
-
 func (h objectHit) iorCh(c int) Real {
-	if h.hc != nil {
-		return h.hc.iorArr[c]
+	if h.mat == nil {
+		return 0
 	}
-	if h.hs != nil {
-		return h.hs.iorArr[c]
-	}
-	if h.s5 != nil {
-		return h.s5.iorArr[c]
-	}
-	if h.c16 != nil {
-		return h.c16.iorArr[c]
-	}
-	if h.c24 != nil {
-		return h.c24.iorArr[c]
-	}
-	return h.poly.iorArr[c]
+	return h.mat.IORCh(c)
 }
-
 func (h objectHit) iorInvCh(c int) Real {
-	if h.hc != nil {
-		return h.hc.iorInv[c]
+	if h.mat == nil {
+		return 0
 	}
-	if h.hs != nil {
-		return h.hs.iorInv[c]
-	}
-	if h.s5 != nil {
-		return h.s5.iorInv[c]
-	}
-	if h.c16 != nil {
-		return h.c16.iorInv[c]
-	}
-	if h.c24 != nil {
-		return h.c24.iorInv[c]
-	}
-	return h.poly.iorInv[c]
+	return h.mat.IORInvCh(c)
 }
 
 func planeHit(scene *Scene, O Point4, D Vector4) Real {
@@ -208,16 +100,6 @@ func nearestHit(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) 
 		rr.invW = 1 / D.W
 	}
 
-	// cells8
-	for _, h := range scene.Cells8 {
-		if ok, tNear := rayAABB(O, h.AABBMin, h.AABBMax, rr); !ok || tNear > bestT {
-			continue
-		}
-		if hit, ok := intersectRayCell8(O, D, h); ok && hit.t > 1e-12 && hit.t < bestT {
-			bestT, best, okAny = hit.t, hit, true
-		}
-	}
-
 	// hyperspheres (ellipsoids)
 	for _, s := range scene.Hyperspheres {
 		if ok, tNear := rayAABB(O, s.AABBMin, s.AABBMax, rr); !ok || tNear > bestT {
@@ -228,12 +110,22 @@ func nearestHit(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) 
 		}
 	}
 
-	// (5-cell)
+	// 5-cells
 	for _, s := range scene.Cells5 {
 		if ok, tNear := rayAABB(O, s.AABBMin, s.AABBMax, rr); !ok || tNear > bestT {
 			continue
 		}
 		if hit, ok := intersectRayCell5(O, D, s); ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
+
+	// 8-cells
+	for _, h := range scene.Cells8 {
+		if ok, tNear := rayAABB(O, h.AABBMin, h.AABBMax, rr); !ok || tNear > bestT {
+			continue
+		}
+		if hit, ok := intersectRayCell8(O, D, h); ok && hit.t > 1e-12 && hit.t < bestT {
 			bestT, best, okAny = hit.t, hit, true
 		}
 	}
@@ -264,7 +156,6 @@ func nearestHit(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) 
 			continue
 		}
 		if hit, ok := intersectRayCellPoly(O, D, &c.cellPoly); ok && hit.t > 1e-12 && hit.t < bestT {
-			hit.poly = &c.cellPoly
 			bestT, best, okAny = hit.t, hit, true
 		}
 	}
@@ -274,7 +165,6 @@ func nearestHit(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) 
 			continue
 		}
 		if hit, ok := intersectRayCellPoly(O, D, &c.cellPoly); ok && hit.t > 1e-12 && hit.t < bestT {
-			hit.poly = &c.cellPoly
 			bestT, best, okAny = hit.t, hit, true
 		}
 	}

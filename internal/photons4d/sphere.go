@@ -178,5 +178,14 @@ func intersectRayHyperSphere(O Point4, D Vector4, h *HyperSphere) (hit objectHit
 	nl := Vector4{S.X / ax.X, S.Y / ax.Y, S.Z / ax.Z, S.W / ax.W}
 	Nw := h.R.MulVec(nl).Norm()
 
-	return objectHit{t: t, Nw: Nw, hs: h, inv: inv}, true
+	return objectHit{t: t, Nw: Nw, mat: h, inv: inv}, true
 }
+
+func (c *HyperSphere) PAbsCh(i int) Real   { return c.pAbs[i] }
+func (c *HyperSphere) DiffCh(i int) Real   { return c.diff[i] }
+func (c *HyperSphere) ColorCh(i int) Real  { return c.colorArr[i] }
+func (c *HyperSphere) F0Ch(i int) Real     { return c.f0[i] }
+func (c *HyperSphere) ReflCh(i int) Real   { return c.refl[i] }
+func (c *HyperSphere) RefrCh(i int) Real   { return c.refr[i] }
+func (c *HyperSphere) IORCh(i int) Real    { return c.iorArr[i] }
+func (c *HyperSphere) IORInvCh(i int) Real { return c.iorInv[i] }

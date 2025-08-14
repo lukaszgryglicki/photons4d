@@ -19,7 +19,7 @@ const (
 	LUTRejectThreshold  = 0.1   // threshold for using rejection sampling vs. LUT inverse-CDF sampling for cone light S^3 cap sampling
 	LutN                = 256
 	AABBBVHMaxLeafSize  = 2
-	AABBBVHFromNObjects = 8 // minimum number of objects to use BVH of AABBs, otherwise just iterate all objects on the scene
+	AABBBVHFromNObjects = 14 // minimum number of objects to use BVH of AABBs, otherwise just iterate all objects on the scene
 	// hot-loop constants reused across bounces
 	epsDist   = 1e-6
 	bumpShift = 1e-6

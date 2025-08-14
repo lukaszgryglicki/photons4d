@@ -163,3 +163,22 @@ func TestCollectSceneObjects_Empty(t *testing.T) {
 		t.Fatalf("expected 0 objects, got %d", len(got))
 	}
 }
+
+func TestRayAABB_InsideOrigin_AllowsTraversal(t *testing.T) {
+	O := Point4{0, 0, 0, 0}  // inside the box
+	D := Vector4{1, 0, 0, 0} // shoot +X
+	rr := computeRayRecips(D)
+	ok, tmin := rayAABB(O,
+		Point4{-1, -1, -1, -1},
+		Point4{+1, +1, +1, +1},
+		rr,
+	)
+	if !ok {
+		t.Fatalf("expected ok for inside-origin ray")
+	}
+	if tmin >= 0 {
+		t.Logf("rayAABB already clamps tmin>=0 (fine). Keeping or removing the tmin<0 cull is harmless.")
+	} else {
+		t.Logf("rayAABB returns tmin<0 for inside-origin (typical). You must NOT cull on tmin<0.")
+	}
+}

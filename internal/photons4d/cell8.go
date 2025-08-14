@@ -244,5 +244,14 @@ func intersectRayCell8(O Point4, D Vector4, h *Cell8) (hit objectHit, ok bool) {
 		Nw = Nw.Mul(-1)
 	}
 
-	return objectHit{t: t, Nw: Nw, hc: h, inv: inv}, true
+	return objectHit{t: t, Nw: Nw, mat: h, inv: inv}, true
 }
+
+func (c *Cell8) PAbsCh(i int) Real   { return c.pAbs[i] }
+func (c *Cell8) DiffCh(i int) Real   { return c.diff[i] }
+func (c *Cell8) ColorCh(i int) Real  { return c.colorArr[i] }
+func (c *Cell8) F0Ch(i int) Real     { return c.f0[i] }
+func (c *Cell8) ReflCh(i int) Real   { return c.refl[i] }
+func (c *Cell8) RefrCh(i int) Real   { return c.refr[i] }
+func (c *Cell8) IORCh(i int) Real    { return c.iorArr[i] }
+func (c *Cell8) IORInvCh(i int) Real { return c.iorInv[i] }
