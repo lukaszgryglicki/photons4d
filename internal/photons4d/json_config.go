@@ -18,7 +18,7 @@ type SceneCfg struct {
 type LightCfg struct {
 	Origin    Point4  `json:"origin"`
 	Direction Vector4 `json:"direction"`
-	VoidLight bool    `json:"voidLight,omitempty"`
+	Intensity Real    `json:"intensity"`
 	Color     RGB     `json:"color"`
 	AngleDeg  Real    `json:"angleDeg"`
 }

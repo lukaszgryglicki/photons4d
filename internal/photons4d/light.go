@@ -14,7 +14,7 @@ type Light struct {
 	Direction Vector4 // unit
 	Color     RGB     // clamped to [0,1]
 	Angle     Real    // half-angle in radians, (0, π]
-	VoidLight bool    // if true then light withdraws energy instead of depositing it
+	Intensity Real
 
 	// cached
 	cosAngle    Real
@@ -22,7 +22,6 @@ type Light struct {
 	colorSum    Real
 	thrR        Real // cumulative threshold for R
 	thrG        Real // cumulative threshold for R+G
-	voidCoeff   Real
 	// orthonormal basis for the 3D subspace orthogonal to Direction
 	U, V, W Vector4
 	// S^3-cap sampling caches
@@ -100,9 +99,12 @@ func jS3(t Real) Real { // J(t) = 1/2 * ( t*sqrt(1-t^2) + asin(t) )
 }
 
 // NewLight constructs a cone light and precomputes caches.
-func NewLight(origin Point4, dir Vector4, color RGB, angle Real, void bool) (*Light, error) {
+func NewLight(origin Point4, dir Vector4, color RGB, angle, intensity Real) (*Light, error) {
 	if angle <= 0 || angle > math.Pi {
 		return nil, errors.New("angle must be in (0, π]")
+	}
+	if intensity == 0.0 {
+		intensity = 1.0
 	}
 	n := dir.Norm()
 	if n.Len() == 0 {
@@ -114,23 +116,18 @@ func NewLight(origin Point4, dir Vector4, color RGB, angle Real, void bool) (*Li
 		return nil, errors.New("colorSum must be positive; got " + fmt.Sprintf("%.6g", csum))
 	}
 	cosA := math.Cos(angle)
-	voidCoeff := 1.0
-	if void {
-		voidCoeff = -1.0 // void light withdraws energy
-	}
 
 	L := &Light{
 		Origin:      origin,
 		Direction:   n,
 		Color:       c,
 		Angle:       angle,
-		VoidLight:   void,
+		Intensity:   intensity,
 		cosAngle:    cosA,
 		oneMinusCos: 1 - cosA,
 		colorSum:    csum,
 		thrR:        c.R,
 		thrG:        c.R + c.G,
-		voidCoeff:   voidCoeff,
 	}
 	L.U, L.V, L.W = orthonormal3(n)
 

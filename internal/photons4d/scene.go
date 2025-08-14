@@ -104,6 +104,10 @@ func (s *Scene) VoxelIndexOf(p Point4) (ok bool, i, j, k int, ux, uy, uz Real) {
 	return true, i, j, k, ux, uy, uz
 }
 
+func (s *Scene) NObjects() int {
+	return len(s.Cells8) + len(s.Hyperspheres) + len(s.Cells5) + len(s.Cells16) + len(s.Cells24) + len(s.Cells120) + len(s.Cells600)
+}
+
 // Flat buffer index helper (c ∈ {ChR,ChG,ChB}).
 func (s *Scene) idx(i, j, k, c int) int {
 	return i*s.StrideX + j*s.StrideY + k*3 + c

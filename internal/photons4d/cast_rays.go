@@ -15,7 +15,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 	ch := pickChannel(light.colorSum, light.thrR, light.thrG, rng)
 
 	// Initial throughput/energy: sum of channels so that E[deposit] = Color[ch]*w
-	throughput := light.Color.R + light.Color.G + light.Color.B
+	throughput := light.Intensity * (light.Color.R + light.Color.G + light.Color.B)
 
 	// Start at the light with a sampled unit direction.
 	O := light.Origin
@@ -42,7 +42,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		tPlane := planeHit(scene, O, D)
 
 		// Next object hit (cell/ellipsoid) with AABB pre-cull
-		hit, okObj := nearestHit(scene, O, D, tPlane)
+		hit, okObj := NearestHitFunc(scene, O, D, tPlane)
 
 		// If no cell/ellipsoid ahead or plane is closer → try to deposit on the plane.
 		if !okObj || tPlane < hit.t {
@@ -68,13 +68,13 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 					if locks != nil {
 						locks.lock(base)
 					}
-					scene.Buf[base+ch] += Real(throughput * w * light.voidCoeff)
+					scene.Buf[base+ch] += Real(throughput * w)
 					if locks != nil {
 						locks.unlock(base)
 					}
 				} else if deposit {
 					base := scene.idx(i, j, k, ChR)
-					scene.Buf[base+ch] += Real(throughput * w * light.voidCoeff)
+					scene.Buf[base+ch] += Real(throughput * w)
 				}
 				if Debug && deposit {
 					logRay("hit_scene", Hit, O, D, P, bounce, totalDist)

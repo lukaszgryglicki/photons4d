@@ -29,7 +29,7 @@ func Run(cfgPath string) error {
 	lights := make([]*Light, 0, len(cfg.Lights))
 	for _, Lc := range cfg.Lights {
 		angle := Lc.AngleDeg * math.Pi / 180.0
-		L, err := NewLight(Lc.Origin, Lc.Direction, Lc.Color, angle, Lc.VoidLight)
+		L, err := NewLight(Lc.Origin, Lc.Direction, Lc.Color, angle, Lc.Intensity)
 		if err != nil {
 			return err
 		}
@@ -90,6 +90,14 @@ func Run(cfgPath string) error {
 			continue
 		}
 		scene.AddCell600(h)
+	}
+	nObjects := scene.NObjects()
+	DebugLog("Scene created with %d objects", nObjects)
+	if nObjects < AABBBVHFromNObjects {
+		NearestHitFunc = nearestHit
+		DebugLog("Using nearestHit function (instead of BVH of AABB) for %d objects", nObjects)
+	} else {
+		DebugLog("Using BVH of AABBs for %d objects", nObjects)
 	}
 
 	Nvox := Nx * Ny * Nz

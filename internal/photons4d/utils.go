@@ -13,6 +13,19 @@ func imax(a, b int) int {
 	return b
 }
 
+func rmin(a, b Real) Real {
+	if a < b {
+		return a
+	}
+	return b
+}
+func rmax(a, b Real) Real {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 // splitEventWeights computes the dynamic (per-hit) probabilities for
 // reflection, refraction and diffuse given:
 //   - refl, refr, diff: per-channel material knobs (0..1)
