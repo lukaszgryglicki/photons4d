@@ -20,6 +20,7 @@ const (
 	LutN                = 256
 	AABBBVHMaxLeafSize  = 6
 	AABBBVHFromNObjects = 14 // minimum number of objects to use BVH of AABBs, otherwise just iterate all objects on the scene
+	EscapeSppFactor     = 4  // factor to increase spp for escape rays to avoid noise
 	// hot-loop constants reused across bounces
 	epsDist   = 1e-6
 	bumpShift = 1e-6

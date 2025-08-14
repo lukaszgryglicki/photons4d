@@ -321,6 +321,9 @@ func loadConfig(path string) (*Config, error) {
 	if cfg.Scene.MaxBounces <= 0 {
 		cfg.Scene.MaxBounces = MaxBounces
 	}
+	if EscapeSPPAdjust && cfg.Scene.EnvHypersphere {
+		cfg.Spp *= EscapeSppFactor
+	}
 	DebugLog("Loaded config from %s: size=(%d, %d, %d), probe=%d, SPP=%d, gamma=%f", path, cfg.SceneResX, cfg.SceneResY, cfg.SceneResZ, cfg.ProbeRays, cfg.Spp, cfg.Gamma)
 	return &cfg, nil
 }
