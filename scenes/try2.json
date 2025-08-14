@@ -1,9 +1,9 @@
 {
   "sceneResX": 256,
   "sceneResY": 256,
-  "sceneResZ": 31,
+  "sceneResZ": 63,
   "probeRays": 100000,
-  "spp": 128,
+  "spp": 256,
   "gifOut": "./gifs/try2.gif",
   "gifDelay": 6,
   "gamma": 0.8,
@@ -13,7 +13,8 @@
     "width": 2.0,
     "height": 2.0,
     "depth": 2.0,
-    "maxBounces": 16
+    "escape": true,
+    "maxBounces": 64
   },
 
   "lights": [
@@ -22,6 +23,62 @@
       "direction": { "X": 0.0,  "Y": -0.05, "Z": 0.02, "W": -1.0 },
       "color":     { "R": 1.0, "G": 1.0, "B": 1.0 },
       "angleDeg":  80.0
+    },
+    {
+      "origin":    { "x": 0.0,  "y": 0.0,  "z": 0.0,  "w": 1.0 },
+      "direction": { "x": 0.0,  "y": 0.0,  "z": 0.0,  "w": -1.0 },
+      "color":     { "r": 1.0,  "g": 1.0,  "b": 1.0 },
+      "angledeg":  60.0,
+      "intensity": 1.0
+    },
+    {
+      "origin":    { "x": 0.0,  "y": 0.0,  "z": 0.0,  "w": -1.0 },
+      "direction": { "x": 0.0,  "y": 0.0,  "z": 0.0,  "w": 1.0 },
+      "color":     { "r": 1.0,  "g": 1.0,  "b": 1.0 },
+      "angledeg":  60.0,
+      "intensity": 1.0
+    },
+    {
+      "origin":    { "x": 0.0,  "y": 0.0,  "z": 1.0,  "w": 0.0 },
+      "direction": { "x": 0.0,  "y": 0.0,  "z": -1.0,  "w": 0.0 },
+      "color":     { "r": 1.0,  "g": 1.0,  "b": 1.0 },
+      "angledeg":  60.0,
+      "intensity": 1.0
+    },
+    {
+      "origin":    { "x": 0.0,  "y": 0.0,  "z": -1.0,  "w": 0.0 },
+      "direction": { "x": 0.0,  "y": 0.0,  "z": 1.0,  "w": 0.0 },
+      "color":     { "r": 1.0,  "g": 1.0,  "b": 1.0 },
+      "angledeg":  60.0,
+      "intensity": 1.0
+    },
+    {
+      "origin":    { "x": 0.0,  "y": 1.0,  "z": 0.0,  "w": 0.0 },
+      "direction": { "x": 0.0,  "y": -1.0,  "z": 0.0,  "w": 0.0 },
+      "color":     { "r": 1.0,  "g": 1.0,  "b": 1.0 },
+      "angledeg":  60.0,
+      "intensity": 1.0
+    },
+    {
+      "origin":    { "x": 0.0,  "y": -1.0,  "z": 0.0,  "w": 0.0 },
+      "direction": { "x": 0.0,  "y": 1.0,  "z": 0.0,  "w": 0.0 },
+      "color":     { "r": 1.0,  "g": 1.0,  "b": 1.0 },
+      "angledeg":  60.0,
+      "intensity": 1.0
+    },
+    {
+      "origin":    { "x": 1.0,  "y": 0.0,  "z": 0.0,  "w": 0.0 },
+      "direction": { "x": -1.0,  "y": 0.0,  "z": 0.0,  "w": 0.0 },
+      "color":     { "r": 1.0,  "g": 1.0,  "b": 1.0 },
+      "angledeg":  60.0,
+      "intensity": 1.0
+    },
+    {
+      "origin":    { "x": -1.0,  "y": 0.0,  "z": 0.0,  "w": 0.0 },
+      "direction": { "x": 1.0,  "y": 0.0,  "z": 0.0,  "w": 0.0 },
+      "color":     { "r": 1.0,  "g": 1.0,  "b": 1.0 },
+      "angledeg":  60.0,
+      "intensity": 1.0
     }
   ],
 
