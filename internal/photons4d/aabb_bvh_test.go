@@ -103,8 +103,8 @@ func TestBuildBVH_LeafAndInternalNodes(t *testing.T) {
 		large = append(large, makeLeaf(i))
 	}
 	root := buildBVH(large)
-	if root == nil || root.leafObjs != nil {
-		t.Fatalf("expected internal root, got %+v", root)
+	if root == nil || root.leafObjs != nil || root.left == nil || root.right == nil {
+		t.Fatalf("expected internal root with children, got %+v", root)
 	}
 }
 
