@@ -31,11 +31,11 @@ def mat(color, diffuse, reflect, refract, ior):
 cfg = {
     "sceneResX": 256,
     "sceneResY": 256,
-    "sceneResZ": 16,
-    "probeRays": 65536,
-    "spp": 256,
+    "sceneResZ": 256,
+    "probeRays": 655360,
+    "spp": 400,
     "gifOut": "./gifs/ultimate_all_objects_trap.gif",
-    "gifDelay": 20,
+    "gifDelay": 25,
     "gamma": 0.8,
     "scene": {
         "center": {"X": 0, "Y": 0, "Z": 0, "W": 0},

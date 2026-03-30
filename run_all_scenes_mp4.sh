@@ -10,10 +10,13 @@ set -e
 
 export PNG=1
 
-if [ -n "${EXCLUDE_GLOB:-}" ]; then
-  SCENES=$(find ./scenes/ -iname "*.json" ! -iname "$EXCLUDE_GLOB")
-else
-  SCENES=$(find ./scenes/ -iname "*.json")
+if [ -z "$SCENES" ]
+then
+  if [ -n "${EXCLUDE_GLOB:-}" ]; then
+    SCENES=$(find ./scenes/ -iname "*.json" ! -iname "$EXCLUDE_GLOB")
+  else
+    SCENES=$(find ./scenes/ -iname "*.json")
+  fi
 fi
 
 for f in $SCENES
