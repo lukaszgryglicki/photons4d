@@ -35,6 +35,7 @@ func NewCell600(center Point4, scale Vector4, angles Rot4, color, diffuse, refle
 	}
 	cp.materialFrom(color, diffuse, reflectivity, refractivity, ior)
 	cp.buildPlanes(verts120Unit(), 1.0)
+	cp.computeAABBFromLocalVerts(verts600Unit())
 
 	// DebugLog("Created 600-cell: center=%+v, scale=%+v, AABB=[%+v..%+v]", center, scale, cp.AABBMin, cp.AABBMax)
 	DebugLog("Created 600-cell: %+v", cp)

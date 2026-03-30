@@ -62,8 +62,57 @@ func (cp *cellPoly) buildPlanes(localNormals []Vector4, radius Real) {
 		cp.U = append(cp.U, u)
 		cp.D = append(cp.D, d)
 	}
-	// AABB via support function along axes
-	cp.computeAABB()
+	// AABB via support function along axes - removed, was broken, replaced with poly-specific one
+	// cp.computeAABB()
+}
+
+func (cp *cellPoly) computeAABBFromLocalVerts(localVerts []Vector4) {
+	if len(localVerts) == 0 {
+		cp.computeAABB()
+		return
+	}
+
+	minP := Point4{+1e300, +1e300, +1e300, +1e300}
+	maxP := Point4{-1e300, -1e300, -1e300, -1e300}
+
+	for _, v := range localVerts {
+		p := Vector4{
+			v.X * cp.Scale.X,
+			v.Y * cp.Scale.Y,
+			v.Z * cp.Scale.Z,
+			v.W * cp.Scale.W,
+		}
+		p = cp.R.MulVec(p)
+		w := Point4{cp.Center.X + p.X, cp.Center.Y + p.Y, cp.Center.Z + p.Z, cp.Center.W + p.W}
+
+		if w.X < minP.X {
+			minP.X = w.X
+		}
+		if w.X > maxP.X {
+			maxP.X = w.X
+		}
+		if w.Y < minP.Y {
+			minP.Y = w.Y
+		}
+		if w.Y > maxP.Y {
+			maxP.Y = w.Y
+		}
+		if w.Z < minP.Z {
+			minP.Z = w.Z
+		}
+		if w.Z > maxP.Z {
+			maxP.Z = w.Z
+		}
+		if w.W < minP.W {
+			minP.W = w.W
+		}
+		if w.W > maxP.W {
+			maxP.W = w.W
+		}
+	}
+
+	cp.AABBMin = minP
+	cp.AABBMax = maxP
 }
 
 func (cp *cellPoly) computeAABB() {

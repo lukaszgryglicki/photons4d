@@ -47,6 +47,19 @@ func TestSceneAABBWithCell600(t *testing.T) {
 		obj.AABBMin.Z <= obj.AABBMax.Z && obj.AABBMin.W <= obj.AABBMax.W) {
 		t.Fatalf("AABB invalid: [%+v .. %+v]", obj.AABBMin, obj.AABBMax)
 	}
+
+	for i, v := range verts600Unit() {
+		p := Vector4{v.X * obj.Scale.X, v.Y * obj.Scale.Y, v.Z * obj.Scale.Z, v.W * obj.Scale.W}
+		p = obj.R.MulVec(p)
+		w := Point4{obj.Center.X + p.X, obj.Center.Y + p.Y, obj.Center.Z + p.Z, obj.Center.W + p.W}
+		if w.X < obj.AABBMin.X-1e-12 || w.X > obj.AABBMax.X+1e-12 ||
+			w.Y < obj.AABBMin.Y-1e-12 || w.Y > obj.AABBMax.Y+1e-12 ||
+			w.Z < obj.AABBMin.Z-1e-12 || w.Z > obj.AABBMax.Z+1e-12 ||
+			w.W < obj.AABBMin.W-1e-12 || w.W > obj.AABBMax.W+1e-12 {
+			t.Fatalf("transformed 600-cell vertex %d outside AABB: %+v not in [%+v .. %+v]", i, w, obj.AABBMin, obj.AABBMax)
+		}
+	}
+
 	c := obj.Center
 	if c.X < obj.AABBMin.X-1e-12 || c.X > obj.AABBMax.X+1e-12 ||
 		c.Y < obj.AABBMin.Y-1e-12 || c.Y > obj.AABBMax.Y+1e-12 ||
