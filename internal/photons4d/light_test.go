@@ -6,6 +6,35 @@ import (
 	"testing"
 )
 
+type seqSource struct {
+	vals []int64
+	i    int
+}
+
+func (s *seqSource) Int63() int64 {
+	v := s.vals[s.i%len(s.vals)]
+	s.i++
+	return v
+}
+
+func (s *seqSource) Seed(seed int64) {}
+
+func TestUnitS3_SkipsZeroSecondDisc(t *testing.T) {
+	const half = int64(1) << 62
+	const threeQuarter = int64(3) << 61
+	rng := rand.New(&seqSource{vals: []int64{
+		half, half, half, half,
+		half, half, threeQuarter, half,
+	}})
+	v := unitS3(rng)
+	if !isFinite(v.X) || !isFinite(v.Y) || !isFinite(v.Z) || !isFinite(v.W) {
+		t.Fatalf("unitS3 returned non-finite vector: %+v", v)
+	}
+	if math.Abs(float64(v.Len()-1)) > 1e-12 {
+		t.Fatalf("unitS3 returned non-unit vector: %+v len=%.12g", v, v.Len())
+	}
+}
+
 func TestNewLightValidation(t *testing.T) {
 	_, err := NewLight(Point4{}, Vector4{}, RGB{1, 1, 1}, 0.1, 1.0)
 	if err == nil {

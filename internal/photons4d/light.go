@@ -182,7 +182,7 @@ func unitS3(rng *rand.Rand) Vector4 {
 		x3 := 2*rng.Float64() - 1
 		x4 := 2*rng.Float64() - 1
 		s2 := x3*x3 + x4*x4
-		if s2 >= 1 {
+		if s2 <= 1e-18 || s2 >= 1 {
 			continue
 		}
 		f := math.Sqrt((1 - s1) / s2)
