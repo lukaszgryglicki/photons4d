@@ -17,4 +17,5 @@ var (
 	_ material = (*Cell16)(nil)
 	_ material = (*Cell24)(nil)
 	_ material = (*cellPoly)(nil) // for 120/600
+	_ material = (*Spherinder)(nil)
 )

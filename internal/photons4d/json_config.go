@@ -45,6 +45,7 @@ type Config struct {
 	Cells24      []Cell24Cfg      `json:"cells24,omitempty"`
 	Cells120     []Cell120Cfg     `json:"cells120,omitempty"`
 	Cells600     []Cell600Cfg     `json:"cells600,omitempty"`
+	Spherinders  []SpherinderCfg  `json:"spherinders,omitempty"`
 }
 
 // Rotation in degrees for JSON (friendlier than radians).
@@ -60,6 +61,18 @@ type Rot4Deg struct {
 type HyperSphereCfg struct {
 	Center Point4  `json:"center"`
 	Scale  Vector4 `json:"scale,omitempty"` // optional per-axis scale; defaults 1
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type SpherinderCfg struct {
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
 	RotDeg Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
@@ -279,6 +292,23 @@ func (c Cell600Cfg) Build() (*Cell600, error) {
 		sc.W = 1
 	}
 	return NewCell600(c.Center, sc, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c SpherinderCfg) Build() (*Spherinder, error) {
+	sc := c.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	return NewSpherinder(c.Center, sc, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
 }
 
 func loadConfig(path string) (*Config, error) {

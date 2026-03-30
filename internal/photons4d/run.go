@@ -119,6 +119,13 @@ func Run(cfgPath string) error {
 		}
 		scene.AddCell600(h)
 	}
+	for i, scfg := range cfg.Spherinders {
+		h, err := scfg.Build()
+		if err != nil {
+			panic(fmt.Errorf("spherinders[%d]: %w", i, err))
+		}
+		scene.AddSpherinder(h)
+	}
 	nObjects := scene.NObjects()
 	DebugLog("Scene created with %d objects", nObjects)
 	if AlwaysBVH && NeverBVH {

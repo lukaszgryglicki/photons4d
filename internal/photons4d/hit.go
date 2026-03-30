@@ -168,6 +168,15 @@ func nearestHit(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) 
 			bestT, best, okAny = hit.t, hit, true
 		}
 	}
+	// spherinders
+	for _, s := range scene.Spherinders {
+		if ok, tNear := rayAABB(O, s.AABBMin, s.AABBMax, rr); !ok || tNear > bestT {
+			continue
+		}
+		if hit, ok := intersectRaySpherinder(O, D, s); ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
 
 	return best, okAny
 }
