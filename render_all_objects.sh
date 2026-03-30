@@ -6,7 +6,7 @@ SCENE_NAME="ultimate_all_objects_trap"
 CFG="${ROOT}/scenes/${SCENE_NAME}.json"
 BIN="${ROOT}/photons4d"
 THREADS="${THREADS:-512}"
-FPS="${FPS:-24}"
+FPS="${FPS:-5}"
 LOSSLESS="${LOSSLESS:-0}"
 
 mkdir -p "${ROOT}/scenes" "${ROOT}/gifs" "${ROOT}/pngs" "${ROOT}/raws" "${ROOT}/mp4" "${ROOT}/logs"
@@ -29,13 +29,13 @@ def mat(color, diffuse, reflect, refract, ior):
     }
 
 cfg = {
-    "sceneResX": 32,
-    "sceneResY": 32,
-    "sceneResZ": 32,
+    "sceneResX": 256,
+    "sceneResY": 256,
+    "sceneResZ": 16,
     "probeRays": 65536,
-    "spp": 32,
+    "spp": 256,
     "gifOut": "./gifs/ultimate_all_objects_trap.gif",
-    "gifDelay": 4,
+    "gifDelay": 20,
     "gamma": 0.8,
     "scene": {
         "center": {"X": 0, "Y": 0, "Z": 0, "W": 0},
@@ -260,7 +260,7 @@ if compgen -G "${ROOT}/pngs/${SCENE_NAME}_*.png" >/dev/null; then
   else
     ffmpeg -y -framerate "${FPS}" -pattern_type glob -i "${ROOT}/pngs/${SCENE_NAME}_*.png" \
       -c:v libx265 -preset slow -pix_fmt yuv444p12le \
-      -x265-params crf=3:tune=grain:aq-mode=3 \
+      -x265-params crf=2:aq-mode=3:aq-strength=1.2:psy-rd=2.0:psy-rdoq=1.5 -tune grain \
       -movflags +faststart "${ROOT}/mp4/${SCENE_NAME}.mp4"
   fi
 else

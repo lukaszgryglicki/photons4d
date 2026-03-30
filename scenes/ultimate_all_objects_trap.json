@@ -1,11 +1,11 @@
 {
-  "sceneResX": 32,
-  "sceneResY": 32,
-  "sceneResZ": 32,
+  "sceneResX": 256,
+  "sceneResY": 256,
+  "sceneResZ": 16,
   "probeRays": 65536,
-  "spp": 32,
+  "spp": 256,
   "gifOut": "./gifs/ultimate_all_objects_trap.gif",
-  "gifDelay": 4,
+  "gifDelay": 20,
   "gamma": 0.8,
   "scene": {
     "center": {

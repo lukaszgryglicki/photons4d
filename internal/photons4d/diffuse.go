@@ -21,13 +21,27 @@ func orthonormal3Fast(a Vector4) (u, v, w Vector4) {
 		{0, 0, 0, 1},
 	}
 
+	absComp := [4]Real{math.Abs(a.X), math.Abs(a.Y), math.Abs(a.Z), math.Abs(a.W)}
+	order := [4]int{0, 1, 2, 3}
+	// Least-aligned helper first => best-conditioned first tangent vector.
+	for i := 1; i < 4; i++ {
+		x := order[i]
+		j := i - 1
+		for ; j >= 0 && absComp[order[j]] > absComp[x]; j-- {
+			order[j+1] = order[j]
+		}
+		order[j+1] = x
+	}
+
 	var basis [3]Vector4
 	n := 0
-	for _, h := range helpers {
-		q := proj(h)
+	for _, idx := range order {
+		q := proj(helpers[idx])
 		for i := 0; i < n; i++ {
 			q = q.Sub(basis[i].Mul(q.Dot(basis[i])))
 		}
+		// Reproject once more to kill accumulated numerical drift back onto a.
+		q = proj(q)
 		l := q.Len()
 		if l <= eps {
 			continue
