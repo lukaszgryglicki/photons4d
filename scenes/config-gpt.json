@@ -2,11 +2,11 @@
   "sceneResX": 512,
   "sceneResY": 512,
   "sceneResZ": 31,
-  "probeRays": 65536,
-  "spp": 192,
+  "probeRays": 131072,
+  "spp": 256,
   "gifOut": "./gifs/config-gpt.gif",
   "gifDelay": 10,
-  "gamma": 0.95,
+  "gamma": 1.08,
   "scene": {
     "center": {
       "X": 0,
@@ -18,7 +18,7 @@
     "height": 2.0,
     "depth": 2.0,
     "escape": true,
-    "maxBounces": 48
+    "maxBounces": 56
   },
   "lights": [
     {
@@ -39,7 +39,7 @@
         "G": 1.0,
         "B": 1.0
       },
-      "angleDeg": 45.0,
+      "angleDeg": 36.0,
       "intensity": 1.0
     },
     {
@@ -60,8 +60,8 @@
         "G": 0.95,
         "B": 1.0
       },
-      "angleDeg": 35.0,
-      "intensity": 0.7
+      "angleDeg": 28.0,
+      "intensity": 0.85
     },
     {
       "origin": {
@@ -81,8 +81,8 @@
         "G": 0.92,
         "B": 0.8
       },
-      "angleDeg": 35.0,
-      "intensity": 0.7
+      "angleDeg": 28.0,
+      "intensity": 0.85
     }
   ],
   "cells8": [

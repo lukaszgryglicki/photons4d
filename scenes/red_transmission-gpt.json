@@ -2,11 +2,11 @@
   "sceneResX": 256,
   "sceneResY": 256,
   "sceneResZ": 31,
-  "probeRays": 65536,
-  "spp": 256,
+  "probeRays": 131072,
+  "spp": 384,
   "gifOut": "./gifs/red_transmission-gpt.gif",
   "gifDelay": 10,
-  "gamma": 1.0,
+  "gamma": 1.12,
   "scene": {
     "center": {
       "X": 0,
@@ -17,7 +17,7 @@
     "width": 2.0,
     "height": 2.0,
     "depth": 2.0,
-    "maxBounces": 48,
+    "maxBounces": 56,
     "escape": true
   },
   "lights": [
@@ -39,7 +39,7 @@
         "G": 1.0,
         "B": 1.0
       },
-      "angleDeg": 36.0,
+      "angleDeg": 28.0,
       "intensity": 1.0
     },
     {
@@ -60,8 +60,29 @@
         "G": 0.9,
         "B": 0.9
       },
-      "angleDeg": 18.0,
-      "intensity": 0.22
+      "angleDeg": 14.0,
+      "intensity": 0.36
+    },
+    {
+      "origin": {
+        "X": -0.34,
+        "Y": 0.18,
+        "Z": -0.1,
+        "W": 1.0
+      },
+      "direction": {
+        "X": 0.2,
+        "Y": -0.08,
+        "Z": 0.04,
+        "W": -1.0
+      },
+      "color": {
+        "R": 0.75,
+        "G": 0.85,
+        "B": 1.0
+      },
+      "angleDeg": 14.0,
+      "intensity": 0.18
     }
   ],
   "cells5": [
@@ -70,13 +91,13 @@
         "X": 0.2,
         "Y": 0.0,
         "Z": 0.0,
-        "W": 0.3
+        "W": 0.34
       },
       "scale": {
-        "X": 0.22,
-        "Y": 0.22,
-        "Z": 0.22,
-        "W": 0.22
+        "X": 0.28,
+        "Y": 0.28,
+        "Z": 0.28,
+        "W": 0.28
       },
       "rotDeg": {
         "xy": 12,

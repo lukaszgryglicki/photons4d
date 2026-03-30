@@ -3,10 +3,10 @@
   "sceneResY": 512,
   "sceneResZ": 31,
   "probeRays": 65536,
-  "spp": 192,
+  "spp": 320,
   "gifOut": "./gifs/cell5-gpt.gif",
   "gifDelay": 10,
-  "gamma": 0.9,
+  "gamma": 1.0,
   "scene": {
     "center": {
       "X": 0,
@@ -17,7 +17,7 @@
     "width": 2.0,
     "height": 2.0,
     "depth": 2.0,
-    "maxBounces": 40
+    "maxBounces": 48
   },
   "lights": [
     {
@@ -38,8 +38,8 @@
         "G": 1.0,
         "B": 1.0
       },
-      "angleDeg": 28.0,
-      "intensity": 1.0
+      "angleDeg": 22.0,
+      "intensity": 1.1
     },
     {
       "origin": {
@@ -59,8 +59,8 @@
         "G": 0.92,
         "B": 0.8
       },
-      "angleDeg": 18.0,
-      "intensity": 0.32
+      "angleDeg": 14.0,
+      "intensity": 0.38
     },
     {
       "origin": {
@@ -80,8 +80,8 @@
         "G": 0.84,
         "B": 1.0
       },
-      "angleDeg": 18.0,
-      "intensity": 0.26
+      "angleDeg": 14.0,
+      "intensity": 0.32
     }
   ],
   "cells5": [
@@ -90,21 +90,21 @@
         "X": 0,
         "Y": 0,
         "Z": 0,
-        "W": 0.32
+        "W": 0.2816
       },
       "scale": {
-        "X": 0.4,
-        "Y": 0.4,
-        "Z": 0.4,
-        "W": 0.4
+        "X": 0.46,
+        "Y": 0.46,
+        "Z": 0.46,
+        "W": 0.46
       },
       "rotDeg": {
-        "xy": 0,
-        "xz": 0,
-        "xw": 0,
-        "yz": 0,
-        "yw": 0,
-        "zw": 0
+        "xy": 8,
+        "xz": 13,
+        "xw": 21,
+        "yz": 5,
+        "yw": 11,
+        "zw": 17
       },
       "color": {
         "R": 1,

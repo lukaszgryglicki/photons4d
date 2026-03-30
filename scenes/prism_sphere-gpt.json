@@ -2,11 +2,11 @@
   "sceneResX": 320,
   "sceneResY": 320,
   "sceneResZ": 17,
-  "probeRays": 131072,
-  "spp": 192,
+  "probeRays": 262144,
+  "spp": 320,
   "gifOut": "./gifs/prism_sphere-gpt.gif",
   "gifDelay": 8,
-  "gamma": 0.95,
+  "gamma": 1.12,
   "scene": {
     "center": {
       "X": 0,
@@ -17,7 +17,7 @@
     "width": 2.0,
     "height": 2.0,
     "depth": 2.0,
-    "maxBounces": 48
+    "maxBounces": 64
   },
   "lights": [
     {
@@ -38,8 +38,8 @@
         "G": 1.0,
         "B": 1.0
       },
-      "angleDeg": 10.0,
-      "intensity": 0.75
+      "angleDeg": 8.0,
+      "intensity": 0.95
     },
     {
       "origin": {
@@ -59,8 +59,8 @@
         "G": 0.85,
         "B": 0.78
       },
-      "angleDeg": 12.0,
-      "intensity": 0.3
+      "angleDeg": 10.0,
+      "intensity": 0.4
     },
     {
       "origin": {
@@ -80,8 +80,8 @@
         "G": 0.88,
         "B": 1.0
       },
-      "angleDeg": 12.0,
-      "intensity": 0.3
+      "angleDeg": 10.0,
+      "intensity": 0.4
     }
   ],
   "hyperspheres": [
@@ -90,13 +90,13 @@
         "X": 0.0,
         "Y": 0.0,
         "Z": 0.0,
-        "W": 0.78
+        "W": 0.74
       },
       "scale": {
-        "X": 0.11,
-        "Y": 0.11,
-        "Z": 0.11,
-        "W": 0.11
+        "X": 0.1298,
+        "Y": 0.1298,
+        "Z": 0.1298,
+        "W": 0.1298
       },
       "rotDeg": {
         "xy": 0,
@@ -132,13 +132,13 @@
         "X": 0.0,
         "Y": 0.0,
         "Z": 0.0,
-        "W": 0.48
+        "W": 0.44
       },
       "scale": {
-        "X": 0.38,
-        "Y": 0.38,
-        "Z": 0.38,
-        "W": 0.34
+        "X": 0.4256,
+        "Y": 0.4256,
+        "Z": 0.4256,
+        "W": 0.3808
       },
       "rotDeg": {
         "xy": 10,

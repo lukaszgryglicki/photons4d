@@ -2,11 +2,11 @@
   "sceneResX": 1024,
   "sceneResY": 1024,
   "sceneResZ": 1,
-  "probeRays": 65536,
-  "spp": 512,
+  "probeRays": 131072,
+  "spp": 768,
   "gifOut": "./gifs/tiny_cell8-gpt.gif",
   "gifDelay": 10,
-  "gamma": 0.9,
+  "gamma": 1.08,
   "scene": {
     "center": {
       "X": 0,
@@ -38,8 +38,8 @@
         "G": 1.0,
         "B": 1.0
       },
-      "angleDeg": 28.0,
-      "intensity": 1.0
+      "angleDeg": 20.0,
+      "intensity": 1.18
     },
     {
       "origin": {
@@ -59,8 +59,8 @@
         "G": 0.92,
         "B": 0.8
       },
-      "angleDeg": 18.0,
-      "intensity": 0.32
+      "angleDeg": 14.0,
+      "intensity": 0.4
     },
     {
       "origin": {
@@ -80,8 +80,8 @@
         "G": 0.84,
         "B": 1.0
       },
-      "angleDeg": 18.0,
-      "intensity": 0.26
+      "angleDeg": 14.0,
+      "intensity": 0.34
     }
   ],
   "cells8": [
@@ -90,13 +90,13 @@
         "X": 0.0,
         "Y": 0.0,
         "Z": 0.0,
-        "W": 0.5
+        "W": 0.42
       },
       "scale": {
-        "X": 0.1,
-        "Y": 0.1,
-        "Z": 0.1,
-        "W": 0.1
+        "X": 0.14,
+        "Y": 0.14,
+        "Z": 0.14,
+        "W": 0.14
       },
       "rotDeg": {
         "xy": 5,

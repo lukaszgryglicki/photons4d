@@ -2,11 +2,11 @@
   "sceneResX": 512,
   "sceneResY": 512,
   "sceneResZ": 16,
-  "probeRays": 131072,
-  "spp": 64,
+  "probeRays": 196608,
+  "spp": 96,
   "gifOut": "./gifs/big_mixed_scene-gpt.gif",
   "gifDelay": 10,
-  "gamma": 0.92,
+  "gamma": 1.02,
   "scene": {
     "center": {
       "X": 0,
@@ -17,7 +17,7 @@
     "width": 2.0,
     "height": 2.0,
     "depth": 2.0,
-    "maxBounces": 48
+    "maxBounces": 64
   },
   "lights": [
     {
@@ -38,8 +38,8 @@
         "G": 1.0,
         "B": 1.0
       },
-      "angleDeg": 22.0,
-      "intensity": 0.78
+      "angleDeg": 16.0,
+      "intensity": 0.48
     },
     {
       "origin": {
@@ -59,8 +59,8 @@
         "G": 0.86,
         "B": 0.72
       },
-      "angleDeg": 18.0,
-      "intensity": 0.34
+      "angleDeg": 14.0,
+      "intensity": 0.52
     },
     {
       "origin": {
@@ -80,8 +80,29 @@
         "G": 0.84,
         "B": 1.0
       },
-      "angleDeg": 18.0,
-      "intensity": 0.34
+      "angleDeg": 14.0,
+      "intensity": 0.52
+    },
+    {
+      "origin": {
+        "X": 0.0,
+        "Y": -0.68,
+        "Z": 0.0,
+        "W": 1.02
+      },
+      "direction": {
+        "X": 0.0,
+        "Y": 0.24,
+        "Z": 0.0,
+        "W": -1.0
+      },
+      "color": {
+        "R": 0.78,
+        "G": 1.0,
+        "B": 0.82
+      },
+      "angleDeg": 12.0,
+      "intensity": 0.22
     }
   ],
   "hyperspheres": [
@@ -459,6 +480,53 @@
         "R": 1.35,
         "G": 1.35,
         "B": 1.55
+      }
+    },
+    {
+      "center": {
+        "X": 0.0,
+        "Y": 0.0,
+        "Z": 0.0,
+        "W": 0.58
+      },
+      "scale": {
+        "X": 0.16,
+        "Y": 0.13,
+        "Z": 0.15,
+        "W": 0.11
+      },
+      "rotDeg": {
+        "xy": 18,
+        "xz": 12,
+        "xw": -10,
+        "yz": 20,
+        "yw": 8,
+        "zw": -16
+      },
+      "color": {
+        "R": 1.0,
+        "G": 1.0,
+        "B": 1.0
+      },
+      "diffuse": {
+        "R": 0.02,
+        "G": 0.02,
+        "B": 0.02
+      },
+      "reflect": {
+        "R": 0.08,
+        "G": 0.08,
+        "B": 0.08
+      },
+      "refract": {
+        "R": 0.86,
+        "G": 0.86,
+        "B": 0.86
+      },
+      "ior": {
+        "R": 1.56,
+        "G": 1.42,
+        "B": 1.66
       }
     }
   ],
