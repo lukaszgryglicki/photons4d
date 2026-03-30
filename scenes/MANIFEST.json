@@ -1,0 +1,557 @@
+[
+  {
+    "source": "scenes/120-cell-2.json",
+    "target": "120-cell-2-gpt.json",
+    "gifOut": "./gifs/120-cell-2-gpt.gif",
+    "res": [
+      128,
+      128,
+      128
+    ],
+    "spp": 192,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/120-cell-3.json",
+    "target": "120-cell-3-gpt.json",
+    "gifOut": "./gifs/120-cell-3-gpt.gif",
+    "res": [
+      1024,
+      1024,
+      32
+    ],
+    "spp": 256,
+    "probeRays": 100000,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 64
+  },
+  {
+    "source": "scenes/120-cell-flat.json",
+    "target": "120-cell-flat-gpt.json",
+    "gifOut": "./gifs/120-cell-flat-gpt.gif",
+    "res": [
+      1024,
+      1024,
+      1
+    ],
+    "spp": 512,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 48
+  },
+  {
+    "source": "scenes/120-cell.json",
+    "target": "120-cell-gpt.json",
+    "gifOut": "./gifs/120-cell-gpt.gif",
+    "res": [
+      256,
+      256,
+      32
+    ],
+    "spp": 256,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/16-cell.json",
+    "target": "16-cell-gpt.json",
+    "gifOut": "./gifs/16-cell-gpt.gif",
+    "res": [
+      256,
+      256,
+      32
+    ],
+    "spp": 256,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/24-cell.json",
+    "target": "24-cell-gpt.json",
+    "gifOut": "./gifs/24-cell-gpt.gif",
+    "res": [
+      256,
+      256,
+      32
+    ],
+    "spp": 256,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/5-cell.json",
+    "target": "5-cell-gpt.json",
+    "gifOut": "./gifs/5-cell-gpt.gif",
+    "res": [
+      256,
+      256,
+      32
+    ],
+    "spp": 256,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/600-cell.json",
+    "target": "600-cell-gpt.json",
+    "gifOut": "./gifs/600-cell-gpt.gif",
+    "res": [
+      256,
+      256,
+      32
+    ],
+    "spp": 256,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/8-cell.json",
+    "target": "8-cell-gpt.json",
+    "gifOut": "./gifs/8-cell-gpt.gif",
+    "res": [
+      256,
+      256,
+      32
+    ],
+    "spp": 256,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/big_mixed_scene.json",
+    "target": "big_mixed_scene-gpt.json",
+    "gifOut": "./gifs/big_mixed_scene-gpt.gif",
+    "res": [
+      512,
+      512,
+      16
+    ],
+    "spp": 64,
+    "probeRays": 131072,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 48
+  },
+  {
+    "source": "scenes/cell5.json",
+    "target": "cell5-gpt.json",
+    "gifOut": "./gifs/cell5-gpt.gif",
+    "res": [
+      512,
+      512,
+      31
+    ],
+    "spp": 192,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/cell5_flat.json",
+    "target": "cell5_flat-gpt.json",
+    "gifOut": "./gifs/cell5_flat-gpt.gif",
+    "res": [
+      1024,
+      1024,
+      8
+    ],
+    "spp": 384,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 48
+  },
+  {
+    "source": "scenes/cells.json",
+    "target": "cells-gpt.json",
+    "gifOut": "./gifs/cells-gpt.gif",
+    "res": [
+      256,
+      256,
+      31
+    ],
+    "spp": 224,
+    "probeRays": 100000,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/cells8.json",
+    "target": "cells8-gpt.json",
+    "gifOut": "./gifs/cells8-gpt.gif",
+    "res": [
+      400,
+      400,
+      31
+    ],
+    "spp": 192,
+    "probeRays": 100000,
+    "nlights": 5,
+    "escape": false,
+    "maxBounces": 36
+  },
+  {
+    "source": "scenes/complex.json",
+    "target": "complex-gpt.json",
+    "gifOut": "./gifs/complex-gpt.gif",
+    "res": [
+      256,
+      256,
+      17
+    ],
+    "spp": 160,
+    "probeRays": 100000,
+    "nlights": 5,
+    "escape": false,
+    "maxBounces": 28
+  },
+  {
+    "source": "scenes/config.json",
+    "target": "config-gpt.json",
+    "gifOut": "./gifs/config-gpt.gif",
+    "res": [
+      512,
+      512,
+      31
+    ],
+    "spp": 192,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": true,
+    "maxBounces": 48
+  },
+  {
+    "source": "scenes/config_flat.json",
+    "target": "config_flat-gpt.json",
+    "gifOut": "./gifs/config_flat-gpt.gif",
+    "res": [
+      1024,
+      1024,
+      1
+    ],
+    "spp": 384,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 36
+  },
+  {
+    "source": "scenes/each.json",
+    "target": "each-gpt.json",
+    "gifOut": "./gifs/each-gpt.gif",
+    "res": [
+      512,
+      512,
+      7
+    ],
+    "spp": 224,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/ellipsoid.json",
+    "target": "ellipsoid-gpt.json",
+    "gifOut": "./gifs/ellipsoid-gpt.gif",
+    "res": [
+      512,
+      512,
+      17
+    ],
+    "spp": 224,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/escape.json",
+    "target": "escape-gpt.json",
+    "gifOut": "./gifs/escape-gpt.gif",
+    "res": [
+      64,
+      64,
+      64
+    ],
+    "spp": 256,
+    "probeRays": 65536,
+    "nlights": 8,
+    "escape": true,
+    "maxBounces": 48
+  },
+  {
+    "source": "scenes/examples.json",
+    "target": "examples-gpt.json",
+    "gifOut": "./gifs/examples-gpt.gif",
+    "res": [
+      256,
+      256,
+      256
+    ],
+    "spp": 96,
+    "probeRays": 65536,
+    "nlights": 4,
+    "escape": true,
+    "maxBounces": 128
+  },
+  {
+    "source": "scenes/inside.json",
+    "target": "inside-gpt.json",
+    "gifOut": "./gifs/inside-gpt.gif",
+    "res": [
+      128,
+      128,
+      16
+    ],
+    "spp": 600,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 512
+  },
+  {
+    "source": "scenes/inside_flat.json",
+    "target": "inside_flat-gpt.json",
+    "gifOut": "./gifs/inside_flat-gpt.gif",
+    "res": [
+      1024,
+      1024,
+      1
+    ],
+    "spp": 512,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 256
+  },
+  {
+    "source": "scenes/inside_polytope.json",
+    "target": "inside_polytope-gpt.json",
+    "gifOut": "./gifs/inside_polytope-gpt.gif",
+    "res": [
+      256,
+      256,
+      16
+    ],
+    "spp": 256,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 96
+  },
+  {
+    "source": "scenes/prism_sphere.json",
+    "target": "prism_sphere-gpt.json",
+    "gifOut": "./gifs/prism_sphere-gpt.gif",
+    "res": [
+      320,
+      320,
+      17
+    ],
+    "spp": 192,
+    "probeRays": 131072,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 48
+  },
+  {
+    "source": "scenes/red_diffuse_box.json",
+    "target": "red_diffuse_box-gpt.json",
+    "gifOut": "./gifs/red_diffuse_box-gpt.gif",
+    "res": [
+      256,
+      256,
+      31
+    ],
+    "spp": 192,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/red_transmission.json",
+    "target": "red_transmission-gpt.json",
+    "gifOut": "./gifs/red_transmission-gpt.gif",
+    "res": [
+      256,
+      256,
+      31
+    ],
+    "spp": 256,
+    "probeRays": 65536,
+    "nlights": 2,
+    "escape": true,
+    "maxBounces": 48
+  },
+  {
+    "source": "scenes/scene_diffuse.json",
+    "target": "scene_diffuse-gpt.json",
+    "gifOut": "./gifs/scene_diffuse-gpt.gif",
+    "res": [
+      512,
+      512,
+      31
+    ],
+    "spp": 192,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 36
+  },
+  {
+    "source": "scenes/scene_diffuse_red_box.json",
+    "target": "scene_diffuse_red_box-gpt.json",
+    "gifOut": "./gifs/scene_diffuse_red_box-gpt.gif",
+    "res": [
+      256,
+      256,
+      31
+    ],
+    "spp": 192,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/scene_diffuse_simple.json",
+    "target": "scene_diffuse_simple-gpt.json",
+    "gifOut": "./gifs/scene_diffuse_simple-gpt.gif",
+    "res": [
+      256,
+      256,
+      31
+    ],
+    "spp": 192,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/sphere.json",
+    "target": "sphere-gpt.json",
+    "gifOut": "./gifs/sphere-gpt.gif",
+    "res": [
+      512,
+      512,
+      31
+    ],
+    "spp": 192,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/spot.json",
+    "target": "spot-gpt.json",
+    "gifOut": "./gifs/spot-gpt.gif",
+    "res": [
+      200,
+      200,
+      21
+    ],
+    "spp": 64,
+    "probeRays": 100000,
+    "nlights": 2,
+    "escape": false,
+    "maxBounces": 24
+  },
+  {
+    "source": "scenes/tiny_cell8.json",
+    "target": "tiny_cell8-gpt.json",
+    "gifOut": "./gifs/tiny_cell8-gpt.gif",
+    "res": [
+      1024,
+      1024,
+      1
+    ],
+    "spp": 512,
+    "probeRays": 65536,
+    "nlights": 3,
+    "escape": false,
+    "maxBounces": 256
+  },
+  {
+    "source": "scenes/tiny_sphere.json",
+    "target": "tiny_sphere-gpt.json",
+    "gifOut": "./gifs/tiny_sphere-gpt.gif",
+    "res": [
+      512,
+      512,
+      7
+    ],
+    "spp": 256,
+    "probeRays": 65536,
+    "nlights": 2,
+    "escape": false,
+    "maxBounces": 40
+  },
+  {
+    "source": "scenes/try2.json",
+    "target": "try2-gpt.json",
+    "gifOut": "./gifs/try2-gpt.gif",
+    "res": [
+      256,
+      256,
+      63
+    ],
+    "spp": 256,
+    "probeRays": 100000,
+    "nlights": 9,
+    "escape": true,
+    "maxBounces": 64
+  },
+  {
+    "source": "scenes/try3.json",
+    "target": "try3-gpt.json",
+    "gifOut": "./gifs/try3-gpt.gif",
+    "res": [
+      1024,
+      1024,
+      1
+    ],
+    "spp": 256,
+    "probeRays": 100000,
+    "nlights": 4,
+    "escape": false,
+    "maxBounces": 20
+  },
+  {
+    "source": "scenes/try4.json",
+    "target": "try4-gpt.json",
+    "gifOut": "./gifs/try4-gpt.gif",
+    "res": [
+      128,
+      128,
+      128
+    ],
+    "spp": 128,
+    "probeRays": 100000,
+    "nlights": 5,
+    "escape": true,
+    "maxBounces": 128
+  }
+]
