@@ -6,6 +6,7 @@ import (
 	"image/png"
 	"math"
 	"os"
+	"path/filepath"
 )
 
 // SavePNGSequence16 writes one 16-bit PNG per Z slice (k = 0..Nz-1).
@@ -105,17 +106,32 @@ func SavePNGSequence16(scene *Scene, prefix string, gamma Real) error {
 
 		// 3) Write PNG (lossless). 16-bit is preserved because we used NRGBA64.
 		full := fmt.Sprintf("%s_%0*d.png", prefix, width, k)
-		f, err := os.Create(full)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			return err
+		}
+		tmp, err := os.CreateTemp(filepath.Dir(full), filepath.Base(full)+".*.tmp")
 		if err != nil {
 			return err
 		}
+		tmpPath := tmp.Name()
 
 		enc := png.Encoder{CompressionLevel: png.BestCompression} // still lossless
-		if err := enc.Encode(f, img); err != nil {
-			f.Close()
+		if err := enc.Encode(tmp, img); err != nil {
+			tmp.Close()
+			_ = os.Remove(tmpPath)
 			return err
 		}
-		if err := f.Close(); err != nil {
+		if err := tmp.Sync(); err != nil {
+			tmp.Close()
+			_ = os.Remove(tmpPath)
+			return err
+		}
+		if err := tmp.Close(); err != nil {
+			_ = os.Remove(tmpPath)
+			return err
+		}
+		if err := os.Rename(tmpPath, full); err != nil {
+			_ = os.Remove(tmpPath)
 			return err
 		}
 	}

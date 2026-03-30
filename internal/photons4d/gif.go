@@ -8,6 +8,7 @@ import (
 	"image/gif"
 	"math"
 	"os"
+	"path/filepath"
 )
 
 // SaveAnimatedGIF writes a GIF with one frame per Z slice (k = 0..Nz-1).
@@ -92,10 +93,29 @@ func SaveAnimatedGIF(scene *Scene, path string, delay int, gamma Real) error {
 		out.Delay = append(out.Delay, delay)
 	}
 
-	f, err := os.Create(path)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return gif.EncodeAll(f, out)
+	tmpPath := tmp.Name()
+	defer func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+	}()
+	if err := gif.EncodeAll(tmp, out); err != nil {
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	return nil
 }

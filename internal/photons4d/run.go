@@ -1,10 +1,38 @@
 package photons4d
 
 import (
+	"fmt"
 	"math"
+	"path/filepath"
 	"strings"
 	"time"
 )
+
+func recoveryRawPathFor(out string) string {
+	base := filepath.Base(out)
+	ext := filepath.Ext(base)
+	name := strings.TrimSuffix(base, ext)
+	if name == "" {
+		name = "scene"
+	}
+	return name + ".recovery.raw"
+}
+
+func saveWithRetry(label string, attempts int, fn func() error) error {
+	var lastErr error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		if err := fn(); err == nil {
+			return nil
+		} else {
+			lastErr = err
+			DebugLog("Save attempt %d/%d for %s failed: %v", attempt, attempts, label, err)
+		}
+		if attempt < attempts {
+			time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
+		}
+	}
+	return lastErr
+}
 
 func Run(cfgPath string) error {
 	cfg, err := loadConfig(cfgPath)
@@ -36,58 +64,58 @@ func Run(cfgPath string) error {
 		lights = append(lights, L)
 	}
 
-	for _, hc := range cfg.Cells8 {
+	for i, hc := range cfg.Cells8 {
 		h, err := hc.Build()
 		if err != nil {
-			continue
+			panic(fmt.Errorf("cells8[%d]: %w", i, err))
 		}
 		scene.AddCell8(h)
 	}
 
-	for _, scfg := range cfg.Hyperspheres {
+	for i, scfg := range cfg.Hyperspheres {
 		h, err := scfg.Build()
 		if err != nil {
-			continue
+			panic(fmt.Errorf("hyperspheres[%d]: %w", i, err))
 		}
 		scene.AddHyperSphere(h)
 	}
 
-	for _, scfg := range cfg.Cells5 {
+	for i, scfg := range cfg.Cells5 {
 		sx, err := scfg.Build()
 		if err != nil {
-			continue
+			panic(fmt.Errorf("cells5[%d]: %w", i, err))
 		}
 		scene.AddCell5(sx)
 	}
 
-	for _, scfg := range cfg.Cells16 {
+	for i, scfg := range cfg.Cells16 {
 		obj, err := scfg.Build()
 		if err != nil {
-			continue
+			panic(fmt.Errorf("cells16[%d]: %w", i, err))
 		}
 		scene.AddCell16(obj)
 	}
 
-	for _, scfg := range cfg.Cells24 {
+	for i, scfg := range cfg.Cells24 {
 		obj, err := scfg.Build()
 		if err != nil {
-			continue
+			panic(fmt.Errorf("cells24[%d]: %w", i, err))
 		}
 		scene.AddCell24(obj)
 	}
 
-	for _, cc := range cfg.Cells120 {
+	for i, cc := range cfg.Cells120 {
 		h, err := cc.Build()
 		if err != nil {
-			continue
+			panic(fmt.Errorf("cells120[%d]: %w", i, err))
 		}
 		scene.AddCell120(h)
 	}
 
-	for _, cc := range cfg.Cells600 {
+	for i, cc := range cfg.Cells600 {
 		h, err := cc.Build()
 		if err != nil {
-			continue
+			panic(fmt.Errorf("cells600[%d]: %w", i, err))
 		}
 		scene.AddCell600(h)
 	}
@@ -149,15 +177,26 @@ func Run(cfgPath string) error {
 		}
 	}
 
-	if err := SaveAnimatedGIF(scene, cfg.GIFOut, cfg.GIFDelay, cfg.Gamma); err != nil {
-		panic(err)
+	recoveryRaw := recoveryRawPathFor(cfg.GIFOut)
+	if err := saveWithRetry("animated GIF", 3, func() error {
+		return SaveAnimatedGIF(scene, cfg.GIFOut, cfg.GIFDelay, cfg.Gamma)
+	}); err != nil {
+		if rawErr := scene.SaveRawRGB64(recoveryRaw); rawErr != nil {
+			return fmt.Errorf("save animated GIF %q: %w; recovery raw save %q also failed: %v", cfg.GIFOut, err, recoveryRaw, rawErr)
+		}
+		return fmt.Errorf("save animated GIF %q: %w; recovery raw saved to %q", cfg.GIFOut, err, recoveryRaw)
 	}
 	DebugLog("Saved animated GIF: %s", cfg.GIFOut)
 	if PNG {
 		prefix := strings.Replace(cfg.GIFOut, ".gif", "", 1)
 		prefix = strings.Replace(prefix, "gifs/", "pngs/", 1)
-		if err := SavePNGSequence16(scene, prefix, cfg.Gamma); err != nil {
-			panic(err)
+		if err := saveWithRetry("PNG sequence", 3, func() error {
+			return SavePNGSequence16(scene, prefix, cfg.Gamma)
+		}); err != nil {
+			if rawErr := scene.SaveRawRGB64(recoveryRaw); rawErr != nil {
+				return fmt.Errorf("save PNG sequence %q: %w; recovery raw save %q also failed: %v", prefix, err, recoveryRaw, rawErr)
+			}
+			return fmt.Errorf("save PNG sequence %q: %w; recovery raw saved to %q", prefix, err, recoveryRaw)
 		}
 		DebugLog("Saved PNG sequence with prefix: %s", prefix)
 	}
@@ -165,8 +204,14 @@ func Run(cfgPath string) error {
 	if RAW {
 		fn := strings.Replace(cfg.GIFOut, ".gif", ".raw", 1)
 		fn = strings.Replace(fn, "gifs/", "raws/", 1)
-		if err := scene.SaveRawRGB64(fn); err != nil {
-			panic(err)
+		if err := saveWithRetry("raw scene", 3, func() error {
+			return scene.SaveRawRGB64(fn)
+		}); err != nil {
+			fallback := recoveryRawPathFor(fn)
+			if rawErr := scene.SaveRawRGB64(fallback); rawErr != nil {
+				return fmt.Errorf("save raw scene %q: %w; fallback raw save %q also failed: %v", fn, err, fallback, rawErr)
+			}
+			return fmt.Errorf("save raw scene %q: %w; fallback raw saved to %q", fn, err, fallback)
 		}
 		DebugLog("Saved RAW scene: %s", fn)
 	}

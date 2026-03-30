@@ -19,7 +19,7 @@ func tinyScene() *Scene {
 
 func TestSaveAnimatedGIF(t *testing.T) {
 	s := tinyScene()
-	tmp := filepath.Join(t.TempDir(), "out.gif")
+	tmp := filepath.Join(t.TempDir(), "nested", "out.gif")
 	if err := SaveAnimatedGIF(s, tmp, 5, 0.8); err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +30,7 @@ func TestSaveAnimatedGIF(t *testing.T) {
 
 func TestSavePNGSequence16(t *testing.T) {
 	s := tinyScene()
-	prefix := filepath.Join(t.TempDir(), "frame")
+	prefix := filepath.Join(t.TempDir(), "nested", "frame")
 	if err := SavePNGSequence16(s, prefix, 0.8); err != nil {
 		t.Fatal(err)
 	}
