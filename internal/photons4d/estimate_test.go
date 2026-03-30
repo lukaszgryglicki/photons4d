@@ -44,7 +44,7 @@ func TestEstimateHitProbAndCastRays(t *testing.T) {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	hit := 0
 	for i := 0; i < 100; i++ {
-		if castSingleRay(L, scene, rng, nil, false) {
+		if ok, _ := castSingleRay(L, scene, rng, nil, false); ok {
 			hit++
 		}
 	}

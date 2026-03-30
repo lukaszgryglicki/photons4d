@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks, deposit bool) bool {
+func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks, deposit bool) (bool, int) {
+	depth := 0
 	// Choose the photon channel.
 	ch := pickChannel(light.colorSum, light.thrR, light.thrG, rng)
 
@@ -68,14 +69,14 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 				if Debug && deposit {
 					logRay("escape_env", Hit, O, D, Point4{}, bounce, totalDist)
 				}
-				return true
+				return true, depth
 			}
 			if !isFinite(tPlane) {
 				if Debug && deposit {
 					logRay("parallel_to_scene", Escape, O, D, Point4{}, bounce, totalDist)
 				}
 				// parallel to plane and no object to stop us
-				return false
+				return false, depth
 			}
 
 			P := O.Add(D.Mul(tPlane))
@@ -100,12 +101,12 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 				if Debug && deposit {
 					logRay("hit_scene", Hit, O, D, P, bounce, totalDist)
 				}
-				return true
+				return true, depth
 			}
 			if Debug && deposit {
 				logRay("miss_scene", Miss, O, D, P, bounce, totalDist)
 			}
-			return false
+			return false, depth
 		}
 
 		// Otherwise: cell8 is the first event.
@@ -114,6 +115,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 
 		// Outward normal (unit)
 		N := hit.Nw
+		depth++
 
 		// --- Absorption & Fresnel split (per channel) ---
 		pAbs := hit.pAbsCh(ch) // object's absorption knob
@@ -122,7 +124,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 			if Debug && deposit {
 				logRay("absorbed", Absorb, O, D, P, bounce, totalDist)
 			}
-			return false
+			return false, depth
 		}
 
 		// cosθ for Schlick (ensure in [0,1])
@@ -155,7 +157,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 			if Debug && deposit {
 				logRay("absorbed", Absorb, O, D, P, bounce, totalDist)
 			}
-			return false
+			return false, depth
 		}
 
 		// Survived → tint throughput by object color.
@@ -221,13 +223,13 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 			continue
 		}
 		// Should not happen (u in [0,1)), but keep safe fallback.
-		return false
+		return false, depth
 	}
 
 	if Debug && deposit {
 		logRay("too_complex", RecurenceLimit, O, D, Point4{}, scene.MaxBounces, totalDist)
 	}
-	return false
+	return false, depth
 }
 
 // raysPerLight must match len(lights). This gives you full control (e.g., after measuring p_hit per light).
@@ -247,10 +249,14 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 		return
 	}
 
-	workers := runtime.NumCPU()
+	// workers := runtime.NumCPU()
+	gomaxprocs := runtime.GOMAXPROCS(0)
+	workers := gomaxprocs
 	if workers < 1 {
 		workers = 1
 	}
+	numCPU := runtime.NumCPU()
+	fmt.Printf("[WORKERS] NumCPU=%d | GOMAXPROCS=%d | using=%d\n", numCPU, gomaxprocs, workers)
 
 	// Distribute each light's rays across workers (evenly, with remainder spread).
 	per := make([][]int, len(lights)) // [light][worker] -> count
@@ -268,13 +274,14 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 	// before launching workers
 	start := time.Now()
 
-	var counter int64 // incremented by workers
+	var counter int64  // incremented by workers
+	var depthSum int64 // sum of per-ray interaction depths
 	// Zero-padding width based on number of slices.
 	width := 1
 	if totalRays > 1 {
 		width = int(math.Log10(Real(totalRays-1))) + 1
 	}
-	fmt.Printf("[PROGRESS] %5.2f%% | rays=%*d/%*d | ETA=—\n", 0.0, width, 0, width, totalRays)
+	fmt.Printf("[PROGRESS] %5.2f%% | rays=%*d/%*d | avg depth=0.00 | ETA=—\n", 0.0, width, 0, width, totalRays)
 
 	// progress monitor (tick every 1s)
 	done := make(chan struct{})
@@ -301,8 +308,12 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 					if rate < 1e-9 {
 						rate = 0
 					}
-					fmt.Printf("[PROGRESS] 100.00%% | rays=%*d/%*d | rate=%.0f/s | elapsed=%s\n",
-						width, fired, width, totalRays, rate, elapsed.Truncate(time.Millisecond))
+					avgDepth := 0.0
+					if fired > 0 {
+						avgDepth = float64(atomic.LoadInt64(&depthSum)) / float64(fired)
+					}
+					fmt.Printf("[PROGRESS] 100.00%% | rays=%*d/%*d | rate=%.0f/s | avg depth=%.2f | elapsed=%s\n",
+						width, fired, width, totalRays, rate, avgDepth, elapsed.Truncate(time.Millisecond))
 					return
 				}
 
@@ -311,6 +322,10 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 				pct := float64(fired) * 100.0 / float64(totalRays)
 				rate := float64(fired) / math.Max(elapsed.Seconds(), 1e-9)
 				eta := time.Duration(0)
+				avgDepth := 0.0
+				if fired > 0 {
+					avgDepth = float64(atomic.LoadInt64(&depthSum)) / float64(fired)
+				}
 				if rate > 0 {
 					rem := float64(totalRays-int(fired)) / rate
 					eta = time.Duration(rem * float64(time.Second))
@@ -325,8 +340,8 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 					// When printing due to bucket crossing, update the bucket.
 					// When printing due to time, do NOT update the bucket so we still
 					// get a message exactly at 10%, 20%, ... later.
-					line := fmt.Sprintf("[PROGRESS] %5.2f%% | rays=%*d/%*d | rate=%.0f/s | ETA=%02d:%02d:%02d\n",
-						pct, width, fired, width, totalRays, rate,
+					line := fmt.Sprintf("[PROGRESS] %5.2f%% | rays=%*d/%*d | rate=%.0f/s | avg depth=%.2f | ETA=%02d:%02d:%02d\n",
+						pct, width, fired, width, totalRays, rate, avgDepth,
 						int(eta.Hours()), int(eta.Minutes())%60, int(eta.Seconds())%60)
 					fmt.Print(line)
 					lastPrintedAt = time.Now()
@@ -341,8 +356,12 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 				elapsed := time.Since(start)
 				pct := float64(fired) * 100.0 / float64(totalRays)
 				rate := float64(fired) / math.Max(elapsed.Seconds(), 1e-9)
-				fmt.Printf("[PROGRESS] %5.2f%% | rays=%*d/%*d | rate=%.0f/s | elapsed=%s\n",
-					pct, width, fired, width, totalRays, rate, elapsed.Truncate(time.Millisecond))
+				avgDepth := 0.0
+				if fired > 0 {
+					avgDepth = float64(atomic.LoadInt64(&depthSum)) / float64(fired)
+				}
+				fmt.Printf("[PROGRESS] %5.2f%% | rays=%*d/%*d | rate=%.0f/s | avg depth=%.2f | elapsed=%s\n",
+					pct, width, fired, width, totalRays, rate, avgDepth, elapsed.Truncate(time.Millisecond))
 				return
 			}
 		}
@@ -365,13 +384,31 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 			defer wg.Done()
 			seed := time.Now().UnixNano() ^ int64(uint64(wid)*0x9e3779b97f4a7c15)
 			rng := rand.New(rand.NewSource(seed))
+
+			var localCount int64
+			var localDepth int64
+			flush := func() {
+				if localCount == 0 {
+					return
+				}
+				atomic.AddInt64(&counter, localCount)
+				atomic.AddInt64(&depthSum, localDepth)
+				localCount = 0
+				localDepth = 0
+			}
+
 			for li, L := range lights {
 				n := per[li][wid]
 				for s := 0; s < n; s++ {
-					_ = castSingleRay(L, scene, rng, locks, true)
-					atomic.AddInt64(&counter, 1)
+					_, depth := castSingleRay(L, scene, rng, locks, true)
+					localCount++
+					localDepth += int64(depth)
+					if localCount >= 256 {
+						flush()
+					}
 				}
 			}
+			flush()
 		}()
 	}
 

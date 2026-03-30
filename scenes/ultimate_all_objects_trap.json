@@ -1,9 +1,9 @@
 {
-  "sceneResX": 512,
-  "sceneResY": 512,
-  "sceneResZ": 128,
+  "sceneResX": 32,
+  "sceneResY": 32,
+  "sceneResZ": 32,
   "probeRays": 65536,
-  "spp": 256,
+  "spp": 32,
   "gifOut": "./gifs/ultimate_all_objects_trap.gif",
   "gifDelay": 4,
   "gamma": 0.8,

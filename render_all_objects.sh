@@ -5,7 +5,7 @@ ROOT="${ROOT:-$(pwd)}"
 SCENE_NAME="ultimate_all_objects_trap"
 CFG="${ROOT}/scenes/${SCENE_NAME}.json"
 BIN="${ROOT}/photons4d"
-THREADS="${THREADS:-256}"
+THREADS="${THREADS:-512}"
 FPS="${FPS:-24}"
 LOSSLESS="${LOSSLESS:-0}"
 
@@ -29,11 +29,11 @@ def mat(color, diffuse, reflect, refract, ior):
     }
 
 cfg = {
-    "sceneResX": 512,
-    "sceneResY": 512,
-    "sceneResZ": 128,
+    "sceneResX": 32,
+    "sceneResY": 32,
+    "sceneResZ": 32,
     "probeRays": 65536,
-    "spp": 256,
+    "spp": 32,
     "gifOut": "./gifs/ultimate_all_objects_trap.gif",
     "gifDelay": 4,
     "gamma": 0.8,

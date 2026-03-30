@@ -11,7 +11,8 @@ func estimateHitProb(light *Light, scene *Scene, trials int) Real {
 	if trials <= 0 {
 		return 0
 	}
-	workers := runtime.NumCPU()
+	// workers := runtime.NumCPU()
+	workers := runtime.GOMAXPROCS(0)
 	if workers < 1 {
 		workers = 1
 	}
@@ -40,7 +41,7 @@ func estimateHitProb(light *Light, scene *Scene, trials int) Real {
 
 			localHits := 0
 			for i := 0; i < n; i++ {
-				if castSingleRay(light, scene, rng, nil, false) {
+				if hit, _ := castSingleRay(light, scene, rng, nil, false); hit {
 					localHits++
 				}
 			}
