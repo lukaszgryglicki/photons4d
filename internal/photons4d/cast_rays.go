@@ -57,7 +57,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 
 				if deposit {
 					base := scene.idx(i, j, k, ChR)
-					if UseLocks && locks != nil {
+					if locks != nil {
 						locks.lock(base)
 						scene.Buf[base+ch] += Real(throughput) // no distance falloff at infinity
 						locks.unlock(base)
@@ -87,18 +87,15 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 					w = 1.0
 				}
 
-				if deposit && UseLocks {
+				if deposit {
 					base := scene.idx(i, j, k, ChR)
 					if locks != nil {
 						locks.lock(base)
-					}
-					scene.Buf[base+ch] += Real(throughput * w)
-					if locks != nil {
+						scene.Buf[base+ch] += Real(throughput * w)
 						locks.unlock(base)
+					} else {
+						scene.Buf[base+ch] += Real(throughput * w)
 					}
-				} else if deposit {
-					base := scene.idx(i, j, k, ChR)
-					scene.Buf[base+ch] += Real(throughput * w)
 				}
 				if Debug && deposit {
 					logRay("hit_scene", Hit, O, D, P, bounce, totalDist)
@@ -351,7 +348,14 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 		}
 	}()
 
-	locks := &shardLocks{}
+	useLocks := UseLocks || workers > 1
+	if !UseLocks && workers > 1 {
+		DebugLog("SKIP_LOCKS requested with %d workers; forcing shard locks for shared scene buffer writes", workers)
+	}
+	var locks *shardLocks
+	if useLocks {
+		locks = &shardLocks{}
+	}
 	var wg sync.WaitGroup
 	wg.Add(workers)
 
