@@ -5,12 +5,51 @@ import (
 	"math/rand"
 )
 
+// Fast deterministic orthonormal basis of the 3D tangent space to unit a in R^4.
+// This avoids time.Now(), RNG construction and retries in the diffuse hot path.
+func orthonormal3Fast(a Vector4) (u, v, w Vector4) {
+	const eps = 1e-12
+
+	proj := func(x Vector4) Vector4 {
+		return x.Sub(a.Mul(x.Dot(a)))
+	}
+
+	helpers := [4]Vector4{
+		{1, 0, 0, 0},
+		{0, 1, 0, 0},
+		{0, 0, 1, 0},
+		{0, 0, 0, 1},
+	}
+
+	var basis [3]Vector4
+	n := 0
+	for _, h := range helpers {
+		q := proj(h)
+		for i := 0; i < n; i++ {
+			q = q.Sub(basis[i].Mul(q.Dot(basis[i])))
+		}
+		l := q.Len()
+		if l <= eps {
+			continue
+		}
+		basis[n] = q.Mul(1 / l)
+		n++
+		if n == 3 {
+			return basis[0], basis[1], basis[2]
+		}
+	}
+
+	// Extremely unlikely fallback.
+	return orthonormal3(a)
+}
+
 // sampleDiffuseDir returns a cosine-weighted unit direction on the S^3 hemisphere around unit N.
 // Construction: pick a point uniformly in the unit 3-ball for the tangent part (U,V,W),
 // then set the normal component to sqrt(1 - r^2). This generalizes the familiar 3D disk mapping.
 func sampleDiffuseDir(N Vector4, rng *rand.Rand) Vector4 {
 	// Build orthonormal basis of the tangent 3-space.
-	U, V, W := orthonormal3(N)
+	// U, V, W := orthonormal3(N)
+	U, V, W := orthonormal3Fast(N)
 
 	// Uniform in unit 3-ball: radius r ~ U^(1/3), orientation from S^2.
 	ux, uy, uz := sampleS2(rng) // unit on S^2

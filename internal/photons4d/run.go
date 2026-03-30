@@ -127,8 +127,12 @@ func Run(cfgPath string) error {
 		NeverBVH = false
 	}
 	if AlwaysBVH {
+		root := getOrBuildBVH(scene)
 		DebugLog("AlwaysBVH is set, using BVH of AABBs")
-		NearestHitFunc = nearestHitBVH
+		// NearestHitFunc = nearestHitBVH
+		NearestHitFunc = func(_ *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) {
+			return traverseNearest(root, O, D, tMax)
+		}
 	} else if NeverBVH {
 		DebugLog("NeverBVH is set, using nearestHit function")
 		NearestHitFunc = nearestHit
@@ -137,7 +141,11 @@ func Run(cfgPath string) error {
 			NearestHitFunc = nearestHit
 			DebugLog("Using nearestHit function (instead of BVH of AABB) for %d objects", nObjects)
 		} else {
-			NearestHitFunc = nearestHitBVH
+			//NearestHitFunc = nearestHitBVH
+			root := getOrBuildBVH(scene)
+			NearestHitFunc = func(_ *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) {
+				return traverseNearest(root, O, D, tMax)
+			}
 			DebugLog("Using BVH of AABBs for %d objects", nObjects)
 		}
 	}
