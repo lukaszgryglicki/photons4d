@@ -44,3 +44,4 @@ out
 *-old.go
 cpu.out
 cpu.out.txt
+src*.txt
