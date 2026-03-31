@@ -20,4 +20,5 @@ var (
 	_ material = (*Spherinder)(nil)
 	_ material = (*HyperCone)(nil)
 	_ material = (*HyperCapsule)(nil)
+	_ material = (*Spheritorus)(nil)
 )

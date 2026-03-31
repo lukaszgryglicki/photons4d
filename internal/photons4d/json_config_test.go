@@ -99,3 +99,24 @@ func TestHyperCapsuleCfgDefaults(t *testing.T) {
 		t.Fatalf("HalfLength default failed: %v", hc.HalfLength)
 	}
 }
+
+func TestSpheritorusCfgDefaults(t *testing.T) {
+	st, err := (SpheritorusCfg{
+		Center:  Point4{0, 0, 0, 1},
+		RotDeg:  Rot4Deg{},
+		Color:   RGB{1, 1, 1},
+		Diffuse: RGB{0, 0, 0},
+		Reflect: RGB{0, 0, 0},
+		Refract: RGB{1, 1, 1},
+		IOR:     RGB{1.4, 1.4, 1.4},
+	}).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Scale != (Vector4{1, 1, 1, 1}) {
+		t.Fatalf("Scale defaults failed: %+v", st.Scale)
+	}
+	if st.MajorRadius != 1 || st.MinorRadius != 0.25 {
+		t.Fatalf("Radius defaults failed: major=%v minor=%v", st.MajorRadius, st.MinorRadius)
+	}
+}

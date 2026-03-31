@@ -140,6 +140,13 @@ func Run(cfgPath string) error {
 		}
 		scene.AddHyperCapsule(h)
 	}
+	for i, tcfg := range cfg.Spheritori {
+		h, err := tcfg.Build()
+		if err != nil {
+			panic(fmt.Errorf("spheritori[%d]: %w", i, err))
+		}
+		scene.AddSpheritorus(h)
+	}
 	nObjects := scene.NObjects()
 	DebugLog("Scene created with %d objects", nObjects)
 	if AlwaysBVH && NeverBVH {
