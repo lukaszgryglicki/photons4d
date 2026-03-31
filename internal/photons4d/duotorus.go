@@ -6,6 +6,8 @@ import (
 	"math/cmplx"
 )
 
+const DuotorusConservativeAABB = false
+
 // Duotorus / Clifford-torus tube (local space):
 //
 //	( sqrt(u² + v²) - Rxy )² + ( sqrt(z² + s²) - Rzw )² <= r²
@@ -113,44 +115,79 @@ func NewDuotorus(center Point4, scale Vector4, majorRadiusXY, majorRadiusZW, min
 		IOR:           ior,
 	}
 
-	// Conservative analytic AABB from the rotated bounding box of the
-	// axis-scaled canonical duotorus.
-	//
-	// In local coordinates:
-	//   x,y are bounded by (Rxy + r)
-	//   z,w are bounded by (Rzw + r)
-	hx := scale.X * (majorRadiusXY + minorRadius)
-	hy := scale.Y * (majorRadiusXY + minorRadius)
-	hz := scale.Z * (majorRadiusZW + minorRadius)
-	hw := scale.W * (majorRadiusZW + minorRadius)
+	if DuotorusConservativeAABB {
+		// Conservative analytic AABB from the rotated bounding box of the
+		// axis-scaled canonical duotorus.
+		hx := scale.X * (majorRadiusXY + minorRadius)
+		hy := scale.Y * (majorRadiusXY + minorRadius)
+		hz := scale.Z * (majorRadiusZW + minorRadius)
+		hw := scale.W * (majorRadiusZW + minorRadius)
 
-	abs := func(x Real) Real {
-		if x < 0 {
-			return -x
+		abs := func(x Real) Real {
+			if x < 0 {
+				return -x
+			}
+			return x
 		}
-		return x
-	}
-	extent := func(row int) (minV, maxV Real) {
-		off := abs(R.M[row][0])*hx + abs(R.M[row][1])*hy + abs(R.M[row][2])*hz + abs(R.M[row][3])*hw
-		var c Real
-		switch row {
-		case 0:
-			c = center.X
-		case 1:
-			c = center.Y
-		case 2:
-			c = center.Z
-		default:
-			c = center.W
+		extent := func(row int) (minV, maxV Real) {
+			off := abs(R.M[row][0])*hx + abs(R.M[row][1])*hy + abs(R.M[row][2])*hz + abs(R.M[row][3])*hw
+			var c Real
+			switch row {
+			case 0:
+				c = center.X
+			case 1:
+				c = center.Y
+			case 2:
+				c = center.Z
+			default:
+				c = center.W
+			}
+			return c - off, c + off
 		}
-		return c - off, c + off
+		minX, maxX := extent(0)
+		minY, maxY := extent(1)
+		minZ, maxZ := extent(2)
+		minW, maxW := extent(3)
+		d.AABBMin = Point4{minX, minY, minZ, minW}
+		d.AABBMax = Point4{maxX, maxY, maxZ, maxW}
+	} else {
+		// Exact support-based AABB.
+		// In scaled local space this shape is:
+		//   (circle in XY of radius Rxy) × (circle in ZW of radius Rzw),
+		// thickened by a 4D ball of radius r.
+		// So support along local direction a is:
+		//   Rxy * sqrt((sx*ax)^2 + (sy*ay)^2)
+		// + Rzw * sqrt((sz*az)^2 + (sw*aw)^2)
+		// + r * sqrt((sx*ax)^2 + (sy*ay)^2 + (sz*az)^2 + (sw*aw)^2)
+		axisExtent := func(row int) (minV, maxV Real) {
+			ax, ay, az, aw := R.M[row][0], R.M[row][1], R.M[row][2], R.M[row][3]
+			Ax := scale.X * ax
+			Ay := scale.Y * ay
+			Az := scale.Z * az
+			Aw := scale.W * aw
+			A := math.Sqrt(Ax*Ax + Ay*Ay)
+			B := math.Sqrt(Az*Az + Aw*Aw)
+			off := majorRadiusXY*A + majorRadiusZW*B + minorRadius*math.Sqrt(A*A+B*B)
+			var c Real
+			switch row {
+			case 0:
+				c = center.X
+			case 1:
+				c = center.Y
+			case 2:
+				c = center.Z
+			default:
+				c = center.W
+			}
+			return c - off, c + off
+		}
+		minX, maxX := axisExtent(0)
+		minY, maxY := axisExtent(1)
+		minZ, maxZ := axisExtent(2)
+		minW, maxW := axisExtent(3)
+		d.AABBMin = Point4{minX, minY, minZ, minW}
+		d.AABBMax = Point4{maxX, maxY, maxZ, maxW}
 	}
-	minX, maxX := extent(0)
-	minY, maxY := extent(1)
-	minZ, maxZ := extent(2)
-	minW, maxW := extent(3)
-	d.AABBMin = Point4{minX, minY, minZ, minW}
-	d.AABBMax = Point4{maxX, maxY, maxZ, maxW}
 
 	d.refl = [3]Real{reflectivity.R, reflectivity.G, reflectivity.B}
 	d.refr = [3]Real{refractivity.R, refractivity.G, refractivity.B}

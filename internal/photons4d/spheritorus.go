@@ -6,6 +6,8 @@ import (
 	"sort"
 )
 
+const SpheritorusConservativeAABB = false
+
 // Spheritorus (local space, core circle in the local XW plane):
 //
 //	( sqrt(u² + s²) - R )² + v² + z² <= r²
@@ -104,46 +106,77 @@ func NewSpheritorus(center Point4, scale Vector4, majorRadius, minorRadius Real,
 		IOR:         ior,
 	}
 
-	// Conservative analytic AABB from the rotated bounding box of the
-	// axis-scaled canonical torus.
-	//
-	// In local coordinates the torus is contained in:
-	//   x in [-(R+r)*sx, +(R+r)*sx]
-	//   y in [ -r*sy,      +r*sy     ]
-	//   z in [ -r*sz,      +r*sz     ]
-	//   w in [-(R+r)*sw, +(R+r)*sw]
-	hx := scale.X * (majorRadius + minorRadius)
-	hy := scale.Y * minorRadius
-	hz := scale.Z * minorRadius
-	hw := scale.W * (majorRadius + minorRadius)
+	if SpheritorusConservativeAABB {
+		// Conservative analytic AABB from the rotated bounding box of the
+		// axis-scaled canonical torus.
+		hx := scale.X * (majorRadius + minorRadius)
+		hy := scale.Y * minorRadius
+		hz := scale.Z * minorRadius
+		hw := scale.W * (majorRadius + minorRadius)
 
-	abs := func(x Real) Real {
-		if x < 0 {
-			return -x
+		abs := func(x Real) Real {
+			if x < 0 {
+				return -x
+			}
+			return x
 		}
-		return x
-	}
-	extent := func(row int) (minV, maxV Real) {
-		off := abs(R.M[row][0])*hx + abs(R.M[row][1])*hy + abs(R.M[row][2])*hz + abs(R.M[row][3])*hw
-		var c Real
-		switch row {
-		case 0:
-			c = center.X
-		case 1:
-			c = center.Y
-		case 2:
-			c = center.Z
-		default:
-			c = center.W
+		extent := func(row int) (minV, maxV Real) {
+			off := abs(R.M[row][0])*hx + abs(R.M[row][1])*hy + abs(R.M[row][2])*hz + abs(R.M[row][3])*hw
+			var c Real
+			switch row {
+			case 0:
+				c = center.X
+			case 1:
+				c = center.Y
+			case 2:
+				c = center.Z
+			default:
+				c = center.W
+			}
+			return c - off, c + off
 		}
-		return c - off, c + off
+		minX, maxX := extent(0)
+		minY, maxY := extent(1)
+		minZ, maxZ := extent(2)
+		minW, maxW := extent(3)
+		t.AABBMin = Point4{minX, minY, minZ, minW}
+		t.AABBMax = Point4{maxX, maxY, maxZ, maxW}
+	} else {
+		// Exact support-based AABB.
+		// In scaled local space this shape is:
+		//   circle(radius=R in XW) Minkowski-summed with a 4D ball(radius=r).
+		// So support along local direction a is:
+		//   R * sqrt((sx*ax)^2 + (sw*aw)^2)
+		// + r * sqrt((sx*ax)^2 + (sy*ay)^2 + (sz*az)^2 + (sw*aw)^2)
+		axisExtent := func(row int) (minV, maxV Real) {
+			ax, ay, az, aw := R.M[row][0], R.M[row][1], R.M[row][2], R.M[row][3]
+			Ax := scale.X * ax
+			Ay := scale.Y * ay
+			Az := scale.Z * az
+			Aw := scale.W * aw
+			major := majorRadius * math.Sqrt(Ax*Ax+Aw*Aw)
+			minor := minorRadius * math.Sqrt(Ax*Ax+Ay*Ay+Az*Az+Aw*Aw)
+			off := major + minor
+			var c Real
+			switch row {
+			case 0:
+				c = center.X
+			case 1:
+				c = center.Y
+			case 2:
+				c = center.Z
+			default:
+				c = center.W
+			}
+			return c - off, c + off
+		}
+		minX, maxX := axisExtent(0)
+		minY, maxY := axisExtent(1)
+		minZ, maxZ := axisExtent(2)
+		minW, maxW := axisExtent(3)
+		t.AABBMin = Point4{minX, minY, minZ, minW}
+		t.AABBMax = Point4{maxX, maxY, maxZ, maxW}
 	}
-	minX, maxX := extent(0)
-	minY, maxY := extent(1)
-	minZ, maxZ := extent(2)
-	minW, maxW := extent(3)
-	t.AABBMin = Point4{minX, minY, minZ, minW}
-	t.AABBMax = Point4{maxX, maxY, maxZ, maxW}
 
 	t.refl = [3]Real{reflectivity.R, reflectivity.G, reflectivity.B}
 	t.refr = [3]Real{refractivity.R, refractivity.G, refractivity.B}

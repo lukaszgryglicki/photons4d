@@ -5,6 +5,8 @@ import (
 	"math"
 )
 
+const SpherinderConservativeAABB = false
+
 // Spherinder (local space, axis along local W):
 //
 //	x²/rx² + y²/ry² + z²/rz² <= 1
@@ -85,33 +87,63 @@ func NewSpherinder(center Point4, scale Vector4, angles Rot4, color, diffuse, re
 		IOR:     ior,
 	}
 
-	abs := func(x Real) Real {
-		if x < 0 {
-			return -x
+	if SpherinderConservativeAABB {
+		abs := func(x Real) Real {
+			if x < 0 {
+				return -x
+			}
+			return x
 		}
-		return x
-	}
-	extent := func(row int) (min, max Real) {
-		off := abs(R.M[row][0])*scale.X + abs(R.M[row][1])*scale.Y + abs(R.M[row][2])*scale.Z + abs(R.M[row][3])*scale.W
-		var c Real
-		switch row {
-		case 0:
-			c = center.X
-		case 1:
-			c = center.Y
-		case 2:
-			c = center.Z
-		default:
-			c = center.W
+		extent := func(row int) (min, max Real) {
+			off := abs(R.M[row][0])*scale.X + abs(R.M[row][1])*scale.Y + abs(R.M[row][2])*scale.Z + abs(R.M[row][3])*scale.W
+			var c Real
+			switch row {
+			case 0:
+				c = center.X
+			case 1:
+				c = center.Y
+			case 2:
+				c = center.Z
+			default:
+				c = center.W
+			}
+			return c - off, c + off
 		}
-		return c - off, c + off
+		minX, maxX := extent(0)
+		minY, maxY := extent(1)
+		minZ, maxZ := extent(2)
+		minW, maxW := extent(3)
+		s.AABBMin = Point4{minX, minY, minZ, minW}
+		s.AABBMax = Point4{maxX, maxY, maxZ, maxW}
+	} else {
+		// Exact support-based AABB.
+		// For a world-axis row a=(ax,ay,az,aw), the local support is:
+		//   sqrt((ax*rx)^2 + (ay*ry)^2 + (az*rz)^2) + h*|aw|
+		// because this is an ellipsoidal 3-ball extruded symmetrically along W.
+		rx, ry, rz, h := scale.X, scale.Y, scale.Z, scale.W
+		axisExtent := func(row int) (min, max Real) {
+			ax, ay, az, aw := R.M[row][0], R.M[row][1], R.M[row][2], R.M[row][3]
+			off := math.Sqrt((ax*rx)*(ax*rx)+(ay*ry)*(ay*ry)+(az*rz)*(az*rz)) + math.Abs(aw)*h
+			var c Real
+			switch row {
+			case 0:
+				c = center.X
+			case 1:
+				c = center.Y
+			case 2:
+				c = center.Z
+			default:
+				c = center.W
+			}
+			return c - off, c + off
+		}
+		minX, maxX := axisExtent(0)
+		minY, maxY := axisExtent(1)
+		minZ, maxZ := axisExtent(2)
+		minW, maxW := axisExtent(3)
+		s.AABBMin = Point4{minX, minY, minZ, minW}
+		s.AABBMax = Point4{maxX, maxY, maxZ, maxW}
 	}
-	minX, maxX := extent(0)
-	minY, maxY := extent(1)
-	minZ, maxZ := extent(2)
-	minW, maxW := extent(3)
-	s.AABBMin = Point4{minX, minY, minZ, minW}
-	s.AABBMax = Point4{maxX, maxY, maxZ, maxW}
 
 	s.refl = [3]Real{reflectivity.R, reflectivity.G, reflectivity.B}
 	s.refr = [3]Real{refractivity.R, refractivity.G, refractivity.B}
