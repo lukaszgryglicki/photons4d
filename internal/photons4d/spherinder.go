@@ -5,6 +5,16 @@ import (
 	"math"
 )
 
+// Spherinder (local space, axis along local W):
+//
+//	x²/rx² + y²/ry² + z²/rz² <= 1
+//	|w| <= h
+//
+// with Scale = (rx, ry, rz, h), where:
+//   - rx, ry, rz are cross-section radii
+//   - h is the half-length along local W
+//
+// The local object is then rotated by R and translated to Center.
 // Spherinder: a 4D cylinder with a 3-ball/ellipsoidal cross-section extruded along local W.
 // Local-space definition:
 //

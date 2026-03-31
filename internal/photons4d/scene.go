@@ -18,6 +18,7 @@ type Scene struct {
 	Cells120             []*Cell120
 	Cells600             []*Cell600
 	Spherinders          []*Spherinder
+	HyperCones           []*HyperCone
 
 	// cached bounds & mapping
 	MinX, MaxX Real
@@ -152,7 +153,7 @@ func (s *Scene) AngleIndexOf(d Vector4) (i, j, k int, alpha, beta, gamma Real) {
 }
 
 func (s *Scene) NObjects() int {
-	return len(s.Cells8) + len(s.Hyperspheres) + len(s.Cells5) + len(s.Cells16) + len(s.Cells24) + len(s.Cells120) + len(s.Cells600) + len(s.Spherinders)
+	return len(s.Cells8) + len(s.Hyperspheres) + len(s.Cells5) + len(s.Cells16) + len(s.Cells24) + len(s.Cells120) + len(s.Cells600) + len(s.Spherinders) + len(s.HyperCones)
 }
 
 // Flat buffer index helper (c ∈ {ChR,ChG,ChB}).
@@ -188,4 +189,8 @@ func (s *Scene) AddCell600(c *Cell600) {
 
 func (s *Scene) AddSpherinder(h *Spherinder) {
 	s.Spherinders = append(s.Spherinders, h)
+}
+
+func (s *Scene) AddHyperCone(h *HyperCone) {
+	s.HyperCones = append(s.HyperCones, h)
 }

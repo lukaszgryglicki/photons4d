@@ -39,7 +39,7 @@ func getOrBuildBVH(s *Scene) *AABBNode {
 
 func collectSceneObjects(s *Scene) []bvhLeaf {
 	out := make([]bvhLeaf, 0,
-		len(s.Cells8)+len(s.Hyperspheres)+len(s.Cells5)+len(s.Cells16)+len(s.Cells24)+len(s.Cells120)+len(s.Cells600)+len(s.Spherinders))
+		len(s.Cells8)+len(s.Hyperspheres)+len(s.Cells5)+len(s.Cells16)+len(s.Cells24)+len(s.Cells120)+len(s.Cells600)+len(s.Spherinders)+len(s.HyperCones))
 
 	for _, o := range s.Cells8 {
 		if o == nil {
@@ -119,6 +119,16 @@ func collectSceneObjects(s *Scene) []bvhLeaf {
 		out = append(out, bvhLeaf{
 			min: obj.AABBMin, max: obj.AABBMax,
 			intersect: func(O Point4, D Vector4) (objectHit, bool) { return intersectRaySpherinder(O, D, obj) },
+		})
+	}
+	for _, o := range s.HyperCones {
+		if o == nil {
+			continue
+		}
+		obj := o
+		out = append(out, bvhLeaf{
+			min: obj.AABBMin, max: obj.AABBMax,
+			intersect: func(O Point4, D Vector4) (objectHit, bool) { return intersectRayHyperCone(O, D, obj) },
 		})
 	}
 	return out
