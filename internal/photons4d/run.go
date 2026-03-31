@@ -147,6 +147,13 @@ func Run(cfgPath string) error {
 		}
 		scene.AddSpheritorus(h)
 	}
+	for i, tcfg := range cfg.Duotori {
+		h, err := tcfg.Build()
+		if err != nil {
+			panic(fmt.Errorf("duotori[%d]: %w", i, err))
+		}
+		scene.AddDuotorus(h)
+	}
 	nObjects := scene.NObjects()
 	DebugLog("Scene created with %d objects", nObjects)
 	if AlwaysBVH && NeverBVH {

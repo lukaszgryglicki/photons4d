@@ -49,6 +49,7 @@ type Config struct {
 	HyperCones    []HyperConeCfg    `json:"hypercones,omitempty"`
 	HyperCapsules []HyperCapsuleCfg `json:"hypercapsules,omitempty"`
 	Spheritori    []SpheritorusCfg  `json:"spheritori,omitempty"`
+	Duotori       []DuotorusCfg     `json:"duotori,omitempty"`
 }
 
 // Rotation in degrees for JSON (friendlier than radians).
@@ -188,6 +189,21 @@ type SpheritorusCfg struct {
 	MajorRadius Real    `json:"majorRadius,omitempty"`
 	MinorRadius Real    `json:"minorRadius,omitempty"`
 	RotDeg      Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type DuotorusCfg struct {
+	Center        Point4  `json:"center"`
+	Scale         Vector4 `json:"scale,omitempty"`
+	MajorRadiusXY Real    `json:"majorRadiusXY,omitempty"`
+	MajorRadiusZW Real    `json:"majorRadiusZW,omitempty"`
+	MinorRadius   Real    `json:"minorRadius,omitempty"`
+	RotDeg        Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
 	Diffuse RGB `json:"diffuse"`
@@ -414,6 +430,35 @@ func (c SpheritorusCfg) Build() (*Spheritorus, error) {
 		r = 0.25
 	}
 	return NewSpheritorus(c.Center, sc, R, r, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c DuotorusCfg) Build() (*Duotorus, error) {
+	sc := c.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	rxy := c.MajorRadiusXY
+	if rxy == 0 {
+		rxy = 1
+	}
+	rzw := c.MajorRadiusZW
+	if rzw == 0 {
+		rzw = 1
+	}
+	r := c.MinorRadius
+	if r == 0 {
+		r = 0.25
+	}
+	return NewDuotorus(c.Center, sc, rxy, rzw, r, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
 }
 
 func loadConfig(path string) (*Config, error) {
