@@ -126,6 +126,20 @@ func Run(cfgPath string) error {
 		}
 		scene.AddSpherinder(h)
 	}
+	for i, hcfg := range cfg.HyperCones {
+		h, err := hcfg.Build()
+		if err != nil {
+			panic(fmt.Errorf("hypercones[%d]: %w", i, err))
+		}
+		scene.AddHyperCone(h)
+	}
+	for i, hcfg := range cfg.HyperCapsules {
+		h, err := hcfg.Build()
+		if err != nil {
+			panic(fmt.Errorf("hypercapsules[%d]: %w", i, err))
+		}
+		scene.AddHyperCapsule(h)
+	}
 	nObjects := scene.NObjects()
 	DebugLog("Scene created with %d objects", nObjects)
 	if AlwaysBVH && NeverBVH {

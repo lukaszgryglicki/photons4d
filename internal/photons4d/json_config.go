@@ -28,25 +28,26 @@ type LightCfg struct {
 }
 
 type Config struct {
-	SceneResX    int              `json:"sceneResX"`
-	SceneResY    int              `json:"sceneResY"`
-	SceneResZ    int              `json:"sceneResZ"`
-	ProbeRays    int              `json:"probeRays"`
-	Spp          int              `json:"spp"`
-	GIFOut       string           `json:"gifOut"`
-	GIFDelay     int              `json:"gifDelay,omitempty"`
-	Gamma        Real             `json:"gamma,omitempty"`
-	Scene        SceneCfg         `json:"scene"`
-	Lights       []LightCfg       `json:"lights"`
-	Hyperspheres []HyperSphereCfg `json:"hyperspheres,omitempty"`
-	Cells5       []Cell5Cfg       `json:"cells5,omitempty"`
-	Cells8       []Cell8Cfg       `json:"cells8,omitempty"`
-	Cells16      []Cell16Cfg      `json:"cells16,omitempty"`
-	Cells24      []Cell24Cfg      `json:"cells24,omitempty"`
-	Cells120     []Cell120Cfg     `json:"cells120,omitempty"`
-	Cells600     []Cell600Cfg     `json:"cells600,omitempty"`
-	Spherinders  []SpherinderCfg  `json:"spherinders,omitempty"`
-	HyperCones   []HyperConeCfg   `json:"hypercones,omitempty"`
+	SceneResX     int               `json:"sceneResX"`
+	SceneResY     int               `json:"sceneResY"`
+	SceneResZ     int               `json:"sceneResZ"`
+	ProbeRays     int               `json:"probeRays"`
+	Spp           int               `json:"spp"`
+	GIFOut        string            `json:"gifOut"`
+	GIFDelay      int               `json:"gifDelay,omitempty"`
+	Gamma         Real              `json:"gamma,omitempty"`
+	Scene         SceneCfg          `json:"scene"`
+	Lights        []LightCfg        `json:"lights"`
+	Hyperspheres  []HyperSphereCfg  `json:"hyperspheres,omitempty"`
+	Cells5        []Cell5Cfg        `json:"cells5,omitempty"`
+	Cells8        []Cell8Cfg        `json:"cells8,omitempty"`
+	Cells16       []Cell16Cfg       `json:"cells16,omitempty"`
+	Cells24       []Cell24Cfg       `json:"cells24,omitempty"`
+	Cells120      []Cell120Cfg      `json:"cells120,omitempty"`
+	Cells600      []Cell600Cfg      `json:"cells600,omitempty"`
+	Spherinders   []SpherinderCfg   `json:"spherinders,omitempty"`
+	HyperCones    []HyperConeCfg    `json:"hypercones,omitempty"`
+	HyperCapsules []HyperCapsuleCfg `json:"hypercapsules,omitempty"`
 }
 
 // Rotation in degrees for JSON (friendlier than radians).
@@ -159,6 +160,19 @@ type HyperConeCfg struct {
 	Center Point4  `json:"center"`
 	Scale  Vector4 `json:"scale,omitempty"`
 	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type HyperCapsuleCfg struct {
+	Center     Point4  `json:"center"`
+	Scale      Vector4 `json:"scale,omitempty"`
+	HalfLength Real    `json:"halfLength,omitempty"`
+	RotDeg     Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
 	Diffuse RGB `json:"diffuse"`
@@ -339,6 +353,27 @@ func (c HyperConeCfg) Build() (*HyperCone, error) {
 		sc.W = 1
 	}
 	return NewHyperCone(c.Center, sc, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c HyperCapsuleCfg) Build() (*HyperCapsule, error) {
+	sc := c.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	hl := c.HalfLength
+	if hl == 0 {
+		hl = 1
+	}
+	return NewHyperCapsule(c.Center, sc, hl, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
 }
 
 func loadConfig(path string) (*Config, error) {

@@ -78,3 +78,24 @@ func TestHyperConeCfgScaleDefaults(t *testing.T) {
 		t.Fatalf("Scale defaults failed: %+v", hc.Scale)
 	}
 }
+
+func TestHyperCapsuleCfgDefaults(t *testing.T) {
+	hc, err := (HyperCapsuleCfg{
+		Center:  Point4{0, 0, 0, 1},
+		RotDeg:  Rot4Deg{},
+		Color:   RGB{1, 1, 1},
+		Diffuse: RGB{0, 0, 0},
+		Reflect: RGB{0, 0, 0},
+		Refract: RGB{1, 1, 1},
+		IOR:     RGB{1.4, 1.4, 1.4},
+	}).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hc.Scale != (Vector4{1, 1, 1, 1}) {
+		t.Fatalf("Scale defaults failed: %+v", hc.Scale)
+	}
+	if hc.HalfLength != 1 {
+		t.Fatalf("HalfLength default failed: %v", hc.HalfLength)
+	}
+}

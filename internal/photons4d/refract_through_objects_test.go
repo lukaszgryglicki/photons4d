@@ -454,3 +454,52 @@ func TestRefractionThrough_HyperCone(t *testing.T) {
 		t.Fatalf("ray re-entered immediately after exit")
 	}
 }
+
+func TestRefractionThrough_HyperCapsule(t *testing.T) {
+	ior := Real(1.1)
+	c, err := NewHyperCapsule(
+		Point4{0, 0, 0, 0.6},
+		Vector4{0.2, 0.2, 0.2, 0.1},
+		0.15,
+		Rot4{},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{ior, ior, ior},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	O := Point4{0, 0, 0, 0}
+	D := Vector4{0, 0, 0, 1}
+
+	h1, ok := intersectRayHyperCapsule(O, D, c)
+	if !ok || h1.inv {
+		t.Fatalf("expected entering hypercapsule hit, ok=%v inv=%v", ok, h1.inv)
+	}
+	P1 := O.Add(D.Mul(h1.t))
+	T1, ok := refract4(D, h1.Nw, 1/ior)
+	if !ok {
+		t.Fatalf("unexpected TIR at entry")
+	}
+	T1 = T1.Norm()
+
+	O2 := bumpPoint(P1, T1, bumpShift)
+	h2, ok := intersectRayHyperCapsule(O2, T1, c)
+	if !ok || !h2.inv {
+		t.Fatalf("expected inside->exit hypercapsule hit, ok=%v inv=%v", ok, h2.inv)
+	}
+	P2 := O2.Add(T1.Mul(h2.t))
+
+	T2, ok := refract4(T1, h2.Nw, ior)
+	if !ok {
+		t.Fatalf("unexpected TIR at exit")
+	}
+	T2 = T2.Norm()
+
+	if h2.Nw.Dot(T2) <= 1e-9 {
+		t.Fatalf("not exiting outward: N·T2=%.12g", h2.Nw.Dot(T2))
+	}
+	O3 := bumpPoint(P2, T2, bumpShift)
+	if h3, ok := intersectRayHyperCapsule(O3, T2, c); ok && h3.t < 1e-6 {
+		t.Fatalf("ray re-entered immediately after exit")
+	}
+}
