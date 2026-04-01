@@ -198,3 +198,24 @@ func TestTorisphereCfgDefaults(t *testing.T) {
 		t.Fatalf("Radius defaults failed: major=%v minor=%v", ts.MajorRadius, ts.MinorRadius)
 	}
 }
+
+func TestSuperquadricCfgDefaults(t *testing.T) {
+	sq, err := (SuperquadricCfg{
+		Center:  Point4{0, 0, 0, 1},
+		RotDeg:  Rot4Deg{},
+		Color:   RGB{1, 1, 1},
+		Diffuse: RGB{0, 0, 0},
+		Reflect: RGB{0, 0, 0},
+		Refract: RGB{1, 1, 1},
+		IOR:     RGB{1.4, 1.4, 1.4},
+	}).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sq.Scale != (Vector4{1, 1, 1, 1}) {
+		t.Fatalf("Scale defaults failed: %+v", sq.Scale)
+	}
+	if sq.Power != 2 {
+		t.Fatalf("Power default failed: %v", sq.Power)
+	}
+}

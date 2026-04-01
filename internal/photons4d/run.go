@@ -168,6 +168,13 @@ func Run(cfgPath string) error {
 		}
 		scene.AddTorisphere(h)
 	}
+	for i, scfg := range cfg.Superquadrics {
+		h, err := scfg.Build()
+		if err != nil {
+			panic(fmt.Errorf("superquadrics[%d]: %w", i, err))
+		}
+		scene.AddSuperquadric(h)
+	}
 	nObjects := scene.NObjects()
 	DebugLog("Scene created with %d objects", nObjects)
 	if AlwaysBVH && NeverBVH {

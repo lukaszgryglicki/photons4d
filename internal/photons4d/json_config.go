@@ -52,6 +52,7 @@ type Config struct {
 	Duotori       []DuotorusCfg     `json:"duotori,omitempty"`
 	Duocylinders  []DuocylinderCfg  `json:"duocylinders,omitempty"`
 	Torispheres   []TorisphereCfg   `json:"torispheres,omitempty"`
+	Superquadrics []SuperquadricCfg `json:"superquadrics,omitempty"`
 }
 
 // Rotation in degrees for JSON (friendlier than radians).
@@ -232,6 +233,19 @@ type TorisphereCfg struct {
 	MajorRadius Real    `json:"majorRadius,omitempty"`
 	MinorRadius Real    `json:"minorRadius,omitempty"`
 	RotDeg      Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type SuperquadricCfg struct {
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	Power  Real    `json:"power,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
 	Diffuse RGB `json:"diffuse"`
@@ -529,6 +543,27 @@ func (c TorisphereCfg) Build() (*Torisphere, error) {
 		r = 0.25
 	}
 	return NewTorisphere(c.Center, sc, R, r, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c SuperquadricCfg) Build() (*Superquadric, error) {
+	sc := c.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	p := c.Power
+	if p == 0 {
+		p = 2
+	}
+	return NewSuperquadric(c.Center, sc, p, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
 }
 
 func loadConfig(path string) (*Config, error) {
