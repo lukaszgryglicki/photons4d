@@ -25,4 +25,5 @@ var (
 	_ material = (*Duocylinder)(nil)
 	_ material = (*Torisphere)(nil)
 	_ material = (*Superquadric)(nil)
+	_ material = (*HyperFrustum)(nil)
 )

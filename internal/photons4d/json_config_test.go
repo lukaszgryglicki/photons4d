@@ -219,3 +219,24 @@ func TestSuperquadricCfgDefaults(t *testing.T) {
 		t.Fatalf("Power default failed: %v", sq.Power)
 	}
 }
+
+func TestHyperFrustumCfgDefaults(t *testing.T) {
+	hf, err := (HyperFrustumCfg{
+		Center:  Point4{0, 0, 0, 1},
+		RotDeg:  Rot4Deg{},
+		Color:   RGB{1, 1, 1},
+		Diffuse: RGB{0, 0, 0},
+		Reflect: RGB{0, 0, 0},
+		Refract: RGB{1, 1, 1},
+		IOR:     RGB{1.4, 1.4, 1.4},
+	}).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hf.Scale != (Vector4{1, 1, 1, 1}) {
+		t.Fatalf("Scale defaults failed: %+v", hf.Scale)
+	}
+	if hf.LowerRadius != 0.5 || hf.UpperRadius != 1.0 {
+		t.Fatalf("Radius defaults failed: lower=%v upper=%v", hf.LowerRadius, hf.UpperRadius)
+	}
+}

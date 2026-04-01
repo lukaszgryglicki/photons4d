@@ -175,6 +175,13 @@ func Run(cfgPath string) error {
 		}
 		scene.AddSuperquadric(h)
 	}
+	for i, hcfg := range cfg.HyperFrustums {
+		h, err := hcfg.Build()
+		if err != nil {
+			panic(fmt.Errorf("hyperfrustums[%d]: %w", i, err))
+		}
+		scene.AddHyperFrustum(h)
+	}
 	nObjects := scene.NObjects()
 	DebugLog("Scene created with %d objects", nObjects)
 	if AlwaysBVH && NeverBVH {

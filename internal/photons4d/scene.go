@@ -25,6 +25,7 @@ type Scene struct {
 	Duocylinders         []*Duocylinder
 	Torispheres          []*Torisphere
 	Superquadrics        []*Superquadric
+	HyperFrustums        []*HyperFrustum
 
 	// cached bounds & mapping
 	MinX, MaxX Real
@@ -159,7 +160,7 @@ func (s *Scene) AngleIndexOf(d Vector4) (i, j, k int, alpha, beta, gamma Real) {
 }
 
 func (s *Scene) NObjects() int {
-	return len(s.Cells8) + len(s.Hyperspheres) + len(s.Cells5) + len(s.Cells16) + len(s.Cells24) + len(s.Cells120) + len(s.Cells600) + len(s.Spherinders) + len(s.HyperCones) + len(s.HyperCapsules) + len(s.Spheritori) + len(s.Duotori) + len(s.Duocylinders) + len(s.Torispheres) + len(s.Superquadrics)
+	return len(s.Cells8) + len(s.Hyperspheres) + len(s.Cells5) + len(s.Cells16) + len(s.Cells24) + len(s.Cells120) + len(s.Cells600) + len(s.Spherinders) + len(s.HyperCones) + len(s.HyperCapsules) + len(s.Spheritori) + len(s.Duotori) + len(s.Duocylinders) + len(s.Torispheres) + len(s.Superquadrics) + len(s.HyperFrustums)
 
 }
 
@@ -224,4 +225,8 @@ func (s *Scene) AddTorisphere(h *Torisphere) {
 
 func (s *Scene) AddSuperquadric(h *Superquadric) {
 	s.Superquadrics = append(s.Superquadrics, h)
+}
+
+func (s *Scene) AddHyperFrustum(h *HyperFrustum) {
+	s.HyperFrustums = append(s.HyperFrustums, h)
 }

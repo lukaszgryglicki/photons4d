@@ -53,6 +53,7 @@ type Config struct {
 	Duocylinders  []DuocylinderCfg  `json:"duocylinders,omitempty"`
 	Torispheres   []TorisphereCfg   `json:"torispheres,omitempty"`
 	Superquadrics []SuperquadricCfg `json:"superquadrics,omitempty"`
+	HyperFrustums []HyperFrustumCfg `json:"hyperfrustums,omitempty"`
 }
 
 // Rotation in degrees for JSON (friendlier than radians).
@@ -246,6 +247,20 @@ type SuperquadricCfg struct {
 	Scale  Vector4 `json:"scale,omitempty"`
 	Power  Real    `json:"power,omitempty"`
 	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type HyperFrustumCfg struct {
+	Center      Point4  `json:"center"`
+	Scale       Vector4 `json:"scale,omitempty"`
+	LowerRadius Real    `json:"lowerRadius,omitempty"`
+	UpperRadius Real    `json:"upperRadius,omitempty"`
+	RotDeg      Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
 	Diffuse RGB `json:"diffuse"`
@@ -564,6 +579,31 @@ func (c SuperquadricCfg) Build() (*Superquadric, error) {
 		p = 2
 	}
 	return NewSuperquadric(c.Center, sc, p, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c HyperFrustumCfg) Build() (*HyperFrustum, error) {
+	sc := c.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	l := c.LowerRadius
+	if l == 0 {
+		l = 0.5
+	}
+	u := c.UpperRadius
+	if u == 0 {
+		u = 1.0
+	}
+	return NewHyperFrustum(c.Center, sc, l, u, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
 }
 
 func loadConfig(path string) (*Config, error) {
