@@ -218,5 +218,15 @@ func nearestHit(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) 
 		}
 	}
 
+	// duocylinders
+	for _, s := range scene.Duocylinders {
+		if ok, tNear := rayAABB(O, s.AABBMin, s.AABBMax, rr); !ok || tNear > bestT {
+			continue
+		}
+		if hit, ok := intersectRayDuocylinder(O, D, s); ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
+
 	return best, okAny
 }

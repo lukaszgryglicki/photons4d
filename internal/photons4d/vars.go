@@ -22,4 +22,5 @@ var (
 	_ material = (*HyperCapsule)(nil)
 	_ material = (*Spheritorus)(nil)
 	_ material = (*Duotorus)(nil)
+	_ material = (*Duocylinder)(nil)
 )

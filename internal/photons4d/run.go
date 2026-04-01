@@ -154,6 +154,13 @@ func Run(cfgPath string) error {
 		}
 		scene.AddDuotorus(h)
 	}
+	for i, dcfg := range cfg.Duocylinders {
+		h, err := dcfg.Build()
+		if err != nil {
+			panic(fmt.Errorf("duocylinders[%d]: %w", i, err))
+		}
+		scene.AddDuocylinder(h)
+	}
 	nObjects := scene.NObjects()
 	DebugLog("Scene created with %d objects", nObjects)
 	if AlwaysBVH && NeverBVH {

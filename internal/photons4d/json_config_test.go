@@ -159,3 +159,21 @@ func TestSpherinderCfgDefaults(t *testing.T) {
 		t.Fatalf("Scale defaults failed: %+v", sp.Scale)
 	}
 }
+
+func TestDuocylinderCfgDefaults(t *testing.T) {
+	dc, err := (DuocylinderCfg{
+		Center:  Point4{0, 0, 0, 1},
+		RotDeg:  Rot4Deg{},
+		Color:   RGB{1, 1, 1},
+		Diffuse: RGB{0, 0, 0},
+		Reflect: RGB{0, 0, 0},
+		Refract: RGB{1, 1, 1},
+		IOR:     RGB{1.4, 1.4, 1.4},
+	}).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dc.Scale != (Vector4{1, 1, 1, 1}) {
+		t.Fatalf("Scale defaults failed: %+v", dc.Scale)
+	}
+}
