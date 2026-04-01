@@ -161,6 +161,13 @@ func Run(cfgPath string) error {
 		}
 		scene.AddDuocylinder(h)
 	}
+	for i, tcfg := range cfg.Torispheres {
+		h, err := tcfg.Build()
+		if err != nil {
+			panic(fmt.Errorf("torispheres[%d]: %w", i, err))
+		}
+		scene.AddTorisphere(h)
+	}
 	nObjects := scene.NObjects()
 	DebugLog("Scene created with %d objects", nObjects)
 	if AlwaysBVH && NeverBVH {

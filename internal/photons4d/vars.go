@@ -23,4 +23,5 @@ var (
 	_ material = (*Spheritorus)(nil)
 	_ material = (*Duotorus)(nil)
 	_ material = (*Duocylinder)(nil)
+	_ material = (*Torisphere)(nil)
 )

@@ -177,3 +177,24 @@ func TestDuocylinderCfgDefaults(t *testing.T) {
 		t.Fatalf("Scale defaults failed: %+v", dc.Scale)
 	}
 }
+
+func TestTorisphereCfgDefaults(t *testing.T) {
+	ts, err := (TorisphereCfg{
+		Center:  Point4{0, 0, 0, 1},
+		RotDeg:  Rot4Deg{},
+		Color:   RGB{1, 1, 1},
+		Diffuse: RGB{0, 0, 0},
+		Reflect: RGB{0, 0, 0},
+		Refract: RGB{1, 1, 1},
+		IOR:     RGB{1.4, 1.4, 1.4},
+	}).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ts.Scale != (Vector4{1, 1, 1, 1}) {
+		t.Fatalf("Scale defaults failed: %+v", ts.Scale)
+	}
+	if ts.MajorRadius != 1 || ts.MinorRadius != 0.25 {
+		t.Fatalf("Radius defaults failed: major=%v minor=%v", ts.MajorRadius, ts.MinorRadius)
+	}
+}

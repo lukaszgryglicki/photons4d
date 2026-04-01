@@ -51,6 +51,7 @@ type Config struct {
 	Spheritori    []SpheritorusCfg  `json:"spheritori,omitempty"`
 	Duotori       []DuotorusCfg     `json:"duotori,omitempty"`
 	Duocylinders  []DuocylinderCfg  `json:"duocylinders,omitempty"`
+	Torispheres   []TorisphereCfg   `json:"torispheres,omitempty"`
 }
 
 // Rotation in degrees for JSON (friendlier than radians).
@@ -217,6 +218,20 @@ type DuocylinderCfg struct {
 	Center Point4  `json:"center"`
 	Scale  Vector4 `json:"scale,omitempty"`
 	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type TorisphereCfg struct {
+	Center      Point4  `json:"center"`
+	Scale       Vector4 `json:"scale,omitempty"`
+	MajorRadius Real    `json:"majorRadius,omitempty"`
+	MinorRadius Real    `json:"minorRadius,omitempty"`
+	RotDeg      Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
 	Diffuse RGB `json:"diffuse"`
@@ -489,6 +504,31 @@ func (c DuocylinderCfg) Build() (*Duocylinder, error) {
 		sc.W = 1
 	}
 	return NewDuocylinder(c.Center, sc, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c TorisphereCfg) Build() (*Torisphere, error) {
+	sc := c.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	R := c.MajorRadius
+	if R == 0 {
+		R = 1
+	}
+	r := c.MinorRadius
+	if r == 0 {
+		r = 0.25
+	}
+	return NewTorisphere(c.Center, sc, R, r, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
 }
 
 func loadConfig(path string) (*Config, error) {
