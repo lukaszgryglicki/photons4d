@@ -17,6 +17,7 @@ type Scene struct {
 	Cells24              []*Cell24
 	Cells120             []*Cell120
 	Cells600             []*Cell600
+	StarCells            []*StarCell
 	Spherinders          []*Spherinder
 	HyperCones           []*HyperCone
 	HyperCapsules        []*HyperCapsule
@@ -160,7 +161,7 @@ func (s *Scene) AngleIndexOf(d Vector4) (i, j, k int, alpha, beta, gamma Real) {
 }
 
 func (s *Scene) NObjects() int {
-	return len(s.Cells8) + len(s.Hyperspheres) + len(s.Cells5) + len(s.Cells16) + len(s.Cells24) + len(s.Cells120) + len(s.Cells600) + len(s.Spherinders) + len(s.HyperCones) + len(s.HyperCapsules) + len(s.Spheritori) + len(s.Duotori) + len(s.Duocylinders) + len(s.Torispheres) + len(s.Superquadrics) + len(s.HyperFrustums)
+	return len(s.Cells8) + len(s.Hyperspheres) + len(s.Cells5) + len(s.Cells16) + len(s.Cells24) + len(s.Cells120) + len(s.Cells600) + len(s.StarCells) + len(s.Spherinders) + len(s.HyperCones) + len(s.HyperCapsules) + len(s.Spheritori) + len(s.Duotori) + len(s.Duocylinders) + len(s.Torispheres) + len(s.Superquadrics) + len(s.HyperFrustums)
 
 }
 
@@ -229,4 +230,8 @@ func (s *Scene) AddSuperquadric(h *Superquadric) {
 
 func (s *Scene) AddHyperFrustum(h *HyperFrustum) {
 	s.HyperFrustums = append(s.HyperFrustums, h)
+}
+
+func (s *Scene) AddStarCell(c *StarCell) {
+	s.StarCells = append(s.StarCells, c)
 }

@@ -168,6 +168,16 @@ func nearestHit(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) 
 			bestT, best, okAny = hit.t, hit, true
 		}
 	}
+
+	// star cells
+	for _, c := range scene.StarCells {
+		if ok, tNear := rayAABB(O, c.AABBMin, c.AABBMax, rr); !ok || tNear > bestT {
+			continue
+		}
+		if hit, ok := intersectRayStarCell(O, D, c); ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
 	// spherinders
 	for _, s := range scene.Spherinders {
 		if ok, tNear := rayAABB(O, s.AABBMin, s.AABBMax, rr); !ok || tNear > bestT {

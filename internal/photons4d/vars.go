@@ -16,6 +16,7 @@ var (
 	_ material = (*Cell5)(nil)
 	_ material = (*Cell16)(nil)
 	_ material = (*Cell24)(nil)
+	_ material = (*StarCell)(nil)
 	_ material = (*cellPoly)(nil) // for 120/600
 	_ material = (*Spherinder)(nil)
 	_ material = (*HyperCone)(nil)

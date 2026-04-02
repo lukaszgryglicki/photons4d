@@ -119,6 +119,13 @@ func Run(cfgPath string) error {
 		}
 		scene.AddCell600(h)
 	}
+	for i, scfg := range cfg.StarCells {
+		h, err := scfg.Build()
+		if err != nil {
+			panic(fmt.Errorf("starCells[%d]: %w", i, err))
+		}
+		scene.AddStarCell(h)
+	}
 	for i, scfg := range cfg.Spherinders {
 		h, err := scfg.Build()
 		if err != nil {

@@ -45,6 +45,7 @@ type Config struct {
 	Cells24       []Cell24Cfg       `json:"cells24,omitempty"`
 	Cells120      []Cell120Cfg      `json:"cells120,omitempty"`
 	Cells600      []Cell600Cfg      `json:"cells600,omitempty"`
+	StarCells     []StarCellCfg     `json:"starCells,omitempty"`
 	Spherinders   []SpherinderCfg   `json:"spherinders,omitempty"`
 	HyperCones    []HyperConeCfg    `json:"hypercones,omitempty"`
 	HyperCapsules []HyperCapsuleCfg `json:"hypercapsules,omitempty"`
@@ -154,6 +155,22 @@ type Cell600Cfg struct {
 	Center Point4  `json:"center"`
 	Scale  Vector4 `json:"scale,omitempty"`
 	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type StarCellCfg struct {
+	Kind        string  `json:"kind"`
+	Center      Point4  `json:"center"`
+	Scale       Vector4 `json:"scale,omitempty"`
+	CoreRadius  Real    `json:"coreRadius,omitempty"`
+	SpikeLength Real    `json:"spikeLength,omitempty"`
+	Sharpness   Real    `json:"sharpness,omitempty"`
+	RotDeg      Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
 	Diffuse RGB `json:"diffuse"`
@@ -407,6 +424,35 @@ func (c Cell600Cfg) Build() (*Cell600, error) {
 		sc.W = 1
 	}
 	return NewCell600(c.Center, sc, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c StarCellCfg) Build() (*StarCell, error) {
+	sc := c.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	core := c.CoreRadius
+	if core == 0 {
+		core = defaultStarCellCoreRadius
+	}
+	spike := c.SpikeLength
+	if spike == 0 {
+		spike = defaultStarCellSpikeLength
+	}
+	sharpness := c.Sharpness
+	if sharpness == 0 {
+		sharpness = defaultStarCellSharpness
+	}
+	return NewStarCell(c.Kind, c.Center, sc, core, spike, sharpness, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
 }
 
 func (c SpherinderCfg) Build() (*Spherinder, error) {

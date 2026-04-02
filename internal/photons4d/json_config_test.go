@@ -240,3 +240,34 @@ func TestHyperFrustumCfgDefaults(t *testing.T) {
 		t.Fatalf("Radius defaults failed: lower=%v upper=%v", hf.LowerRadius, hf.UpperRadius)
 	}
 }
+
+func TestStarCellCfgDefaults(t *testing.T) {
+	sc, err := (StarCellCfg{
+		Kind:    "star-cell-24",
+		Center:  Point4{0, 0, 0, 1},
+		RotDeg:  Rot4Deg{},
+		Color:   RGB{1, 1, 1},
+		Diffuse: RGB{0, 0, 0},
+		Reflect: RGB{0, 0, 0},
+		Refract: RGB{1, 1, 1},
+		IOR:     RGB{1.4, 1.4, 1.4},
+	}).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sc.Scale != (Vector4{1, 1, 1, 1}) {
+		t.Fatalf("Scale defaults failed: %+v", sc.Scale)
+	}
+	if sc.CoreRadius != defaultStarCellCoreRadius {
+		t.Fatalf("CoreRadius default failed: %v", sc.CoreRadius)
+	}
+	if sc.SpikeLength != defaultStarCellSpikeLength {
+		t.Fatalf("SpikeLength default failed: %v", sc.SpikeLength)
+	}
+	if sc.Sharpness != defaultStarCellSharpness {
+		t.Fatalf("Sharpness default failed: %v", sc.Sharpness)
+	}
+	if sc.Kind != "star-cell-24" {
+		t.Fatalf("kind canonicalization failed: %q", sc.Kind)
+	}
+}
