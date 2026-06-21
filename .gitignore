@@ -42,6 +42,7 @@ out
 *.mp4
 ._*
 /photons4d
+/genscenes
 *-old.go
 cpu.out
 cpu.out.txt
