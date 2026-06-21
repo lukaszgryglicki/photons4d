@@ -1,0 +1,263 @@
+{
+  "gamma": 0.7,
+  "gifDelay": 6,
+  "gifOut": "./gifs/showcase_starcell.gif",
+  "lights": [
+    {
+      "angleDeg": 34,
+      "color": {
+        "B": 1,
+        "G": 1,
+        "R": 1
+      },
+      "direction": {
+        "W": -1,
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "intensity": 1,
+      "origin": {
+        "W": 1.25,
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      }
+    },
+    {
+      "angleDeg": 28,
+      "color": {
+        "B": 0.3,
+        "G": 0.58,
+        "R": 1
+      },
+      "direction": {
+        "W": -1,
+        "X": 0.16,
+        "Y": -0.1,
+        "Z": 0.05
+      },
+      "intensity": 0.5,
+      "origin": {
+        "W": 1.18,
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      }
+    },
+    {
+      "angleDeg": 28,
+      "color": {
+        "B": 1,
+        "G": 0.64,
+        "R": 0.36
+      },
+      "direction": {
+        "W": -1,
+        "X": -0.16,
+        "Y": 0.1,
+        "Z": -0.05
+      },
+      "intensity": 0.5,
+      "origin": {
+        "W": 1.18,
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      }
+    },
+    {
+      "angleDeg": 26,
+      "color": {
+        "B": 0.55,
+        "G": 1,
+        "R": 0.5
+      },
+      "direction": {
+        "W": -1,
+        "X": 0.02,
+        "Y": 0.16,
+        "Z": 0.12
+      },
+      "intensity": 0.34,
+      "origin": {
+        "W": 1.15,
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      }
+    }
+  ],
+  "probeRays": 200000,
+  "scene": {
+    "center": {
+      "W": 0,
+      "X": 0,
+      "Y": 0,
+      "Z": 0
+    },
+    "depth": 2.2,
+    "height": 2.2,
+    "maxBounces": 42,
+    "width": 2.6
+  },
+  "sceneResX": 600,
+  "sceneResY": 600,
+  "sceneResZ": 128,
+  "spp": 900,
+  "starCells": [
+    {
+      "center": {
+        "W": 0.5,
+        "X": -0.62,
+        "Y": 0.3,
+        "Z": 0
+      },
+      "color": {
+        "B": 0.3,
+        "G": 0.55,
+        "R": 1
+      },
+      "coreRadius": 0.4,
+      "diffuse": {
+        "B": 0,
+        "G": 0,
+        "R": 0
+      },
+      "ior": {
+        "B": 1.58,
+        "G": 1.52,
+        "R": 1.46
+      },
+      "kind": "star-cell-16",
+      "reflect": {
+        "B": 0.08,
+        "G": 0.08,
+        "R": 0.08
+      },
+      "refract": {
+        "B": 0.88,
+        "G": 0.88,
+        "R": 0.88
+      },
+      "rotDeg": {
+        "xw": 18,
+        "xy": 12,
+        "xz": -14,
+        "yw": -10,
+        "yz": 16,
+        "zw": 22
+      },
+      "scale": {
+        "W": 0.2,
+        "X": 0.2,
+        "Y": 0.2,
+        "Z": 0.2
+      },
+      "sharpness": 6,
+      "spikeLength": 0.62
+    },
+    {
+      "center": {
+        "W": 0.5,
+        "X": 0,
+        "Y": -0.34,
+        "Z": 0
+      },
+      "color": {
+        "B": 1,
+        "G": 0.85,
+        "R": 0.4
+      },
+      "coreRadius": 0.42,
+      "diffuse": {
+        "B": 0,
+        "G": 0,
+        "R": 0
+      },
+      "ior": {
+        "B": 1.58,
+        "G": 1.52,
+        "R": 1.46
+      },
+      "kind": "star-cell-24",
+      "reflect": {
+        "B": 0.08,
+        "G": 0.08,
+        "R": 0.08
+      },
+      "refract": {
+        "B": 0.88,
+        "G": 0.88,
+        "R": 0.88
+      },
+      "rotDeg": {
+        "xw": -16,
+        "xy": 20,
+        "xz": 10,
+        "yw": 18,
+        "yz": -12,
+        "zw": 26
+      },
+      "scale": {
+        "W": 0.22,
+        "X": 0.22,
+        "Y": 0.22,
+        "Z": 0.22
+      },
+      "sharpness": 6.4,
+      "spikeLength": 0.6
+    },
+    {
+      "center": {
+        "W": 0.5,
+        "X": 0.62,
+        "Y": 0.3,
+        "Z": 0
+      },
+      "color": {
+        "B": 0.55,
+        "G": 1,
+        "R": 0.7
+      },
+      "coreRadius": 0.46,
+      "diffuse": {
+        "B": 0,
+        "G": 0,
+        "R": 0
+      },
+      "ior": {
+        "B": 1.58,
+        "G": 1.52,
+        "R": 1.46
+      },
+      "kind": "star-cell-600",
+      "reflect": {
+        "B": 0.08,
+        "G": 0.08,
+        "R": 0.08
+      },
+      "refract": {
+        "B": 0.88,
+        "G": 0.88,
+        "R": 0.88
+      },
+      "rotDeg": {
+        "xw": 12,
+        "xy": 8,
+        "xz": 22,
+        "yw": 26,
+        "yz": 18,
+        "zw": 14
+      },
+      "scale": {
+        "W": 0.2,
+        "X": 0.2,
+        "Y": 0.2,
+        "Z": 0.2
+      },
+      "sharpness": 7,
+      "spikeLength": 0.56
+    }
+  ]
+}

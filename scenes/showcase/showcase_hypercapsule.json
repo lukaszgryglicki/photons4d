@@ -1,0 +1,158 @@
+{
+  "gamma": 0.7,
+  "gifDelay": 6,
+  "gifOut": "./gifs/showcase_hypercapsule.gif",
+  "hypercapsules": [
+    {
+      "center": {
+        "W": 0.5,
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "color": {
+        "B": 1,
+        "G": 0.95,
+        "R": 0.9
+      },
+      "diffuse": {
+        "B": 0,
+        "G": 0,
+        "R": 0
+      },
+      "halfLength": 0.46,
+      "ior": {
+        "B": 1.55,
+        "G": 1.5,
+        "R": 1.45
+      },
+      "reflect": {
+        "B": 0.07,
+        "G": 0.07,
+        "R": 0.07
+      },
+      "refract": {
+        "B": 0.9,
+        "G": 0.9,
+        "R": 0.9
+      },
+      "rotDeg": {
+        "xw": 18,
+        "xy": 0,
+        "xz": 24,
+        "yw": 26,
+        "yz": 10,
+        "zw": -14
+      },
+      "scale": {
+        "W": 0.3,
+        "X": 0.34,
+        "Y": 0.34,
+        "Z": 0.34
+      }
+    }
+  ],
+  "lights": [
+    {
+      "angleDeg": 34,
+      "color": {
+        "B": 1,
+        "G": 1,
+        "R": 1
+      },
+      "direction": {
+        "W": -1,
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "intensity": 1,
+      "origin": {
+        "W": 1.25,
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      }
+    },
+    {
+      "angleDeg": 28,
+      "color": {
+        "B": 0.3,
+        "G": 0.58,
+        "R": 1
+      },
+      "direction": {
+        "W": -1,
+        "X": 0.16,
+        "Y": -0.1,
+        "Z": 0.05
+      },
+      "intensity": 0.5,
+      "origin": {
+        "W": 1.18,
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      }
+    },
+    {
+      "angleDeg": 28,
+      "color": {
+        "B": 1,
+        "G": 0.64,
+        "R": 0.36
+      },
+      "direction": {
+        "W": -1,
+        "X": -0.16,
+        "Y": 0.1,
+        "Z": -0.05
+      },
+      "intensity": 0.5,
+      "origin": {
+        "W": 1.18,
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      }
+    },
+    {
+      "angleDeg": 26,
+      "color": {
+        "B": 0.55,
+        "G": 1,
+        "R": 0.5
+      },
+      "direction": {
+        "W": -1,
+        "X": 0.02,
+        "Y": 0.16,
+        "Z": 0.12
+      },
+      "intensity": 0.34,
+      "origin": {
+        "W": 1.15,
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      }
+    }
+  ],
+  "probeRays": 200000,
+  "scene": {
+    "center": {
+      "W": 0,
+      "X": 0,
+      "Y": 0,
+      "Z": 0
+    },
+    "depth": 2.2,
+    "height": 2.2,
+    "maxBounces": 42,
+    "width": 2.2
+  },
+  "sceneResX": 600,
+  "sceneResY": 600,
+  "sceneResZ": 128,
+  "spp": 768
+}

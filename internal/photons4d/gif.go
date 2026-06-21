@@ -34,7 +34,10 @@ func SaveAnimatedGIF(scene *Scene, path string, delay int, gamma Real) error {
 			n = 1
 		}
 		if gamma != 1 {
-			n = math.Pow(n, 1.0/gamma)
+			// Documented contract (see func comment): gamma<1 brightens.
+			// For n in (0,1), n^gamma with gamma<1 is > n (brighter); the
+			// previous n^(1/gamma) inverted this and darkened instead.
+			n = math.Pow(n, gamma)
 		}
 		return uint8(math.Round(n * 255))
 	}

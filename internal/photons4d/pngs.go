@@ -27,7 +27,8 @@ func SavePNGSequence16(scene *Scene, prefix string, gamma Real) error {
 			n = 1
 		}
 		if gamma != 1 {
-			n = math.Pow(n, 1.0/gamma)
+			// Match SaveAnimatedGIF: gamma<1 brightens (n^gamma > n for n in (0,1)).
+			n = math.Pow(n, gamma)
 		}
 		x := math.Round(n * 65535.0)
 		if x < 0 {

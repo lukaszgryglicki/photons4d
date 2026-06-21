@@ -350,7 +350,11 @@ func getCentroidAxis(o bvhLeaf, axis int) Real {
 }
 
 func computeRayRecips(d Vector4) rayRecips {
-	const eps = 1e-18
+	// Must match the parallel-axis threshold used by the linear nearestHit path
+	// (hit.go uses 1e-12). With the old 1e-18 a near-parallel ray (|D|~1e-14)
+	// was treated as parallel by nearestHit but non-parallel by the BVH, so the
+	// two acceleration paths could disagree on AABB culling for the same ray.
+	const eps = 1e-12
 	rr := rayRecips{}
 	if x := d.X; x > eps || x < -eps {
 		rr.invX = 1 / x
