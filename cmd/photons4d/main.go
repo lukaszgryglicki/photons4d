@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 	"os"
@@ -12,6 +13,13 @@ import (
 
 	"github.com/lukaszgryglicki/photons4d/internal/photons4d"
 )
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -55,11 +63,49 @@ func main() {
 		}
 	}
 
-	cfg := "scenes/config.json"
-	if len(os.Args) > 1 {
-		cfg = os.Args[1]
+	// Distributed (horizontal) mode is optional; default "local" keeps the
+	// classic single-machine vertical behavior byte-for-byte identical.
+	mode := flag.String("mode", envOr("MODE", "local"), "run mode: local (default), server (distributed collector) or client (distributed worker)")
+	listen := flag.String("listen", envOr("LISTEN", ":31417"), "server mode: TCP address to listen on")
+	connect := flag.String("connect", envOr("CONNECT", ""), "client mode: server address host:port")
+	chunks := flag.Int("chunks", 64, "server mode: number of work chunks each light's ray budget is split into (or CHUNKS env)")
+	compress := flag.Bool("compress", envOr("COMPRESS", "") != "", "client mode: DEFLATE-compress voxel updates (bit-exact, saves network traffic; or COMPRESS env)")
+	batch := flag.Int("batch", 0, "client mode: max sparse entries per update message, 0 = default 4194304 ≈ 64 MB raw (or BATCH env)")
+	flag.Parse()
+	if v := os.Getenv("CHUNKS"); v != "" {
+		var c int
+		if _, err := fmt.Sscanf(v, "%d", &c); err == nil && c > 0 {
+			*chunks = c
+		}
 	}
-	if err := photons4d.Run(cfg); err != nil {
+	if v := os.Getenv("BATCH"); v != "" {
+		var b int
+		if _, err := fmt.Sscanf(v, "%d", &b); err == nil && b > 0 {
+			*batch = b
+		}
+	}
+
+	cfg := "scenes/config.json"
+	if flag.NArg() > 0 {
+		cfg = flag.Arg(0)
+	}
+
+	var err error
+	switch *mode {
+	case "local":
+		err = photons4d.Run(cfg)
+	case "server":
+		err = photons4d.RunServer(cfg, *listen, *chunks)
+	case "client":
+		if *connect == "" {
+			err = fmt.Errorf("client mode requires -connect host:port (or CONNECT env)")
+		} else {
+			err = photons4d.RunClient(cfg, *connect, photons4d.ClientOpts{Compress: *compress, BatchEntries: *batch})
+		}
+	default:
+		err = fmt.Errorf("unknown mode %q (want local, server or client)", *mode)
+	}
+	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}

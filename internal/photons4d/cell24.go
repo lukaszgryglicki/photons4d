@@ -59,6 +59,40 @@ func canonical24Verts() [24]Vector4 {
 	return out
 }
 
+// dual24Dirs returns the 24 facet-normal directions of the 24-cell whose
+// vertices are canonical24Verts (the D4 root set, perms of (±1,±1,0,0)).
+// Those facet normals form the dual 24-cell vertex family:
+// 8 of (±1,0,0,0) and 16 of (±1,±1,±1,±1) (magnitudes irrelevant here —
+// the plane offsets are computed via support over the actual vertices and
+// then normalized). Using the vertex set itself as normals (the previous
+// code) is wrong: the 24-cell is self-dual only up to a rotation, and the
+// D4 roots are NOT facet normals of conv(D4 roots) — that produced a
+// circumscribing polytope √2× larger than the declared vertex hull, whose
+// parts stuck out of the AABB and were clipped by the AABB pre-cull.
+func dual24Dirs() [24]Vector4 {
+	out := [24]Vector4{}
+	idx := 0
+	for a := 0; a < 4; a++ {
+		for s := -1; s <= 1; s += 2 {
+			v := [4]Real{0, 0, 0, 0}
+			v[a] = Real(s)
+			out[idx] = Vector4{v[0], v[1], v[2], v[3]}
+			idx++
+		}
+	}
+	for sx := -1; sx <= 1; sx += 2 {
+		for sy := -1; sy <= 1; sy += 2 {
+			for sz := -1; sz <= 1; sz += 2 {
+				for sw := -1; sw <= 1; sw += 2 {
+					out[idx] = Vector4{Real(sx), Real(sy), Real(sz), Real(sw)}
+					idx++
+				}
+			}
+		}
+	}
+	return out
+}
+
 func NewCell24(
 	center Point4,
 	scale Vector4,
@@ -175,7 +209,8 @@ func NewCell24(
 		c.f0[i] = r0 * r0
 	}
 
-	// planes: seeds = same canonical set (self-dual), transform normals by A^{-T}
+	// planes: seeds = facet normals of conv(Verts) (dual 24-cell directions),
+	// transformed to world by A^{-T}; offsets via support over world verts.
 	Sinv := Mat4{M: [4][4]Real{
 		{1 / sx, 0, 0, 0},
 		{0, 1 / sy, 0, 0},
@@ -183,7 +218,7 @@ func NewCell24(
 		{0, 0, 0, 1 / sw},
 	}}
 	AinvT := R.Mul(Sinv)
-	seeds := canonical24Verts()
+	seeds := dual24Dirs()
 	for i := 0; i < 24; i++ {
 		nw := AinvT.MulVec(seeds[i]) // not unit yet
 		// support value over verts

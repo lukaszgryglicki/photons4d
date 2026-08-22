@@ -35,9 +35,42 @@ func saveWithRetry(label string, attempts int, fn func() error) error {
 }
 
 func Run(cfgPath string) error {
-	cfg, err := loadConfig(cfgPath)
+	cfg, err := prepareConfig(cfgPath)
 	if err != nil {
 		return err
+	}
+
+	scene, lights, err := buildScene(cfg)
+	if err != nil {
+		return err
+	}
+
+	needRays := computeNeedRays(cfg, scene, lights)
+
+	start := time.Now()
+	castRays(lights, scene, needRays)
+	elapsed := time.Since(start)
+	DebugLog("Rays: %d, time: %s", isum(needRays), elapsed)
+
+	if Debug {
+		raysStats()
+		if !DumpAABBBVH(scene, false) {
+			DebugLog("Current scene does not use AABB BVH, here is what it will look like if used:")
+			DumpAABBBVH(scene, true)
+		}
+	}
+
+	return saveOutputs(cfg, scene)
+}
+
+// prepareConfig loads the config and applies the same deterministic
+// mutations Run always applied (debug reductions). Shared by local,
+// server and client modes so that the effective config — and hence its
+// SHA256 — is computed identically everywhere.
+func prepareConfig(cfgPath string) (*Config, error) {
+	cfg, err := loadConfig(cfgPath)
+	if err != nil {
+		return nil, err
 	}
 
 	if Debug {
@@ -50,7 +83,20 @@ func Run(cfgPath string) error {
 		cfg.GIFOut = strings.Replace(cfg.GIFOut, ".gif", "_debug.gif", 1)
 		DebugLog("Debug mode: reduced resolution to %d x %d x %d, spp to %d and max bounces to %d", cfg.SceneResX, cfg.SceneResY, cfg.SceneResZ, cfg.Spp, cfg.Scene.MaxBounces)
 	}
+	return cfg, nil
+}
 
+func isum(a []int) int {
+	s := 0
+	for _, x := range a {
+		s += x
+	}
+	return s
+}
+
+// buildScene constructs the scene, lights and all objects from the config
+// and selects the nearest-hit strategy (plain scan vs BVH).
+func buildScene(cfg *Config) (*Scene, []*Light, error) {
 	Nx, Ny, Nz := cfg.SceneResX, cfg.SceneResY, cfg.SceneResZ
 	scene := NewScene(cfg.Scene.Center, cfg.Scene.Width, cfg.Scene.Height, cfg.Scene.Depth, Nx, Ny, Nz, cfg.Scene.MaxBounces, cfg.Scene.EnvHypersphere)
 
@@ -59,7 +105,7 @@ func Run(cfgPath string) error {
 		angle := Lc.AngleDeg * math.Pi / 180.0
 		L, err := NewLight(Lc.Origin, Lc.Direction, Lc.Color, angle, Lc.Intensity)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 		lights = append(lights, L)
 	}
@@ -67,7 +113,7 @@ func Run(cfgPath string) error {
 	for i, hc := range cfg.Cells8 {
 		h, err := hc.Build()
 		if err != nil {
-			panic(fmt.Errorf("cells8[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("cells8[%d]: %w", i, err)
 		}
 		scene.AddCell8(h)
 	}
@@ -75,7 +121,7 @@ func Run(cfgPath string) error {
 	for i, scfg := range cfg.Hyperspheres {
 		h, err := scfg.Build()
 		if err != nil {
-			panic(fmt.Errorf("hyperspheres[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("hyperspheres[%d]: %w", i, err)
 		}
 		scene.AddHyperSphere(h)
 	}
@@ -83,7 +129,7 @@ func Run(cfgPath string) error {
 	for i, scfg := range cfg.Cells5 {
 		sx, err := scfg.Build()
 		if err != nil {
-			panic(fmt.Errorf("cells5[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("cells5[%d]: %w", i, err)
 		}
 		scene.AddCell5(sx)
 	}
@@ -91,7 +137,7 @@ func Run(cfgPath string) error {
 	for i, scfg := range cfg.Cells16 {
 		obj, err := scfg.Build()
 		if err != nil {
-			panic(fmt.Errorf("cells16[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("cells16[%d]: %w", i, err)
 		}
 		scene.AddCell16(obj)
 	}
@@ -99,7 +145,7 @@ func Run(cfgPath string) error {
 	for i, scfg := range cfg.Cells24 {
 		obj, err := scfg.Build()
 		if err != nil {
-			panic(fmt.Errorf("cells24[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("cells24[%d]: %w", i, err)
 		}
 		scene.AddCell24(obj)
 	}
@@ -107,7 +153,7 @@ func Run(cfgPath string) error {
 	for i, cc := range cfg.Cells120 {
 		h, err := cc.Build()
 		if err != nil {
-			panic(fmt.Errorf("cells120[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("cells120[%d]: %w", i, err)
 		}
 		scene.AddCell120(h)
 	}
@@ -115,77 +161,77 @@ func Run(cfgPath string) error {
 	for i, cc := range cfg.Cells600 {
 		h, err := cc.Build()
 		if err != nil {
-			panic(fmt.Errorf("cells600[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("cells600[%d]: %w", i, err)
 		}
 		scene.AddCell600(h)
 	}
 	for i, scfg := range cfg.StarCells {
 		h, err := scfg.Build()
 		if err != nil {
-			panic(fmt.Errorf("starCells[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("starCells[%d]: %w", i, err)
 		}
 		scene.AddStarCell(h)
 	}
 	for i, scfg := range cfg.Spherinders {
 		h, err := scfg.Build()
 		if err != nil {
-			panic(fmt.Errorf("spherinders[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("spherinders[%d]: %w", i, err)
 		}
 		scene.AddSpherinder(h)
 	}
 	for i, hcfg := range cfg.HyperCones {
 		h, err := hcfg.Build()
 		if err != nil {
-			panic(fmt.Errorf("hypercones[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("hypercones[%d]: %w", i, err)
 		}
 		scene.AddHyperCone(h)
 	}
 	for i, hcfg := range cfg.HyperCapsules {
 		h, err := hcfg.Build()
 		if err != nil {
-			panic(fmt.Errorf("hypercapsules[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("hypercapsules[%d]: %w", i, err)
 		}
 		scene.AddHyperCapsule(h)
 	}
 	for i, tcfg := range cfg.Spheritori {
 		h, err := tcfg.Build()
 		if err != nil {
-			panic(fmt.Errorf("spheritori[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("spheritori[%d]: %w", i, err)
 		}
 		scene.AddSpheritorus(h)
 	}
 	for i, tcfg := range cfg.Duotori {
 		h, err := tcfg.Build()
 		if err != nil {
-			panic(fmt.Errorf("duotori[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("duotori[%d]: %w", i, err)
 		}
 		scene.AddDuotorus(h)
 	}
 	for i, dcfg := range cfg.Duocylinders {
 		h, err := dcfg.Build()
 		if err != nil {
-			panic(fmt.Errorf("duocylinders[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("duocylinders[%d]: %w", i, err)
 		}
 		scene.AddDuocylinder(h)
 	}
 	for i, tcfg := range cfg.Torispheres {
 		h, err := tcfg.Build()
 		if err != nil {
-			panic(fmt.Errorf("torispheres[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("torispheres[%d]: %w", i, err)
 		}
 		scene.AddTorisphere(h)
 	}
 	for i, scfg := range cfg.Superquadrics {
 		h, err := scfg.Build()
 		if err != nil {
-			panic(fmt.Errorf("superquadrics[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("superquadrics[%d]: %w", i, err)
 		}
 		scene.AddSuperquadric(h)
 	}
 	for i, hcfg := range cfg.HyperFrustums {
 		h, err := hcfg.Build()
 		if err != nil {
-			panic(fmt.Errorf("hyperfrustums[%d]: %w", i, err))
+			return nil, nil, fmt.Errorf("hyperfrustums[%d]: %w", i, err)
 		}
 		scene.AddHyperFrustum(h)
 	}
@@ -199,28 +245,31 @@ func Run(cfgPath string) error {
 	if AlwaysBVH {
 		root := getOrBuildBVH(scene)
 		DebugLog("AlwaysBVH is set, using BVH of AABBs")
-		// NearestHitFunc = nearestHitBVH
-		NearestHitFunc = func(_ *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) {
+		scene.NearestHit = func(_ *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) {
 			return traverseNearest(root, O, D, tMax)
 		}
 	} else if NeverBVH {
 		DebugLog("NeverBVH is set, using nearestHit function")
-		NearestHitFunc = nearestHit
+		scene.NearestHit = nearestHit
 	} else {
 		if nObjects < AABBBVHFromNObjects {
-			NearestHitFunc = nearestHit
+			scene.NearestHit = nearestHit
 			DebugLog("Using nearestHit function (instead of BVH of AABB) for %d objects", nObjects)
 		} else {
-			//NearestHitFunc = nearestHitBVH
 			root := getOrBuildBVH(scene)
-			NearestHitFunc = func(_ *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) {
+			scene.NearestHit = func(_ *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) {
 				return traverseNearest(root, O, D, tMax)
 			}
 			DebugLog("Using BVH of AABBs for %d objects", nObjects)
 		}
 	}
+	return scene, lights, nil
+}
 
-	Nvox := Nx * Ny * Nz
+// computeNeedRays estimates per-light hit probabilities and derives the
+// per-light ray budgets required to reach the configured spp saturation.
+func computeNeedRays(cfg *Config, scene *Scene, lights []*Light) []int {
+	Nvox := cfg.SceneResX * cfg.SceneResY * cfg.SceneResZ
 	needRays := make([]int, len(lights))
 	totalRays := 0
 	for i, L := range lights {
@@ -238,23 +287,14 @@ func Run(cfgPath string) error {
 		DebugLog("Light #%d, needs: %d rays, scene hit probability %.12f", i, need, p)
 	}
 	DebugLog("Total rays needed: %d", totalRays)
-	if AlwaysBVH || nObjects >= AABBBVHFromNObjects {
+	if AlwaysBVH || scene.NObjects() >= AABBBVHFromNObjects {
 		DumpAABBBVH(scene, false)
 	}
+	return needRays
+}
 
-	start := time.Now()
-	castRays(lights, scene, needRays)
-	elapsed := time.Since(start)
-	DebugLog("Rays: %d, time: %s", totalRays, elapsed)
-
-	if Debug {
-		raysStats()
-		if !DumpAABBBVH(scene, false) {
-			DebugLog("Current scene does not use AABB BVH, here is what it will look like if used:")
-			DumpAABBBVH(scene, true)
-		}
-	}
-
+// saveOutputs writes the animated GIF and the optional PNG/RAW artifacts.
+func saveOutputs(cfg *Config, scene *Scene) error {
 	recoveryRaw := recoveryRawPathFor(cfg.GIFOut)
 	if err := saveWithRetry("animated GIF", 3, func() error {
 		return SaveAnimatedGIF(scene, cfg.GIFOut, cfg.GIFDelay, cfg.Gamma)

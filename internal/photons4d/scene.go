@@ -37,6 +37,11 @@ type Scene struct {
 	InvSpanZ   Real
 	StrideX    int // i * StrideX + j * StrideY + k*3 + c
 	StrideY    int
+
+	// NearestHit is the hit strategy for this scene (linear scan or BVH).
+	// Kept per-scene (not a package global) so multiple scenes can coexist
+	// in one process (e.g. in-process distributed server + client tests).
+	NearestHit func(s *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool)
 }
 
 // NewScene allocates a zero-initialized flat voxel grid and precomputes bounds & strides.
@@ -83,6 +88,8 @@ func NewScene(center Point4, width, height, depth Real, nx, ny, nz, maxBounces i
 		InvSpanZ: invSpanZ,
 		StrideX:  strideX,
 		StrideY:  strideY,
+
+		NearestHit: nearestHit,
 	}
 	DebugLog("Created scene center=%+v, size=(%.2f, %.2f, %.2f), resolution=(%d, %d, %d), maxBounces=%d, escape=%v", center, width, height, depth, nx, ny, nz, maxBounces, escape)
 	return s

@@ -1,5 +1,7 @@
 package photons4d
 
+import "math"
+
 // Polytope										Vertices		Edges		Faces (2D)			Cells (3D)
 // 5-cell 	(simplex)					5						10			10 triangles		5 tetrahedra
 // 8-cell 	(tesseract)				16					32			24 squares			8 cubes
@@ -32,6 +34,10 @@ type cellPoly struct {
 	AABBMin Point4
 	AABBMax Point4
 
+	// local (pre-transform) plane data, kept for exact AABB computation
+	localN      []Vector4
+	localRadius Real
+
 	// material caches (same layout as others)
 	refl     [3]Real
 	refr     [3]Real
@@ -47,6 +53,8 @@ func (cp *cellPoly) buildPlanes(localNormals []Vector4, radius Real) {
 	// world N = R * S^{-T} * n
 	sx, sy, sz, sw := cp.Scale.X, cp.Scale.Y, cp.Scale.Z, cp.Scale.W
 	inv := func(x Real) Real { return 1 / x }
+	cp.localN = localNormals
+	cp.localRadius = radius
 	for _, n := range localNormals {
 		// S^{-T}*n
 		m := Vector4{n.X * inv(sx), n.Y * inv(sy), n.Z * inv(sz), n.W * inv(sw)}
@@ -66,6 +74,14 @@ func (cp *cellPoly) buildPlanes(localNormals []Vector4, radius Real) {
 	// cp.computeAABB()
 }
 
+// computeAABBFromLocalVerts computes the world AABB from the polytope's
+// vertex DIRECTIONS in local (pre-scale) space. The local polytope is
+// {x : n_i·x <= localRadius} with the unit normals stored by buildPlanes;
+// its true vertex along the unit direction v̂ lies at v̂ * localRadius/max_i(n_i·v̂)
+// (polar duality). The previous code used the unit directions directly,
+// i.e. the circumradius-1 dual vertex set, while the plane set describes an
+// inradius-localRadius polytope whose vertices lie FARTHER out — the AABB
+// under-covered the geometry and the AABB pre-cull clipped real hits.
 func (cp *cellPoly) computeAABBFromLocalVerts(localVerts []Vector4) {
 	if len(localVerts) == 0 {
 		cp.computeAABB()
@@ -76,6 +92,22 @@ func (cp *cellPoly) computeAABBFromLocalVerts(localVerts []Vector4) {
 	maxP := Point4{-1e300, -1e300, -1e300, -1e300}
 
 	for _, v := range localVerts {
+		// Normalize the direction defensively, then push it out to the
+		// actual vertex of the half-space intersection.
+		if l := v.Len(); l > 0 && math.Abs(l-1) > 1e-12 {
+			v = v.Mul(1 / l)
+		}
+		if len(cp.localN) > 0 {
+			sup := -1e300
+			for _, n := range cp.localN {
+				if d := n.Dot(v); d > sup {
+					sup = d
+				}
+			}
+			if sup > 1e-12 {
+				v = v.Mul(cp.localRadius / sup)
+			}
+		}
 		p := Vector4{
 			v.X * cp.Scale.X,
 			v.Y * cp.Scale.Y,

@@ -48,7 +48,7 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 		}
 
 		// Next object hit (cell/ellipsoid) with AABB pre-cull
-		hit, okObj := NearestHitFunc(scene, O, D, tPlane)
+		hit, okObj := scene.NearestHit(scene, O, D, tPlane)
 
 		// If no cell/ellipsoid ahead or plane is closer → try to deposit on the plane.
 		if !okObj || tPlane < hit.t {

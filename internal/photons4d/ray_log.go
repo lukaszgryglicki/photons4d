@@ -19,49 +19,33 @@ const (
 	RecurenceLimit                 // ray hit a recurrence limit (e.g. max bounces exceeded)
 )
 
-type RayLog struct {
-	Name      string
-	Category  Category
-	Origin    Point4
-	Direction Vector4
-	Point     Point4 // hit point, if any
-	Bounce    int    // bounce number (0 for first ray)
-	Distance  Real   // distance traveled by the ray
-}
-
+// RayLogCache accumulates per-event-name counters for DEBUG ray statistics.
+// Only counts are retained: raysStats only ever reported counts, and storing a
+// full record per ray event grows O(rays×bounces) and OOM-kills large renders.
 type RayLogCache struct {
 	mu   sync.Mutex
-	rays map[string][]RayLog // map of ray name to logs
+	rays map[string]int64 // map of ray event name to count
 }
 
 var cache = &RayLogCache{
-	rays: make(map[string][]RayLog),
+	rays: make(map[string]int64),
 }
 
-func logRay(name string, category Category, origin Point4, direction Vector4, point Point4, bounce int, distance Real) {
+func logRay(name string, _ Category, _ Point4, _ Vector4, _ Point4, _ int, _ Real) {
 	cache.mu.Lock()
-	defer cache.mu.Unlock()
-	cache.rays[name] = append(cache.rays[name], RayLog{
-		Name:      name,
-		Category:  category,
-		Origin:    origin,
-		Direction: direction,
-		Point:     point,
-		Bounce:    bounce,
-		Distance:  distance,
-	})
+	cache.rays[name]++
+	cache.mu.Unlock()
 }
 
 func raysStats() {
-	allRays := 0
-	for _, v := range cache.rays {
-		allRays += len(v)
+	var allRays int64
+	for _, n := range cache.rays {
+		allRays += n
 	}
-	for k, v := range cache.rays {
-		fmt.Printf("Ray type %s: %d logs (%f%%)\n", k, len(v), Real(len(v))/Real(allRays)*100)
-		//for _, log := range v {
-		//	fmt.Printf("  Bounce %d: Category=%d, Origin=%+v, Direction=%+v, Point=%+v, Distance=%.6f\n",
-		//		log.Bounce, log.Category, log.Origin, log.Direction, log.Point, log.Distance)
-		//}
+	if allRays == 0 {
+		return
+	}
+	for k, n := range cache.rays {
+		fmt.Printf("Ray type %s: %d logs (%f%%)\n", k, n, Real(n)/Real(allRays)*100)
 	}
 }

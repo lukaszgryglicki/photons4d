@@ -1,6 +1,9 @@
 package photons4d
 
-import "math"
+import (
+	"math"
+	"sync"
+)
 
 // ---- helpers ----
 func evenPerms4() [][]int {
@@ -110,12 +113,16 @@ func verts600Unit() []Vector4 {
 		}
 	}
 
-	// 96: all 24 perms of (0, 1/2, φ/2, 1/(2φ)) with even minus on the 3 nonzeros
-	base := [4]Real{0, Real(0.5), Real(0.5 * phi), Real(0.5 * inv)}
-	for _, p := range allPerms4Distinct(base) {
-		v := [4]Real{p[0], p[1], p[2], p[3]}
+	// 96: EVEN permutations of (φ/2, 1/2, 1/(2φ), 0) with ALL sign
+	// combinations of the nonzero coordinates (12 × 8 = 96).
+	// The previous code used all 24 permutations restricted to an even number
+	// of minus signs — a different set that is NOT the 600-cell snub family
+	// and produced a deformed polytope.
+	base := [4]Real{Real(0.5 * phi), Real(0.5), Real(0.5 * inv), 0}
+	for _, p := range evenPerms4() {
+		v := [4]Real{base[p[0]], base[p[1]], base[p[2]], base[p[3]]}
 		mask := [4]bool{v[0] != 0, v[1] != 0, v[2] != 0, v[3] != 0}
-		for _, vv := range signVariants(v, mask, true) {
+		for _, vv := range allSignVariants(v, mask) {
 			pushUnique(set, &out, vv)
 		}
 	}
@@ -126,141 +133,84 @@ func verts600Unit() []Vector4 {
 	return out
 }
 
+// allSignVariants returns every sign combination of the masked (nonzero) coordinates.
+func allSignVariants(vals [4]Real, maskNonZero [4]bool) [][4]Real {
+	return signVariants(vals, maskNonZero, false)
+}
+
+var (
+	v120Once  sync.Once
+	v120Cache []Vector4
+)
+
+// verts120Unit returns the 600 unit vertex directions of the regular
+// 120-cell that is the polar dual of conv(verts600Unit()).
+//
+// They are computed as the (normalized) centers of the 600 tetrahedral
+// facets of the 600-cell, i.e. of all 4-cliques of its edge graph. This
+// guarantees EXACT dual alignment with verts600Unit(): the polytope
+// {x : v·x <= r for all v in verts600Unit()} has its vertices precisely
+// along these directions (all with the same support scale), which is what
+// cellPoly relies on for its AABB.
+//
+// The previous hand-written coordinate table was not a regular 120-cell
+// (wrong vertex families and sign/permutation rules), so the 600-cell
+// built from it was irregular and both objects' AABBs missed geometry.
 func verts120Unit() []Vector4 {
-	phi := (1 + math.Sqrt(5)) / 2
-	inv := 1 / phi
-	rt5 := math.Sqrt(5)
-	rt8 := math.Sqrt(8)
+	v120Once.Do(func() {
+		vs := verts600Unit()
+		n := len(vs)
 
-	set := make(map[[4]int64]struct{}, 640)
-	out := make([]Vector4, 0, 600)
-
-	// 8 axes
-	for a := 0; a < 4; a++ {
-		for s := -1; s <= 1; s += 2 {
-			v := [4]Real{0, 0, 0, 0}
-			v[a] = Real(s)
-			pushUnique(set, &out, v)
-		}
-	}
-
-	// 16: (±1/2,±1/2,±1/2,±1/2)
-	for sx := -1; sx <= 1; sx += 2 {
-		for sy := -1; sy <= 1; sy += 2 {
-			for sz := -1; sz <= 1; sz += 2 {
-				for sw := -1; sw <= 1; sw += 2 {
-					pushUnique(set, &out, [4]Real{
-						0.5 * Real(sx), 0.5 * Real(sy), 0.5 * Real(sz), 0.5 * Real(sw),
-					})
+		// Edge length of the unit-circumradius 600-cell is 1/phi (~0.618).
+		minD := Real(1e300)
+		for i := 0; i < n; i++ {
+			for j := i + 1; j < n; j++ {
+				if d := vs[i].Sub(vs[j]).Len(); d > 1e-9 && d < minD {
+					minD = d
 				}
 			}
 		}
-	}
+		tol := minD * 1.0001
 
-	// 96: (0, ±(φ−1)/2, ±1/2, ±φ/2), even minus on the 3 nonzeros, all 24 perms
-	c3 := [3]Real{Real(inv * 0.5), 0.5, Real(phi * 0.5)}
-	for zero := 0; zero < 4; zero++ {
-		p3 := [][]int{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}}
-		for _, p := range p3 {
-			val := [4]Real{}
-			idx := 0
-			for k := 0; k < 4; k++ {
-				if k == zero {
-					val[k] = 0
-				} else {
-					val[k] = c3[p[idx]]
-					idx++
+		adj := make([][]bool, n)
+		nbr := make([][]int, n)
+		for i := range adj {
+			adj[i] = make([]bool, n)
+		}
+		for i := 0; i < n; i++ {
+			for j := i + 1; j < n; j++ {
+				if vs[i].Sub(vs[j]).Len() <= tol {
+					adj[i][j], adj[j][i] = true, true
+					nbr[i] = append(nbr[i], j)
+					nbr[j] = append(nbr[j], i)
 				}
 			}
-			mask := [4]bool{val[0] != 0, val[1] != 0, val[2] != 0, val[3] != 0}
-			for _, vv := range signVariants(val, mask, true) {
-				pushUnique(set, &out, vv)
-			}
 		}
-	}
 
-	// 32: ([±1, ±1, ±1, ±√5]) / √8, even minus
-	for pos := 0; pos < 4; pos++ {
-		val := [4]Real{Real(1 / rt8), Real(1 / rt8), Real(1 / rt8), Real(1 / rt8)}
-		val[pos] = Real(rt5 / rt8)
-		for _, vv := range signVariants(val, [4]bool{true, true, true, true}, true) {
-			pushUnique(set, &out, vv)
-		}
-	}
-
-	// 32: ([±(φ−1), ±(φ−1), ±(φ−1), ±φ^2]) / √8, even minus
-	for pos := 0; pos < 4; pos++ {
-		val := [4]Real{Real(inv / rt8), Real(inv / rt8), Real(inv / rt8), Real(inv / rt8)}
-		val[pos] = Real((phi * phi) / rt8)
-		for _, vv := range signVariants(val, [4]bool{true, true, true, true}, true) {
-			pushUnique(set, &out, vv)
-		}
-	}
-
-	// 32: ([±φ, ±φ, ±φ, ±(2−φ)]) / √8, even minus  ← missing family added
-	for pos := 0; pos < 4; pos++ {
-		val := [4]Real{Real(phi / rt8), Real(phi / rt8), Real(phi / rt8), Real(phi / rt8)}
-		val[pos] = Real((2 - phi) / rt8) // = 1/φ² / √8
-		for _, vv := range signVariants(val, [4]bool{true, true, true, true}, true) {
-			pushUnique(set, &out, vv)
-		}
-	}
-
-	// 96: ([0, ±(φ−1), ±φ, ±√5]) / √8, even minus on the 3 nonzeros
-	c3b := [3]Real{Real(inv / rt8), Real(phi / rt8), Real(rt5 / rt8)}
-	for zero := 0; zero < 4; zero++ {
-		p3 := [][]int{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}}
-		for _, p := range p3 {
-			val := [4]Real{}
-			idx := 0
-			for k := 0; k < 4; k++ {
-				if k == zero {
-					val[k] = 0
-				} else {
-					val[k] = c3b[p[idx]]
-					idx++
+		out := make([]Vector4, 0, 600)
+		for i := 0; i < n; i++ {
+			for _, j := range nbr[i] {
+				if j <= i {
+					continue
+				}
+				for _, k := range nbr[i] {
+					if k <= j || !adj[j][k] {
+						continue
+					}
+					for _, l := range nbr[i] {
+						if l <= k || !adj[j][l] || !adj[k][l] {
+							continue
+						}
+						c := vs[i].Add(vs[j]).Add(vs[k]).Add(vs[l])
+						out = append(out, c.Norm())
+					}
 				}
 			}
-			mask := [4]bool{val[0] != 0, val[1] != 0, val[2] != 0, val[3] != 0}
-			for _, vv := range signVariants(val, mask, true) {
-				pushUnique(set, &out, vv)
-			}
 		}
-	}
-
-	// 96: ([0, ±(φ−2), ±1, ±φ^2]) / √8, even minus on the 3 nonzeros
-	phim2 := phi - 2 // negative
-	c3c := [3]Real{Real(phim2 / rt8), Real(1 / rt8), Real((phi * phi) / rt8)}
-	for zero := 0; zero < 4; zero++ {
-		p3 := [][]int{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}}
-		for _, p := range p3 {
-			val := [4]Real{}
-			idx := 0
-			for k := 0; k < 4; k++ {
-				if k == zero {
-					val[k] = 0
-				} else {
-					val[k] = c3c[p[idx]]
-					idx++
-				}
-			}
-			mask := [4]bool{val[0] != 0, val[1] != 0, val[2] != 0, val[3] != 0}
-			for _, vv := range signVariants(val, mask, true) {
-				pushUnique(set, &out, vv)
-			}
+		if len(out) != 600 {
+			DebugLog("verts120Unit: expected 600 tetrahedral cells, got %d", len(out))
 		}
-	}
-
-	// 192: ([±(φ−1), ±1, ±φ, ±2]) / √8, even minus on all 4
-	base := [4]Real{Real(inv / rt8), Real(1 / rt8), Real(phi / rt8), Real(2 / rt8)}
-	for _, p := range allPerms4Distinct(base) {
-		for _, vv := range signVariants(p, [4]bool{true, true, true, true}, true) {
-			pushUnique(set, &out, vv)
-		}
-	}
-
-	if len(out) != 600 {
-		DebugLog("verts120Unit: expected 600, got %d", len(out))
-	}
-	return out
+		v120Cache = out
+	})
+	return v120Cache
 }
