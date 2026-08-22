@@ -1,11 +1,11 @@
 {
-  "sceneResX": 600,
-  "sceneResY": 450,
-  "sceneResZ": 240,
+  "sceneResX": 720,
+  "sceneResY": 540,
+  "sceneResZ": 300,
   "probeRays": 1048576,
   "spp": 256,
   "gifOut": "gifs/grandfinal.gif",
-  "gifDelay": 7,
+  "gifDelay": 10,
   "gamma": 0.85,
   "scene": {
     "center": {
