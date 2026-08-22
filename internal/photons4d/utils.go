@@ -3,6 +3,7 @@ package photons4d
 import (
 	crand "crypto/rand"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"sync/atomic"
 	"time"
@@ -83,4 +84,10 @@ func splitEventWeights(refl, refr, diff, F, pAbs Real) (Real, Real, Real) {
 		pDiff = 0
 	}
 	return pRefl, pRefr, pDiff
+}
+
+// logf prints one log line prefixed with a UTC timestamp. All human-readable
+// run logs (server, client, progress, output stages) go through it.
+func logf(format string, a ...any) {
+	fmt.Printf("%s "+format, append([]any{time.Now().UTC().Format("2006-01-02 15:04:05")}, a...)...)
 }

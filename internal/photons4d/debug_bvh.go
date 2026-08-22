@@ -21,7 +21,7 @@ func DumpAABBBVH(scene *Scene, build bool) bool {
 	}
 	memo := make(map[*AABBNode]bvhCounts, 1024)
 	totals := bvhCount(root, memo)
-	fmt.Printf("[BVH] root: nodes=%d leaves=%d objs=%d\n", totals.nodes, totals.leaves, totals.objs)
+	logf("[BVH] root: nodes=%d leaves=%d objs=%d\n", totals.nodes, totals.leaves, totals.objs)
 	bvhPrint(root, 0, memo)
 	return true
 }
@@ -62,14 +62,14 @@ func bvhPrint(n *AABBNode, depth int, memo map[*AABBNode]bvhCounts) {
 	ind := strings.Repeat("\t", depth)
 	c := memo[n]
 	if n.leafObjs != nil {
-		fmt.Printf("%sLEAF  objs=%d | min=(%.5g,%.5g,%.5g,%.5g) max=(%.5g,%.5g,%.5g,%.5g)\n",
+		logf("%sLEAF  objs=%d | min=(%.5g,%.5g,%.5g,%.5g) max=(%.5g,%.5g,%.5g,%.5g)\n",
 			ind, len(n.leafObjs),
 			n.min.X, n.min.Y, n.min.Z, n.min.W,
 			n.max.X, n.max.Y, n.max.Z, n.max.W,
 		)
 		return
 	}
-	fmt.Printf("%sNODE  nodes=%d leaves=%d objs=%d | min=(%.5g,%.5g,%.5g,%.5g) max=(%.5g,%.5g,%.5g,%.5g)\n",
+	logf("%sNODE  nodes=%d leaves=%d objs=%d | min=(%.5g,%.5g,%.5g,%.5g) max=(%.5g,%.5g,%.5g,%.5g)\n",
 		ind, c.nodes, c.leaves, c.objs,
 		n.min.X, n.min.Y, n.min.Z, n.min.W,
 		n.max.X, n.max.Y, n.max.Z, n.max.W,

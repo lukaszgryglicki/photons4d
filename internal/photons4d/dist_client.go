@@ -65,7 +65,7 @@ func RunClient(cfgPath, serverAddr string, opts ClientOpts) error {
 		if i >= attempts {
 			return fmt.Errorf("client: cannot reach server %s after %d attempts: %w", serverAddr, attempts, err)
 		}
-		fmt.Printf("[CLIENT] server %s not reachable (attempt %d/%d): %v — retrying in 2s\n", serverAddr, i, attempts, err)
+		logf("[CLIENT] server %s not reachable (attempt %d/%d): %v — retrying in 2s\n", serverAddr, i, attempts, err)
 		time.Sleep(2 * time.Second)
 	}
 	w := newWire(conn)
@@ -97,7 +97,7 @@ func RunClient(cfgPath, serverAddr string, opts ClientOpts) error {
 			codecName = fmt.Sprintf("flate-%d", opts.Level)
 		}
 	}
-	fmt.Printf("[CLIENT] connected to %s as client #%d | scene sha256 %s | compress=%s batch=%d\n", serverAddr, ack.ClientID, hash, codecName, opts.BatchEntries)
+	logf("[CLIENT] connected to %s as client #%d | scene sha256 %s | compress=%s batch=%d\n", serverAddr, ack.ClientID, hash, codecName, opts.BatchEntries)
 
 	rounds := 0
 	raysCast := int64(0)
@@ -111,7 +111,7 @@ func RunClient(cfgPath, serverAddr string, opts ClientOpts) error {
 			return fmt.Errorf("client: work assignment: %w", err)
 		}
 		if assign.Done {
-			fmt.Printf("[CLIENT] all work done: %d rounds, %d rays in %s\n", rounds, raysCast, time.Since(start).Truncate(time.Millisecond))
+			logf("[CLIENT] all work done: %d rounds, %d rays in %s\n", rounds, raysCast, time.Since(start).Truncate(time.Millisecond))
 			return nil
 		}
 		if len(assign.RaysPerLight) != len(lights) {
@@ -123,7 +123,7 @@ func RunClient(cfgPath, serverAddr string, opts ClientOpts) error {
 			roundRays += n
 		}
 		if roundRays > 0 {
-			fmt.Printf("[CLIENT] round %d: casting %d rays %v\n", assign.RoundID, roundRays, assign.RaysPerLight)
+			logf("[CLIENT] round %d: casting %d rays %v\n", assign.RoundID, roundRays, assign.RaysPerLight)
 			castRays(lights, scene, assign.RaysPerLight)
 			rounds++
 			raysCast += int64(roundRays)
@@ -144,7 +144,7 @@ func RunClient(cfgPath, serverAddr string, opts ClientOpts) error {
 			if uack.RaysTotal > 0 {
 				pct = 100.0 * float64(uack.RaysDone) / float64(uack.RaysTotal)
 			}
-			fmt.Printf("[CLIENT] round %d merged | cluster progress %d/%d rays (%.2f%%)\n", assign.RoundID, uack.RaysDone, uack.RaysTotal, pct)
+			logf("[CLIENT] round %d merged | cluster progress %d/%d rays (%.2f%%)\n", assign.RoundID, uack.RaysDone, uack.RaysTotal, pct)
 		} else {
 			// Wait round: no work available right now, stand by.
 			time.Sleep(2 * time.Second)

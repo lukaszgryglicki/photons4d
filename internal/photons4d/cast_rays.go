@@ -256,7 +256,7 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 		workers = 1
 	}
 	numCPU := runtime.NumCPU()
-	fmt.Printf("[WORKERS] NumCPU=%d | GOMAXPROCS=%d | using=%d\n", numCPU, gomaxprocs, workers)
+	logf("[WORKERS] NumCPU=%d | GOMAXPROCS=%d | using=%d\n", numCPU, gomaxprocs, workers)
 
 	// Distribute each light's rays across workers (evenly, with remainder spread).
 	per := make([][]int, len(lights)) // [light][worker] -> count
@@ -281,7 +281,7 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 	if totalRays > 1 {
 		width = int(math.Log10(Real(totalRays-1))) + 1
 	}
-	fmt.Printf("[PROGRESS] %5.2f%% | rays=%*d/%*d | avg depth=0.00 | ETA=—\n", 0.0, width, 0, width, totalRays)
+	logf("[PROGRESS] %5.2f%% | rays=%*d/%*d | avg depth=0.00 | ETA=—\n", 0.0, width, 0, width, totalRays)
 
 	// progress monitor (tick every 1s)
 	done := make(chan struct{})
@@ -312,7 +312,7 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 					if fired > 0 {
 						avgDepth = float64(atomic.LoadInt64(&depthSum)) / float64(fired)
 					}
-					fmt.Printf("[PROGRESS] 100.00%% | rays=%*d/%*d | rate=%.0f/s | avg depth=%.2f | elapsed=%s\n",
+					logf("[PROGRESS] 100.00%% | rays=%*d/%*d | rate=%.0f/s | avg depth=%.2f | elapsed=%s\n",
 						width, fired, width, totalRays, rate, avgDepth, elapsed.Truncate(time.Millisecond))
 					return
 				}
@@ -360,7 +360,7 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 				if fired > 0 {
 					avgDepth = float64(atomic.LoadInt64(&depthSum)) / float64(fired)
 				}
-				fmt.Printf("[PROGRESS] %5.2f%% | rays=%*d/%*d | rate=%.0f/s | avg depth=%.2f | elapsed=%s\n",
+				logf("[PROGRESS] %5.2f%% | rays=%*d/%*d | rate=%.0f/s | avg depth=%.2f | elapsed=%s\n",
 					pct, width, fired, width, totalRays, rate, avgDepth, elapsed.Truncate(time.Millisecond))
 				return
 			}

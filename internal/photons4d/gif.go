@@ -1,7 +1,6 @@
 package photons4d
 
 import (
-	"fmt"
 	"image"
 	"image/color/palette"
 	"image/draw"
@@ -47,7 +46,7 @@ func SaveAnimatedGIF(scene *Scene, path string, delay int, gamma Real) error {
 		// (relies on max(int,int) from your debug helpers)
 		if k%imax(1, Nz/100) == 0 { // ~1% steps
 			percent := Real(k+1) * 100 / Real(Nz)
-			fmt.Printf("[GIF] %.2f%%\n", percent)
+			logf("[GIF] %.2f%%\n", percent)
 		}
 		// 1) find max over this slice
 		sliceMax := 0.0

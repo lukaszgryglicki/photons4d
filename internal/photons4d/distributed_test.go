@@ -234,7 +234,7 @@ func TestDistributedEndToEnd(t *testing.T) {
 
 	serverErr := make(chan error, 1)
 	go func() {
-		serverErr <- runServerOnListener(scenePath, ln, 8, 0.05)
+		serverErr <- runServerOnListener(scenePath, ln, 8, 0.05, 1)
 	}()
 
 	var wg sync.WaitGroup

@@ -55,7 +55,7 @@ func SavePNGSequence16(scene *Scene, prefix string, gamma Real) error {
 	for k := 0; k < Nz; k++ {
 		if k%step == 0 {
 			percent := Real(k+1) * 100 / Real(Nz)
-			fmt.Printf("[PNG]  %.2f%%\n", percent)
+			logf("[PNG]  %.2f%%\n", percent)
 		}
 
 		// 1) Find max over this slice (peak across RGB channels).

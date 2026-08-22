@@ -1,7 +1,6 @@
 package photons4d
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -46,6 +45,6 @@ func raysStats() {
 		return
 	}
 	for k, n := range cache.rays {
-		fmt.Printf("Ray type %s: %d logs (%f%%)\n", k, n, Real(n)/Real(allRays)*100)
+		logf("Ray type %s: %d logs (%f%%)\n", k, n, Real(n)/Real(allRays)*100)
 	}
 }

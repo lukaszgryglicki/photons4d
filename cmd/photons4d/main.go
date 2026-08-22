@@ -70,6 +70,7 @@ func main() {
 	connect := flag.String("connect", envOr("CONNECT", ""), "client mode: server address host:port")
 	chunks := flag.Int("chunks", 64, "server mode: number of work chunks each light's ray budget is split into (or CHUNKS env)")
 	round := flag.Float64("round", 0, "server mode: optional adaptive round sizing — target seconds per client round; 0 (default) = classic fixed -chunks distribution (or ROUND env)")
+	stats := flag.Float64("stats", 300, "server mode: progress/per-client stats print interval in seconds (or STATS env)")
 	compress := flag.Bool("compress", envOr("COMPRESS", "") != "", "client mode: losslessly compress voxel updates (bit-exact, saves network traffic; or COMPRESS env)")
 	calgo := flag.String("calgo", envOr("CALGO", "zstd"), "client mode: compression algorithm when -compress is set: zstd (default) or flate (or CALGO env)")
 	clevel := flag.Int("clevel", 6, "client mode: compression level 1..9, higher = smaller wire size, more CPU (or CLEVEL env)")
@@ -99,6 +100,12 @@ func main() {
 			*clevel = l
 		}
 	}
+	if v := os.Getenv("STATS"); v != "" {
+		var s float64
+		if _, err := fmt.Sscanf(v, "%f", &s); err == nil && s > 0 {
+			*stats = s
+		}
+	}
 
 	cfg := "scenes/config.json"
 	if flag.NArg() > 0 {
@@ -110,7 +117,7 @@ func main() {
 	case "local":
 		err = photons4d.Run(cfg)
 	case "server":
-		err = photons4d.RunServer(cfg, *listen, *chunks, *round)
+		err = photons4d.RunServer(cfg, *listen, *chunks, *round, *stats)
 	case "client":
 		if *connect == "" {
 			err = fmt.Errorf("client mode requires -connect host:port (or CONNECT env)")

@@ -8,6 +8,49 @@ import (
 	"time"
 )
 
+// statsLoop periodically prints cluster progress and every client's
+// contribution until casting completes. Runs on the server only.
+func (s *distServer) statsLoop(every time.Duration) {
+	tick := time.NewTicker(every)
+	defer tick.Stop()
+	last := time.Now()
+	var lastDone int64
+	for {
+		select {
+		case <-s.doneCh:
+			return
+		case now := <-tick.C:
+			type row struct {
+				id           int
+				host         string
+				rounds, rays int64
+			}
+			s.mu.Lock()
+			done, total := s.raysDone, s.raysTotal
+			connected := s.clients
+			outst := len(s.outstanding)
+			rows := make([]row, 0, len(s.perClient))
+			for id, st := range s.perClient {
+				rows = append(rows, row{id, st.host, st.rounds, st.rays})
+			}
+			s.mu.Unlock()
+			sort.Slice(rows, func(i, j int) bool { return rows[i].id < rows[j].id })
+			rate := float64(done-lastDone) / now.Sub(last).Seconds()
+			eta := "n/a"
+			if rate > 0 && done < total {
+				eta = time.Duration(float64(total-done) / rate * float64(time.Second)).Round(time.Second).String()
+			}
+			logf("[STATS] merged %.2f%% (%d/%d rays) | window rate %.2fM rays/s | ETA %s | clients connected %d | outstanding rounds %d\n",
+				100*float64(done)/float64(total), done, total, rate/1e6, eta, connected, outst)
+			for _, r := range rows {
+				logf("[STATS]   client #%d (%s): %d rounds, %d rays (%.2f%% of total)\n",
+					r.id, r.host, r.rounds, r.rays, 100*float64(r.rays)/float64(total))
+			}
+			last, lastDone = now, done
+		}
+	}
+}
+
 // clientStat tracks one admitted client's contribution (for the final
 // summary and the adaptive round sizing).
 type clientStat struct {
@@ -48,12 +91,13 @@ type distServer struct {
 // the unchanged single-node output pipeline (GIF/PNG/RAW).
 // roundSec > 0 sizes rounds adaptively so each client's round takes about
 // that long (measured per client); roundSec <= 0 uses fixed max-size chunks.
-func RunServer(cfgPath, listenAddr string, chunks int, roundSec float64) error {
+// statsSec sets the progress-report interval (<= 0 → 300s default).
+func RunServer(cfgPath, listenAddr string, chunks int, roundSec, statsSec float64) error {
 	ln, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return fmt.Errorf("server listen %s: %w", listenAddr, err)
 	}
-	return runServerOnListener(cfgPath, ln, chunks, roundSec)
+	return runServerOnListener(cfgPath, ln, chunks, roundSec, statsSec)
 }
 
 // newDistServer wires up server state for a prepared scene. chunks controls
@@ -88,7 +132,7 @@ func newDistServer(cfg *Config, scene *Scene, hash string, needRays []int, chunk
 	return srv
 }
 
-func runServerOnListener(cfgPath string, ln net.Listener, chunks int, roundSec float64) error {
+func runServerOnListener(cfgPath string, ln net.Listener, chunks int, roundSec, statsSec float64) error {
 	defer ln.Close()
 
 	cfg, err := prepareConfig(cfgPath)
@@ -107,9 +151,14 @@ func runServerOnListener(cfgPath string, ln net.Listener, chunks int, roundSec f
 
 	srv := newDistServer(cfg, scene, hash, needRays, chunks, roundSec)
 
-	fmt.Printf("[SERVER] listening on %s | scene %s | sha256 %s\n", ln.Addr(), cfgPath, hash)
-	fmt.Printf("[SERVER] total rays needed: %d (per light: %v), max chunk per light: %v, round target: %.0fs\n",
+	logf("[SERVER] listening on %s | scene %s | sha256 %s\n", ln.Addr(), cfgPath, hash)
+	logf("[SERVER] total rays needed: %d (per light: %v), max chunk per light: %v, round target: %.0fs\n",
 		srv.raysTotal, needRays, srv.chunk, roundSec)
+
+	if statsSec <= 0 {
+		statsSec = 300
+	}
+	go srv.statsLoop(time.Duration(statsSec * float64(time.Second)))
 
 	var wg sync.WaitGroup
 	acceptDone := make(chan struct{})
@@ -132,9 +181,9 @@ func runServerOnListener(cfgPath string, ln net.Listener, chunks int, roundSec f
 	srv.mu.Lock()
 	raysDone, entriesIn, packedIn, unpackedIn := srv.raysDone, srv.entriesIn, srv.packedIn, srv.unpackedIn
 	srv.mu.Unlock()
-	fmt.Printf("[SERVER] all %d rays merged (%d sparse entries received), finalizing\n", raysDone, entriesIn)
+	logf("[SERVER] all %d rays merged (%d sparse entries received), finalizing\n", raysDone, entriesIn)
 	if packedIn > 0 {
-		fmt.Printf("[SERVER] compressed updates: %d bytes on the wire for %d raw bytes (%.2fx saved)\n",
+		logf("[SERVER] compressed updates: %d bytes on the wire for %d raw bytes (%.2fx saved)\n",
 			packedIn, unpackedIn, float64(unpackedIn)/float64(packedIn))
 	}
 	srv.mu.Lock()
@@ -145,7 +194,7 @@ func runServerOnListener(cfgPath string, ln net.Listener, chunks int, roundSec f
 	sort.Ints(ids)
 	for _, id := range ids {
 		st := srv.perClient[id]
-		fmt.Printf("[SERVER] client #%d (%s): %d rounds, %d rays (%.2f%% of total)\n",
+		logf("[SERVER] client #%d (%s): %d rounds, %d rays (%.2f%% of total)\n",
 			id, st.host, st.rounds, st.rays, 100.0*float64(st.rays)/float64(srv.raysTotal))
 	}
 	srv.mu.Unlock()
@@ -161,7 +210,7 @@ func runServerOnListener(cfgPath string, ln net.Listener, chunks int, roundSec f
 	select {
 	case <-graceDone:
 	case <-time.After(30 * time.Second):
-		fmt.Printf("[SERVER] grace period expired, proceeding with output\n")
+		logf("[SERVER] grace period expired, proceeding with output\n")
 	}
 	<-acceptDone
 
@@ -266,7 +315,7 @@ func (s *distServer) returnWork(rounds map[int]bool) {
 		for i, n := range rays {
 			s.remaining[i] += n
 		}
-		fmt.Printf("[SERVER] round %d returned to pool (client lost): %v rays\n", id, rays)
+		logf("[SERVER] round %d returned to pool (client lost): %v rays\n", id, rays)
 	}
 }
 
@@ -298,7 +347,7 @@ func (s *distServer) completeRound(clientID, roundID int, batches []UpdateMsg) e
 	}
 
 	pct := 100.0 * float64(s.raysDone) / float64(s.raysTotal)
-	fmt.Printf("[SERVER] round %d merged | rays %d/%d (%.2f%%) | outstanding rounds %d\n",
+	logf("[SERVER] round %d merged | rays %d/%d (%.2f%%) | outstanding rounds %d\n",
 		roundID, s.raysDone, s.raysTotal, pct, len(s.outstanding))
 
 	if s.raysDone >= s.raysTotal && len(s.outstanding) == 0 {
@@ -329,7 +378,7 @@ func (s *distServer) handleConn(conn net.Conn) {
 
 	var hello HelloMsg
 	if err := w.recv(&hello); err != nil {
-		fmt.Printf("[SERVER] %s handshake read failed: %v\n", conn.RemoteAddr(), err)
+		logf("[SERVER] %s handshake read failed: %v\n", conn.RemoteAddr(), err)
 		return
 	}
 	if hello.Version != DistProtocolVersion {
@@ -337,7 +386,7 @@ func (s *distServer) handleConn(conn net.Conn) {
 		return
 	}
 	if hello.SceneHash != s.sceneHash {
-		fmt.Printf("[SERVER] rejecting %s (%s): scene hash mismatch (server=%s client=%s)\n", conn.RemoteAddr(), hello.Host, s.sceneHash, hello.SceneHash)
+		logf("[SERVER] rejecting %s (%s): scene hash mismatch (server=%s client=%s)\n", conn.RemoteAddr(), hello.Host, s.sceneHash, hello.SceneHash)
 		_ = w.send(HelloAck{OK: false, Reason: fmt.Sprintf("scene SHA256 mismatch: server=%s client=%s — make sure both run the identical scene file, binary version and env (DEBUG/FORCE_ESCAPE/SPP_ADJUST)", s.sceneHash, hello.SceneHash)})
 		return
 	}
@@ -359,13 +408,13 @@ func (s *distServer) handleConn(conn net.Conn) {
 	if err := w.send(HelloAck{OK: true, ClientID: clientID}); err != nil {
 		return
 	}
-	fmt.Printf("[SERVER] client #%d connected from %s (%s, %d workers)\n", clientID, conn.RemoteAddr(), hello.Host, hello.Workers)
+	logf("[SERVER] client #%d connected from %s (%s, %d workers)\n", clientID, conn.RemoteAddr(), hello.Host, hello.Workers)
 
 	rate := 0.0 // EWMA rays/s for this client, 0 = not measured yet
 	for {
 		var req WorkRequest
 		if err := w.recv(&req); err != nil {
-			fmt.Printf("[SERVER] client #%d disconnected: %v\n", clientID, err)
+			logf("[SERVER] client #%d disconnected: %v\n", clientID, err)
 			return
 		}
 		want := 0
@@ -382,7 +431,7 @@ func (s *distServer) handleConn(conn net.Conn) {
 			return
 		}
 		if assign.Done {
-			fmt.Printf("[SERVER] client #%d released (all work done)\n", clientID)
+			logf("[SERVER] client #%d released (all work done)\n", clientID)
 			return
 		}
 		if assign.RoundID != 0 {
@@ -402,7 +451,7 @@ func (s *distServer) handleConn(conn net.Conn) {
 		for {
 			var upd UpdateMsg
 			if err := w.recv(&upd); err != nil {
-				fmt.Printf("[SERVER] client #%d died mid-round %d: %v\n", clientID, assign.RoundID, err)
+				logf("[SERVER] client #%d died mid-round %d: %v\n", clientID, assign.RoundID, err)
 				return
 			}
 			if upd.RoundID != assign.RoundID {
@@ -411,7 +460,7 @@ func (s *distServer) handleConn(conn net.Conn) {
 			}
 			wl, rl, err := decodeUpdate(&upd)
 			if err != nil {
-				fmt.Printf("[SERVER] client #%d round %d undecodable: %v\n", clientID, assign.RoundID, err)
+				logf("[SERVER] client #%d round %d undecodable: %v\n", clientID, assign.RoundID, err)
 				_ = w.send(UpdateAck{OK: false, Reason: err.Error()})
 				return
 			}
@@ -445,7 +494,7 @@ func (s *distServer) handleConn(conn net.Conn) {
 				s.mu.Unlock()
 			}
 			if err := s.completeRound(clientID, assign.RoundID, batches); err != nil {
-				fmt.Printf("[SERVER] client #%d round %d rejected: %v\n", clientID, assign.RoundID, err)
+				logf("[SERVER] client #%d round %d rejected: %v\n", clientID, assign.RoundID, err)
 				_ = w.send(UpdateAck{OK: false, Reason: err.Error()})
 				return
 			}
