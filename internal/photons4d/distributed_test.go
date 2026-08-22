@@ -58,9 +58,9 @@ func TestSparseRoundTripExact(t *testing.T) {
 }
 
 // TestSparseBatchingWire verifies the multi-batch re-anchoring logic through
-// a real gob wire (tiny batch size to force many batches), for both codecs.
+// a real gob wire (tiny batch size to force many batches), for all codecs.
 func TestSparseBatchingWire(t *testing.T) {
-	for _, compress := range []bool{false, true} {
+	for _, codec := range []uint8{CodecRaw, CodecFlate, CodecZstd} {
 		rng := rand.New(rand.NewSource(1717))
 		src := make([]Real, 5000)
 		for i := range src {
@@ -75,27 +75,27 @@ func TestSparseBatchingWire(t *testing.T) {
 
 		errCh := make(chan error, 1)
 		go func() {
-			errCh <- sendSparseUpdateSized(sender, 1, 7, src, 3, compress)
+			errCh <- sendSparseUpdateSized(sender, 1, 7, src, 3, codec, 6)
 		}()
 
 		dst := make([]Real, len(orig))
 		for {
 			var upd UpdateMsg
 			if err := receiver.recv(&upd); err != nil {
-				t.Fatalf("compress=%v recv: %v", compress, err)
+				t.Fatalf("codec=%d recv: %v", codec, err)
 			}
 			if upd.RoundID != 7 {
-				t.Fatalf("compress=%v wrong round: %d", compress, upd.RoundID)
+				t.Fatalf("codec=%d wrong round: %d", codec, upd.RoundID)
 			}
-			if compress && upd.Codec != CodecFlate {
-				t.Fatalf("expected packed message, got codec %d", upd.Codec)
+			if upd.Codec != codec {
+				t.Fatalf("expected codec %d on the wire, got %d", codec, upd.Codec)
 			}
 			if _, _, err := decodeUpdate(&upd); err != nil {
-				t.Fatalf("compress=%v decode: %v", compress, err)
+				t.Fatalf("codec=%d decode: %v", codec, err)
 			}
 			if len(upd.IdxDeltas) > 0 {
 				if err := applySparse(dst, upd.IdxDeltas, upd.Values); err != nil {
-					t.Fatalf("compress=%v applySparse: %v", compress, err)
+					t.Fatalf("codec=%d applySparse: %v", codec, err)
 				}
 			}
 			if !upd.More {
@@ -103,11 +103,11 @@ func TestSparseBatchingWire(t *testing.T) {
 			}
 		}
 		if err := <-errCh; err != nil {
-			t.Fatalf("compress=%v send: %v", compress, err)
+			t.Fatalf("codec=%d send: %v", codec, err)
 		}
 		for i := range orig {
 			if dst[i] != orig[i] {
-				t.Fatalf("compress=%v mismatch at %d: got %v want %v", compress, i, dst[i], orig[i])
+				t.Fatalf("codec=%d mismatch at %d: got %v want %v", codec, i, dst[i], orig[i])
 			}
 		}
 		sender.Close()
@@ -138,37 +138,45 @@ func TestPackSparseRoundTrip(t *testing.T) {
 		}
 		cases = append(cases, [2][]float64{deltas, values})
 	}
+	codecCombos := []struct {
+		codec uint8
+		level int
+	}{{CodecFlate, 1}, {CodecFlate, 9}, {CodecZstd, 1}, {CodecZstd, 6}, {CodecZstd, 9}}
 	for ci, cse := range cases {
 		idx := make([]int64, len(cse[0]))
 		for i, d := range cse[0] {
 			idx[i] = int64(d)
 		}
-		packed, err := packSparse(idx, cse[1])
-		if err != nil {
-			t.Fatalf("case %d: pack: %v", ci, err)
-		}
-		gotIdx, gotVal, rawLen, err := unpackSparse(packed)
-		if err != nil {
-			t.Fatalf("case %d: unpack: %v", ci, err)
-		}
-		if len(gotIdx) != len(idx) || len(gotVal) != len(cse[1]) {
-			t.Fatalf("case %d: length mismatch", ci)
-		}
-		if len(idx) > 0 && rawLen <= 0 {
-			t.Fatalf("case %d: bad rawLen %d", ci, rawLen)
-		}
-		for i := range idx {
-			if gotIdx[i] != idx[i] {
-				t.Fatalf("case %d: idx[%d] = %d want %d", ci, i, gotIdx[i], idx[i])
+		for _, cc := range codecCombos {
+			packed, err := packSparse(idx, cse[1], cc.codec, cc.level)
+			if err != nil {
+				t.Fatalf("case %d codec %d level %d: pack: %v", ci, cc.codec, cc.level, err)
 			}
-			if math.Float64bits(gotVal[i]) != math.Float64bits(cse[1][i]) {
-				t.Fatalf("case %d: val[%d] = %x want %x", ci, i, math.Float64bits(gotVal[i]), math.Float64bits(cse[1][i]))
+			gotIdx, gotVal, rawLen, err := unpackSparse(packed, cc.codec)
+			if err != nil {
+				t.Fatalf("case %d codec %d level %d: unpack: %v", ci, cc.codec, cc.level, err)
+			}
+			if len(gotIdx) != len(idx) || len(gotVal) != len(cse[1]) {
+				t.Fatalf("case %d codec %d: length mismatch", ci, cc.codec)
+			}
+			if len(idx) > 0 && rawLen <= 0 {
+				t.Fatalf("case %d codec %d: bad rawLen %d", ci, cc.codec, rawLen)
+			}
+			for i := range idx {
+				if gotIdx[i] != idx[i] {
+					t.Fatalf("case %d codec %d: idx[%d] = %d want %d", ci, cc.codec, i, gotIdx[i], idx[i])
+				}
+				if math.Float64bits(gotVal[i]) != math.Float64bits(cse[1][i]) {
+					t.Fatalf("case %d codec %d: val[%d] = %x want %x", ci, cc.codec, i, math.Float64bits(gotVal[i]), math.Float64bits(cse[1][i]))
+				}
 			}
 		}
 	}
 	// Corrupt streams must error out, never panic or corrupt.
-	if _, _, _, err := unpackSparse([]byte{0x42, 0x13, 0x37}); err == nil {
-		t.Fatal("garbage packed stream not rejected")
+	for _, codec := range []uint8{CodecFlate, CodecZstd} {
+		if _, _, _, err := unpackSparse([]byte{0x42, 0x13, 0x37}, codec); err == nil {
+			t.Fatalf("garbage packed stream not rejected (codec %d)", codec)
+		}
 	}
 }
 

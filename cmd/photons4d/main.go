@@ -70,7 +70,9 @@ func main() {
 	connect := flag.String("connect", envOr("CONNECT", ""), "client mode: server address host:port")
 	chunks := flag.Int("chunks", 64, "server mode: number of work chunks each light's ray budget is split into (or CHUNKS env)")
 	round := flag.Float64("round", 0, "server mode: optional adaptive round sizing — target seconds per client round; 0 (default) = classic fixed -chunks distribution (or ROUND env)")
-	compress := flag.Bool("compress", envOr("COMPRESS", "") != "", "client mode: DEFLATE-compress voxel updates (bit-exact, saves network traffic; or COMPRESS env)")
+	compress := flag.Bool("compress", envOr("COMPRESS", "") != "", "client mode: losslessly compress voxel updates (bit-exact, saves network traffic; or COMPRESS env)")
+	calgo := flag.String("calgo", envOr("CALGO", "zstd"), "client mode: compression algorithm when -compress is set: zstd (default) or flate (or CALGO env)")
+	clevel := flag.Int("clevel", 6, "client mode: compression level 1..9, higher = smaller wire size, more CPU (or CLEVEL env)")
 	batch := flag.Int("batch", 0, "client mode: max sparse entries per update message, 0 = default 4194304 ≈ 64 MB raw (or BATCH env)")
 	flag.Parse()
 	if v := os.Getenv("CHUNKS"); v != "" {
@@ -91,6 +93,12 @@ func main() {
 			*batch = b
 		}
 	}
+	if v := os.Getenv("CLEVEL"); v != "" {
+		var l int
+		if _, err := fmt.Sscanf(v, "%d", &l); err == nil && l >= 1 && l <= 9 {
+			*clevel = l
+		}
+	}
 
 	cfg := "scenes/config.json"
 	if flag.NArg() > 0 {
@@ -107,7 +115,16 @@ func main() {
 		if *connect == "" {
 			err = fmt.Errorf("client mode requires -connect host:port (or CONNECT env)")
 		} else {
-			err = photons4d.RunClient(cfg, *connect, photons4d.ClientOpts{Compress: *compress, BatchEntries: *batch})
+			var codec uint8 = photons4d.CodecZstd
+			switch *calgo {
+			case "zstd":
+			case "flate", "deflate":
+				codec = photons4d.CodecFlate
+			default:
+				fmt.Printf("Error: unknown -calgo %q (want zstd or flate)\n", *calgo)
+				os.Exit(1)
+			}
+			err = photons4d.RunClient(cfg, *connect, photons4d.ClientOpts{Compress: *compress, Codec: codec, Level: *clevel, BatchEntries: *batch})
 		}
 	default:
 		err = fmt.Errorf("unknown mode %q (want local, server or client)", *mode)

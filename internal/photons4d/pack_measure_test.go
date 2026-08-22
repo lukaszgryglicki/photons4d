@@ -1,6 +1,7 @@
 package photons4d
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,25 +27,42 @@ func TestMeasurePackRatio(t *testing.T) {
 	idx, vals := extractSparseAndZero(scene.Buf)
 	n := len(vals)
 	t.Logf("entries: %d (buffer %d, %.1f%% dense)", n, len(scene.Buf), 100*float64(n)/float64(len(scene.Buf)))
-	t0 := time.Now()
-	packed, err := packSparse(idx, vals)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tPack := time.Since(t0)
 	rawLen := 0
-	{
-		_, _, rl, err := unpackSparse(packed)
+	type combo struct {
+		name  string
+		codec uint8
+		level int
+	}
+	for _, cc := range []combo{
+		{"flate-1", CodecFlate, 1}, {"flate-6", CodecFlate, 6}, {"flate-9", CodecFlate, 9},
+		{"zstd-1", CodecZstd, 1}, {"zstd-3", CodecZstd, 3}, {"zstd-6", CodecZstd, 6}, {"zstd-9", CodecZstd, 9},
+	} {
+		t0 := time.Now()
+		packed, err := packSparse(idx, vals, cc.codec, cc.level)
 		if err != nil {
 			t.Fatal(err)
 		}
+		tPack := time.Since(t0)
+		gi, gv, rl, err := unpackSparse(packed, cc.codec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range idx {
+			if gi[i] != idx[i] || math.Float64bits(gv[i]) != math.Float64bits(vals[i]) {
+				t.Fatalf("%s: lossless round-trip violated at %d", cc.name, i)
+			}
+		}
 		rawLen = rl
+		t1 := time.Now()
+		for i := 0; i < 3; i++ {
+			_, _, _, _ = unpackSparse(packed, cc.codec)
+		}
+		tUnpack := time.Since(t1) / 3
+		t.Logf("%-8s packed: %9d B (%.2f B/entry) ratio %.2fx | pack %8s (%4.0f MB/s) unpack %8s (%4.0f MB/s)",
+			cc.name, len(packed), float64(len(packed))/float64(n), float64(rawLen)/float64(len(packed)),
+			tPack.Round(time.Millisecond), float64(rawLen)/tPack.Seconds()/1e6,
+			tUnpack.Round(time.Millisecond), float64(rawLen)/tUnpack.Seconds()/1e6)
 	}
-	t1 := time.Now()
-	for i := 0; i < 3; i++ {
-		_, _, _, _ = unpackSparse(packed)
-	}
-	tUnpack := time.Since(t1) / 3
 	gobEst := 0
 	for _, d := range idx {
 		z := uint64(d)
@@ -57,6 +75,4 @@ func TestMeasurePackRatio(t *testing.T) {
 	}
 	gobEst += 9 * n
 	t.Logf("raw payload: %d B (%.1f B/entry) | gob-estimate: %d B (%.1f B/entry)", rawLen, float64(rawLen)/float64(n), gobEst, float64(gobEst)/float64(n))
-	t.Logf("packed: %d B (%.2f B/entry) | ratio vs raw %.2fx, vs gob %.2fx", len(packed), float64(len(packed))/float64(n), float64(rawLen)/float64(len(packed)), float64(gobEst)/float64(len(packed)))
-	t.Logf("pack: %s (%.0f MB/s) | unpack: %s (%.0f MB/s)", tPack, float64(rawLen)/tPack.Seconds()/1e6, tUnpack, float64(rawLen)/tUnpack.Seconds()/1e6)
 }

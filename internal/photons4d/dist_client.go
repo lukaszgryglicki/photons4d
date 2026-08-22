@@ -10,9 +10,15 @@ import (
 
 // ClientOpts tunes the distributed worker's upload behavior.
 type ClientOpts struct {
-	// Compress enables DEFLATE compression of voxel updates (CodecFlate).
-	// Bit-exact; trades a little CPU for a large network-traffic cut.
+	// Compress enables lossless compression of voxel updates. Bit-exact;
+	// trades a little CPU for a large network-traffic cut.
 	Compress bool
+	// Codec selects the compression algorithm when Compress is set:
+	// CodecZstd (default, best ratio) or CodecFlate. Ignored otherwise.
+	Codec uint8
+	// Level is the 1..9 compression level (0 → default 6). Higher = better
+	// ratio, more client CPU. Both codecs honor it.
+	Level int
 	// BatchEntries caps sparse entries per UpdateMsg (<=0: default 4M ≈ 64 MB
 	// raw). Bigger batches mean fewer messages and better compression at the
 	// cost of per-message memory on both sides.
@@ -28,6 +34,10 @@ func RunClient(cfgPath, serverAddr string, opts ClientOpts) error {
 	if opts.BatchEntries <= 0 {
 		opts.BatchEntries = updateBatchEntries
 	}
+	if opts.Compress && opts.Codec == CodecRaw {
+		opts.Codec = CodecZstd
+	}
+	opts.Level = packLevel(opts.Level)
 	cfg, err := prepareConfig(cfgPath)
 	if err != nil {
 		return err
@@ -78,7 +88,16 @@ func RunClient(cfgPath, serverAddr string, opts ClientOpts) error {
 	if !ack.OK {
 		return fmt.Errorf("client rejected by server: %s", ack.Reason)
 	}
-	fmt.Printf("[CLIENT] connected to %s as client #%d | scene sha256 %s | compress=%v batch=%d\n", serverAddr, ack.ClientID, hash, opts.Compress, opts.BatchEntries)
+	codecName := "off"
+	if opts.Compress {
+		switch opts.Codec {
+		case CodecZstd:
+			codecName = fmt.Sprintf("zstd-%d", opts.Level)
+		case CodecFlate:
+			codecName = fmt.Sprintf("flate-%d", opts.Level)
+		}
+	}
+	fmt.Printf("[CLIENT] connected to %s as client #%d | scene sha256 %s | compress=%s batch=%d\n", serverAddr, ack.ClientID, hash, codecName, opts.BatchEntries)
 
 	rounds := 0
 	raysCast := int64(0)
@@ -135,12 +154,16 @@ func RunClient(cfgPath, serverAddr string, opts ClientOpts) error {
 
 // sendSparseUpdate extracts all non-zero voxel deltas (zeroing the local
 // buffer for the next round) and streams them in bounded batches, optionally
-// DEFLATE-compressed.
+// compressed (zstd or DEFLATE).
 func sendSparseUpdate(w *wire, clientID, roundID int, buf []Real, opts ClientOpts) error {
-	return sendSparseUpdateSized(w, clientID, roundID, buf, opts.BatchEntries, opts.Compress)
+	codec := uint8(CodecRaw)
+	if opts.Compress {
+		codec = opts.Codec
+	}
+	return sendSparseUpdateSized(w, clientID, roundID, buf, opts.BatchEntries, codec, opts.Level)
 }
 
-func sendSparseUpdateSized(w *wire, clientID, roundID int, buf []Real, batchEntries int, compress bool) error {
+func sendSparseUpdateSized(w *wire, clientID, roundID int, buf []Real, batchEntries int, codec uint8, level int) error {
 	idxDeltas, values := extractSparseAndZero(buf)
 	n := len(values)
 	if n == 0 {
@@ -167,12 +190,12 @@ func sendSparseUpdateSized(w *wire, clientID, roundID int, buf []Real, batchEntr
 			RoundID:  roundID,
 			More:     end < n,
 		}
-		if compress {
-			packed, err := packSparse(idxDeltas[off:end], values[off:end])
+		if codec != CodecRaw {
+			packed, err := packSparse(idxDeltas[off:end], values[off:end], codec, level)
 			if err != nil {
 				return err
 			}
-			msg.Codec = CodecFlate
+			msg.Codec = codec
 			msg.Packed = packed
 		} else {
 			msg.IdxDeltas = idxDeltas[off:end]

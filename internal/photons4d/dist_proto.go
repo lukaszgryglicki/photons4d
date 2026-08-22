@@ -42,7 +42,7 @@ import (
 // DistProtocolVersion guards against mixing incompatible binaries.
 // v2: optional per-message compression (UpdateMsg.Codec/Packed) and
 // client-configurable update batch size.
-const DistProtocolVersion = 2
+const DistProtocolVersion = 3
 
 // updateBatchEntries is the default cap on entries per UpdateMsg so neither
 // side ever has to hold a whole huge round in one gob message
