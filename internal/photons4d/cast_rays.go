@@ -382,7 +382,7 @@ func castRays(lights []*Light, scene *Scene, raysPerLight []int) {
 		wid := w
 		go func() {
 			defer wg.Done()
-			seed := time.Now().UnixNano() ^ int64(uint64(wid)*0x9e3779b97f4a7c15)
+			seed := freshSeed(wid)
 			rng := rand.New(rand.NewSource(seed))
 
 			var localCount int64

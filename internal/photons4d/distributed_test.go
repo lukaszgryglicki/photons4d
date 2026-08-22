@@ -226,7 +226,7 @@ func TestDistributedEndToEnd(t *testing.T) {
 
 	serverErr := make(chan error, 1)
 	go func() {
-		serverErr <- runServerOnListener(scenePath, ln, 8)
+		serverErr <- runServerOnListener(scenePath, ln, 8, 0.05)
 	}()
 
 	var wg sync.WaitGroup
@@ -284,25 +284,7 @@ func TestDistributedMergeMatchesLocalSum(t *testing.T) {
 	}
 	needRays := computeNeedRays(cfg, scene, lights)
 
-	srv := &distServer{
-		cfg:         cfg,
-		scene:       scene,
-		sceneHash:   hash,
-		needRays:    needRays,
-		remaining:   append([]int(nil), needRays...),
-		outstanding: make(map[int][]int),
-		nextRound:   1,
-		doneCh:      make(chan struct{}),
-		chunk:       make([]int, len(needRays)),
-	}
-	for i, n := range needRays {
-		c := n / 4
-		if c < 1 {
-			c = 1
-		}
-		srv.chunk[i] = c
-		srv.raysTotal += int64(n)
-	}
+	srv := newDistServer(cfg, scene, hash, needRays, 4, 0)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -392,11 +374,7 @@ func TestSceneHashMismatchRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 	needRays := computeNeedRays(cfg, scene, lights)
-	srv := &distServer{
-		cfg: cfg, scene: scene, sceneHash: hash, needRays: needRays,
-		remaining: append([]int(nil), needRays...), outstanding: make(map[int][]int),
-		nextRound: 1, doneCh: make(chan struct{}), chunk: append([]int(nil), needRays...),
-	}
+	srv := newDistServer(cfg, scene, hash, needRays, 1, 0)
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -417,4 +395,175 @@ func TestSceneHashMismatchRejected(t *testing.T) {
 		t.Fatal("client with different scene was not rejected")
 	}
 	t.Logf("correctly rejected: %v", err)
+}
+
+// TestAssignWorkAdaptive verifies the adaptive round sizing math: clamping to
+// [minRound, chunkTotal], proportional spread across lights by remaining
+// budget, the progress guarantee, and exact accounting until drained.
+func TestAssignWorkAdaptive(t *testing.T) {
+	srv := newDistServer(nil, nil, "x", []int{900000, 100000}, 10, 60)
+	if srv.chunkTotal != 100000 {
+		t.Fatalf("chunkTotal=%d want 100000", srv.chunkTotal)
+	}
+
+	sum := func(v []int) int {
+		s := 0
+		for _, n := range v {
+			s += n
+		}
+		return s
+	}
+
+	// want<=0 → classic fixed chunks: exactly min(chunk[i], remaining[i]).
+	a := srv.assignWork(0)
+	if a.RaysPerLight[0] != 90000 || a.RaysPerLight[1] != 10000 {
+		t.Fatalf("classic mode: got %v want [90000 10000]", a.RaysPerLight)
+	}
+
+	// Explicit size respected.
+	a = srv.assignWork(50000)
+	if got := sum(a.RaysPerLight); got < 49998 || got > 50000 {
+		t.Fatalf("want=50000 assigned %d", got)
+	}
+
+	// Tiny request clamped up to minRound (chunkTotal/1024 < 1024 → 1024).
+	a = srv.assignWork(10)
+	if got := sum(a.RaysPerLight); got < 1022 || got > 1024 {
+		t.Fatalf("want=10 assigned %d, expected ~1024", got)
+	}
+
+	// Huge request clamped down to chunkTotal.
+	a = srv.assignWork(1 << 30)
+	if got := sum(a.RaysPerLight); got > 100000 {
+		t.Fatalf("want=1<<30 assigned %d > chunkTotal", got)
+	}
+
+	// Drain fully; totals must match exactly, all rounds tracked.
+	total := 0
+	for _, r := range srv.outstanding {
+		total += sum(r)
+	}
+	for i := 0; i < 1_000_000; i++ {
+		a = srv.assignWork(1 << 30)
+		if a.RoundID == 0 {
+			break
+		}
+		total += sum(a.RaysPerLight)
+	}
+	if total != 1000000 {
+		t.Fatalf("drained %d rays, want 1000000", total)
+	}
+	if rem := sum(srv.remaining); rem != 0 {
+		t.Fatalf("remaining %d after drain", rem)
+	}
+	// All assigned but outstanding → wait round (all zeros, RoundID 0).
+	a = srv.assignWork(0)
+	if a.Done || a.RoundID != 0 || sum(a.RaysPerLight) != 0 {
+		t.Fatalf("expected wait round, got %+v", a)
+	}
+}
+
+// TestSingleLightManyClients is the requirement-#0 regression test:
+// horizontal distribution must be per-ray, so a scene with exactly ONE light
+// must still be split across many concurrent clients. Four clients handshake
+// through a barrier (conns accepted first, served after all four are in), and
+// every one of them must merge at least one non-empty round.
+func TestSingleLightManyClients(t *testing.T) {
+	dir := t.TempDir()
+	gif := filepath.Join(dir, "one.gif")
+	scenePath := writeDistTestScene(t, dir, gif)
+
+	// More rays → many small rounds → every client provably participates.
+	b, err := os.ReadFile(scenePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"spp": 4`) {
+		t.Fatal("expected spp in test scene")
+	}
+	if err := os.WriteFile(scenePath, []byte(strings.Replace(string(b), `"spp": 4`, `"spp": 64`, 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := prepareConfig(scenePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hash, err := SceneHash(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scene, lights, err := buildScene(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lights) != 1 {
+		t.Fatalf("test premise broken: %d lights, want 1", len(lights))
+	}
+	needRays := computeNeedRays(cfg, scene, lights)
+
+	const nClients = 4
+	srv := newDistServer(cfg, scene, hash, needRays, 16, 0.01)
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		// Barrier: accept all clients before serving any, so none can race
+		// ahead and drain the budget before the others handshake.
+		conns := make([]net.Conn, 0, nClients)
+		for len(conns) < nClients {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			conns = append(conns, conn)
+		}
+		for _, c := range conns {
+			go srv.handleConn(c)
+		}
+	}()
+
+	var wg sync.WaitGroup
+	errs := make([]error, nClients)
+	for i := 0; i < nClients; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			errs[i] = RunClient(scenePath, ln.Addr().String(), ClientOpts{Compress: i%2 == 1})
+		}(i)
+	}
+	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("client %d: %v", i, err)
+		}
+	}
+	select {
+	case <-srv.doneCh:
+	case <-time.After(60 * time.Second):
+		t.Fatal("server never completed")
+	}
+
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	if srv.raysDone != srv.raysTotal {
+		t.Fatalf("raysDone=%d raysTotal=%d", srv.raysDone, srv.raysTotal)
+	}
+	if len(srv.perClient) != nClients {
+		t.Fatalf("admitted %d clients, want %d", len(srv.perClient), nClients)
+	}
+	var sumRays int64
+	for id, st := range srv.perClient {
+		t.Logf("client #%d: %d rounds, %d rays", id, st.rounds, st.rays)
+		if st.rounds < 1 || st.rays < 1 {
+			t.Fatalf("client #%d did not participate in the single-light workload: %+v", id, st)
+		}
+		sumRays += st.rays
+	}
+	if sumRays != srv.raysTotal {
+		t.Fatalf("per-client rays sum %d != total %d", sumRays, srv.raysTotal)
+	}
 }

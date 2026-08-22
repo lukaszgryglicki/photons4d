@@ -69,6 +69,7 @@ func main() {
 	listen := flag.String("listen", envOr("LISTEN", ":31417"), "server mode: TCP address to listen on")
 	connect := flag.String("connect", envOr("CONNECT", ""), "client mode: server address host:port")
 	chunks := flag.Int("chunks", 64, "server mode: number of work chunks each light's ray budget is split into (or CHUNKS env)")
+	round := flag.Float64("round", 0, "server mode: optional adaptive round sizing — target seconds per client round; 0 (default) = classic fixed -chunks distribution (or ROUND env)")
 	compress := flag.Bool("compress", envOr("COMPRESS", "") != "", "client mode: DEFLATE-compress voxel updates (bit-exact, saves network traffic; or COMPRESS env)")
 	batch := flag.Int("batch", 0, "client mode: max sparse entries per update message, 0 = default 4194304 ≈ 64 MB raw (or BATCH env)")
 	flag.Parse()
@@ -76,6 +77,12 @@ func main() {
 		var c int
 		if _, err := fmt.Sscanf(v, "%d", &c); err == nil && c > 0 {
 			*chunks = c
+		}
+	}
+	if v := os.Getenv("ROUND"); v != "" {
+		var r float64
+		if _, err := fmt.Sscanf(v, "%g", &r); err == nil && r >= 0 {
+			*round = r
 		}
 	}
 	if v := os.Getenv("BATCH"); v != "" {
@@ -95,7 +102,7 @@ func main() {
 	case "local":
 		err = photons4d.Run(cfg)
 	case "server":
-		err = photons4d.RunServer(cfg, *listen, *chunks)
+		err = photons4d.RunServer(cfg, *listen, *chunks, *round)
 	case "client":
 		if *connect == "" {
 			err = fmt.Errorf("client mode requires -connect host:port (or CONNECT env)")

@@ -4,7 +4,6 @@ import (
 	"math/rand"
 	"runtime"
 	"sync"
-	"time"
 )
 
 func estimateHitProb(light *Light, scene *Scene, trials int) Real {
@@ -36,7 +35,7 @@ func estimateHitProb(light *Light, scene *Scene, trials int) Real {
 		go func(wid, n int) {
 			defer wg.Done()
 			// independent RNG per worker
-			seed := time.Now().UnixNano() ^ int64(uint64(wid)*0x9e3779b97f4a7c15)
+			seed := freshSeed(wid)
 			rng := rand.New(rand.NewSource(seed))
 
 			localHits := 0

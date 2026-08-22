@@ -1,10 +1,34 @@
 package photons4d
 
 import (
+	crand "crypto/rand"
+	"encoding/binary"
 	"math"
+	"sync/atomic"
+	"time"
 )
 
 func isFinite(x Real) bool { return !math.IsInf(x, 0) && !math.IsNaN(x) }
+
+var rngSeedCounter int64
+
+// freshSeed returns a unique, unpredictable RNG seed. Crypto entropy makes
+// seeds independent across machines (two distributed clients starting the
+// same nanosecond must never replay the same ray stream); the counter and
+// clock guarantee uniqueness across workers even if entropy reads fail.
+func freshSeed(wid int) int64 {
+	var b [8]byte
+	var e int64
+	if _, err := crand.Read(b[:]); err == nil {
+		e = int64(binary.LittleEndian.Uint64(b[:]))
+	}
+	c := atomic.AddInt64(&rngSeedCounter, 1)
+	seed := e ^ time.Now().UnixNano() ^ int64(uint64(c)*0x9e3779b97f4a7c15) ^ int64(uint64(wid)*0xbf58476d1ce4e5b9)
+	if seed == 0 {
+		seed = 0x2545f4914f6cdd1d
+	}
+	return seed
+}
 
 func imax(a, b int) int {
 	if a > b {

@@ -3,9 +3,18 @@ package photons4d
 import (
 	"fmt"
 	"net"
+	"sort"
 	"sync"
 	"time"
 )
+
+// clientStat tracks one admitted client's contribution (for the final
+// summary and the adaptive round sizing).
+type clientStat struct {
+	host   string
+	rounds int64
+	rays   int64
+}
 
 // distServer owns the master scene buffer and doles out ray-casting rounds.
 type distServer struct {
@@ -25,24 +34,61 @@ type distServer struct {
 	packedIn    int64 // compressed bytes received (CodecFlate batches)
 	unpackedIn  int64 // same batches after decompression
 	clients     int
+	perClient   map[int]*clientStat
 	doneCh      chan struct{}
 	doneOnce    sync.Once
-	chunk       []int // per-light rays per assignment
+	chunk       []int // per-light max rays per assignment
+	chunkTotal  int   // sum(chunk)
+	roundTarget float64
 }
 
 // RunServer starts distributed-mode collector: it builds the scene, computes
 // the spp-saturation ray budget exactly like vertical mode, serves rounds to
 // clients until the budget is exhausted and every round is merged, then runs
 // the unchanged single-node output pipeline (GIF/PNG/RAW).
-func RunServer(cfgPath, listenAddr string, chunks int) error {
+// roundSec > 0 sizes rounds adaptively so each client's round takes about
+// that long (measured per client); roundSec <= 0 uses fixed max-size chunks.
+func RunServer(cfgPath, listenAddr string, chunks int, roundSec float64) error {
 	ln, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return fmt.Errorf("server listen %s: %w", listenAddr, err)
 	}
-	return runServerOnListener(cfgPath, ln, chunks)
+	return runServerOnListener(cfgPath, ln, chunks, roundSec)
 }
 
-func runServerOnListener(cfgPath string, ln net.Listener, chunks int) error {
+// newDistServer wires up server state for a prepared scene. chunks controls
+// the per-light max round size (budget/chunks); roundSec > 0 enables
+// adaptive per-client round sizing.
+func newDistServer(cfg *Config, scene *Scene, hash string, needRays []int, chunks int, roundSec float64) *distServer {
+	if chunks < 1 {
+		chunks = 1
+	}
+	srv := &distServer{
+		cfg:         cfg,
+		scene:       scene,
+		sceneHash:   hash,
+		needRays:    needRays,
+		remaining:   append([]int(nil), needRays...),
+		outstanding: make(map[int][]int),
+		nextRound:   1,
+		doneCh:      make(chan struct{}),
+		chunk:       make([]int, len(needRays)),
+		perClient:   make(map[int]*clientStat),
+		roundTarget: roundSec,
+	}
+	for i, n := range needRays {
+		c := n / chunks
+		if c < 1 {
+			c = 1
+		}
+		srv.chunk[i] = c
+		srv.chunkTotal += c
+		srv.raysTotal += int64(n)
+	}
+	return srv
+}
+
+func runServerOnListener(cfgPath string, ln net.Listener, chunks int, roundSec float64) error {
 	defer ln.Close()
 
 	cfg, err := prepareConfig(cfgPath)
@@ -59,31 +105,11 @@ func runServerOnListener(cfgPath string, ln net.Listener, chunks int) error {
 	}
 	needRays := computeNeedRays(cfg, scene, lights)
 
-	if chunks < 1 {
-		chunks = 1
-	}
-	srv := &distServer{
-		cfg:         cfg,
-		scene:       scene,
-		sceneHash:   hash,
-		needRays:    needRays,
-		remaining:   append([]int(nil), needRays...),
-		outstanding: make(map[int][]int),
-		nextRound:   1,
-		doneCh:      make(chan struct{}),
-		chunk:       make([]int, len(needRays)),
-	}
-	for i, n := range needRays {
-		c := n / chunks
-		if c < 1 {
-			c = 1
-		}
-		srv.chunk[i] = c
-		srv.raysTotal += int64(n)
-	}
+	srv := newDistServer(cfg, scene, hash, needRays, chunks, roundSec)
 
 	fmt.Printf("[SERVER] listening on %s | scene %s | sha256 %s\n", ln.Addr(), cfgPath, hash)
-	fmt.Printf("[SERVER] total rays needed: %d (per light: %v), chunks per light: %v\n", srv.raysTotal, needRays, srv.chunk)
+	fmt.Printf("[SERVER] total rays needed: %d (per light: %v), max chunk per light: %v, round target: %.0fs\n",
+		srv.raysTotal, needRays, srv.chunk, roundSec)
 
 	var wg sync.WaitGroup
 	acceptDone := make(chan struct{})
@@ -111,6 +137,18 @@ func runServerOnListener(cfgPath string, ln net.Listener, chunks int) error {
 		fmt.Printf("[SERVER] compressed updates: %d bytes on the wire for %d raw bytes (%.2fx saved)\n",
 			packedIn, unpackedIn, float64(unpackedIn)/float64(packedIn))
 	}
+	srv.mu.Lock()
+	ids := make([]int, 0, len(srv.perClient))
+	for id := range srv.perClient {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	for _, id := range ids {
+		st := srv.perClient[id]
+		fmt.Printf("[SERVER] client #%d (%s): %d rounds, %d rays (%.2f%% of total)\n",
+			id, st.host, st.rounds, st.rays, 100.0*float64(st.rays)/float64(srv.raysTotal))
+	}
+	srv.mu.Unlock()
 
 	// Stop accepting, give connected clients a grace period to pick up their
 	// Done notice, then force-close whatever is left.
@@ -132,7 +170,15 @@ func runServerOnListener(cfgPath string, ln net.Listener, chunks int) error {
 
 // assignWork returns the next round for a client, an all-zero wait assignment
 // (stragglers still hold outstanding rounds), or Done.
-func (s *distServer) assignWork() WorkAssign {
+//
+// want <= 0 (default, -round 0): classic fixed-chunk mode — every light
+// contributes min(chunk[i], remaining[i]), byte-for-byte the original
+// behavior. want > 0 (optional adaptive mode, -round > 0): the
+// client-specific desired total ray count (EWMA rays/s x round target),
+// clamped to [minRound, chunkTotal] and spread across lights proportionally
+// to their remaining budgets. Either way any light mix — including a single
+// light — is split across however many clients are pulling work.
+func (s *distServer) assignWork(want int) WorkAssign {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -150,12 +196,52 @@ func (s *distServer) assignWork() WorkAssign {
 	}
 
 	rays := make([]int, len(s.remaining))
-	for i := range s.remaining {
-		n := s.chunk[i]
-		if n > s.remaining[i] {
-			n = s.remaining[i]
+	if want <= 0 {
+		// Classic fixed-chunk distribution (default).
+		for i, rem := range s.remaining {
+			n := s.chunk[i]
+			if n > rem {
+				n = rem
+			}
+			rays[i] = n
 		}
-		rays[i] = n
+	} else {
+		if want > s.chunkTotal {
+			want = s.chunkTotal
+		}
+		minRound := s.chunkTotal / 1024
+		if minRound < 1024 {
+			minRound = 1024
+		}
+		if want < minRound {
+			want = minRound
+		}
+		assigned := 0
+		for i, rem := range s.remaining {
+			n := int(float64(want) * float64(rem) / float64(remTotal))
+			if n > rem {
+				n = rem
+			}
+			rays[i] = n
+			assigned += n
+		}
+		if assigned == 0 {
+			// Rounding starved the round; guarantee progress on the largest
+			// remaining light.
+			bi := 0
+			for i, r := range s.remaining {
+				if r > s.remaining[bi] {
+					bi = i
+				}
+			}
+			n := s.remaining[bi]
+			if n > minRound {
+				n = minRound
+			}
+			rays[bi] = n
+		}
+	}
+	for i, n := range rays {
 		s.remaining[i] -= n
 	}
 	id := s.nextRound
@@ -186,7 +272,7 @@ func (s *distServer) returnWork(rounds map[int]bool) {
 
 // completeRound transactionally merges all buffered batches of a round into
 // the master buffer and updates progress accounting.
-func (s *distServer) completeRound(roundID int, batches []UpdateMsg) error {
+func (s *distServer) completeRound(clientID, roundID int, batches []UpdateMsg) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -201,8 +287,14 @@ func (s *distServer) completeRound(roundID int, batches []UpdateMsg) error {
 		s.entriesIn += int64(len(b.Values))
 	}
 	delete(s.outstanding, roundID)
+	roundRays := int64(0)
 	for _, n := range rays {
-		s.raysDone += int64(n)
+		roundRays += int64(n)
+	}
+	s.raysDone += roundRays
+	if st, ok := s.perClient[clientID]; ok {
+		st.rounds++
+		st.rays += roundRays
 	}
 
 	pct := 100.0 * float64(s.raysDone) / float64(s.raysTotal)
@@ -262,19 +354,30 @@ func (s *distServer) handleConn(conn net.Conn) {
 	s.nextClient++
 	clientID := s.nextClient
 	s.clients++
+	s.perClient[clientID] = &clientStat{host: hello.Host}
 	s.mu.Unlock()
 	if err := w.send(HelloAck{OK: true, ClientID: clientID}); err != nil {
 		return
 	}
 	fmt.Printf("[SERVER] client #%d connected from %s (%s, %d workers)\n", clientID, conn.RemoteAddr(), hello.Host, hello.Workers)
 
+	rate := 0.0 // EWMA rays/s for this client, 0 = not measured yet
 	for {
 		var req WorkRequest
 		if err := w.recv(&req); err != nil {
 			fmt.Printf("[SERVER] client #%d disconnected: %v\n", clientID, err)
 			return
 		}
-		assign := s.assignWork()
+		want := 0
+		if s.roundTarget > 0 {
+			if rate > 0 {
+				want = int(rate * s.roundTarget)
+			} else {
+				// Unknown speed: start with a small probe round and ramp up.
+				want = s.chunkTotal / 8
+			}
+		}
+		assign := s.assignWork(want)
 		if err := w.send(assign); err != nil {
 			return
 		}
@@ -285,6 +388,11 @@ func (s *distServer) handleConn(conn net.Conn) {
 		if assign.RoundID != 0 {
 			owned[assign.RoundID] = true
 		}
+		roundRays := 0
+		for _, n := range assign.RaysPerLight {
+			roundRays += n
+		}
+		tAssign := time.Now()
 
 		// Receive the round's batches (possibly zero entries for a wait
 		// round). Packed batches are decompressed here, outside the merge
@@ -318,13 +426,25 @@ func (s *distServer) handleConn(conn net.Conn) {
 		}
 
 		if assign.RoundID != 0 {
+			// Update this client's measured throughput (cast + extract +
+			// upload) for adaptive sizing of its next round.
+			if roundRays > 0 {
+				if el := time.Since(tAssign).Seconds(); el > 0.005 {
+					r := float64(roundRays) / el
+					if rate <= 0 {
+						rate = r
+					} else {
+						rate = 0.5*rate + 0.5*r
+					}
+				}
+			}
 			if wireB > 0 {
 				s.mu.Lock()
 				s.packedIn += wireB
 				s.unpackedIn += rawB
 				s.mu.Unlock()
 			}
-			if err := s.completeRound(assign.RoundID, batches); err != nil {
+			if err := s.completeRound(clientID, assign.RoundID, batches); err != nil {
 				fmt.Printf("[SERVER] client #%d round %d rejected: %v\n", clientID, assign.RoundID, err)
 				_ = w.send(UpdateAck{OK: false, Reason: err.Error()})
 				return
