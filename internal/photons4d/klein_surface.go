@@ -127,7 +127,9 @@ func newKleinSurface(name string, band bool, major, minor, thickness Real, twist
 		far += minor
 	}
 	k.sweep = math.Hypot(far, k.half*minor)
-	k.du = 0.15 / math.Max(1, k.half)
+	// A quarter of the widest step that still found the nearest point of
+	// every one of millions of points, for 0 to 16 half-turns.
+	k.du = 0.3 / math.Max(1, k.half)
 
 	// A world axis sees the local point q as c + a·q with a = Scale times the row of R.
 	extent := func(row int, c Real) (Real, Real) {
@@ -243,6 +245,7 @@ func (k *KleinSurface) aside(q Vector4) Real {
 
 // kleinFoot is a point of the surface: its turn and its place on the profile.
 type kleinFoot struct {
+	u              Real
 	su, cu, sh, ch Real
 	a, b           Real
 }
@@ -255,6 +258,7 @@ func (f kleinFoot) point() Vector4 {
 // first two derivatives over u and the nearest point of that profile.
 func (k *KleinSurface) at(q Vector4, u Real) (g, g1, g2 Real, f kleinFoot) {
 	c := k.half
+	f.u = u
 	f.su, f.cu = math.Sincos(u)
 	f.sh, f.ch = math.Sincos(c * u)
 	x, y := q.X*f.cu+q.Y*f.su, q.Y*f.cu-q.X*f.su
@@ -278,8 +282,8 @@ func (k *KleinSurface) descend(q Vector4, u, lim Real) (Real, kleinFoot) {
 // descendFrom is descend with the values at u at hand.
 func (k *KleinSurface) descendFrom(q Vector4, u, lim, g, g1, g2 Real, f kleinFoot) (Real, kleinFoot) {
 	for it := 0; it < 64; it++ {
-		if g2 > 0 && math.Abs(g1) < 1e-9*g2 {
-			// the last step: its error is below the rounding
+		if g2 > 0 && math.Abs(g1) < 1e-7*g2 {
+			// the last step: what is left after it is its square, below the rounding
 			g, _, _, f = k.at(q, u-g1/g2)
 			break
 		}
@@ -315,22 +319,60 @@ func (k *KleinSurface) descendFrom(q Vector4, u, lim, g, g1, g2 Real, f kleinFoo
 // nearest returns the distance from q to the surface and the point of the
 // surface at that distance. With far set, a point that is clearly further
 // from the surface than the wall gets only a lower bound of its distance,
-// which is told by exact = false.
-func (k *KleinSurface) nearest(q Vector4, far bool) (dist Real, foot Vector4, exact bool) {
+// which is told by exact = false. last, if given, holds the turn of the
+// nearest point of a point not far from q (NaN when there is none yet) and
+// takes the turn found.
+func (k *KleinSurface) nearest(q Vector4, far bool, last *Real) (dist Real, foot Vector4, exact bool) {
 	const most = 1024
 	rho := math.Hypot(q.X, q.Y)
-	phi := math.Atan2(q.Y, q.X)
-	// The profile in the half-plane of q bounds the distance from above, and
-	// a profile turned away from q by the angle at which the line of its
-	// half-plane is that far from q, or by more, cannot be nearer.
-	g0, g1, g2, f0 := k.at(q, phi)
+	mid := math.Atan2(q.Y, q.X)
+
+	// A bound of the distance from above: the dip next to the turn that was
+	// the nearest a moment ago, or else the profile in the half-plane of q.
+	var g, g1, g2 Real
+	var f kleinFoot
+	known := last != nil && !math.IsNaN(*last)
+	if known {
+		g, f = k.descend(q, *last, k.du)
+	} else {
+		g, g1, g2, f = k.at(q, mid)
+	}
+	// A profile turned away from q by the angle at which the line of its
+	// half-plane is as far from q as that bound, or by more, cannot be nearer.
 	width := Real(math.Pi)
-	if d0 := math.Sqrt(g0); rho > d0 {
-		width = math.Min(width, 1.01*math.Asin(d0/rho)+1e-9)
+	if bound := math.Sqrt(g); rho > bound {
+		width = math.Min(width, 1.01*math.Asin(bound/rho)+1e-9)
+	}
+	if width > k.du && k.Twist == 1 {
+		// With one half-turn there is one turn at which the plane of the
+		// profile holds the part of q in ZW, and a plane turned away from it
+		// leaves q at the distance of that part times the sine of half the
+		// turn: a second bound of the same kind, around another turn.
+		sigma := math.Hypot(q.Z, q.W)
+		turn := 2 * math.Atan2(q.W, q.Z)
+		if !known {
+			if ga, g1a, g2a, fa := k.at(q, turn); ga < g {
+				g, g1, g2, f = ga, g1a, g2a, fa
+			}
+		}
+		bound := math.Sqrt(g)
+		if rho > bound {
+			width = math.Min(width, 1.01*math.Asin(bound/rho)+1e-9)
+		}
+		if sigma > bound {
+			if wide := 2.02*math.Asin(bound/sigma) + 1e-9; wide < width {
+				mid, width = turn, wide
+			}
+		}
 	}
 	if width <= k.du {
-		// too narrow for more than one dip: straight down from the turn of q
-		g, f := k.descendFrom(q, phi, width, g0, g1, g2, f0)
+		// too narrow for more than one dip, which the bound belongs to
+		if !known {
+			g, f = k.descendFrom(q, f.u, width, g, g1, g2, f)
+		}
+		if last != nil {
+			*last = f.u
+		}
 		return math.Sqrt(g), f.point(), true
 	}
 	n := 2 * int(math.Ceil(width/k.du))
@@ -343,8 +385,8 @@ func (k *KleinSurface) nearest(q Vector4, far bool) (dist Real, foot Vector4, ex
 	h := 2 * width / Real(n)
 
 	var gs [most + 1]Real
-	su, cu := math.Sincos(phi - width)
-	sh, ch := math.Sincos(k.half * (phi - width))
+	su, cu := math.Sincos(mid - width)
+	sh, ch := math.Sincos(k.half * (mid - width))
 	sd, cd := math.Sincos(h)
 	shd, chd := math.Sincos(k.half * h)
 	low := math.Inf(1)
@@ -380,18 +422,23 @@ func (k *KleinSurface) nearest(q Vector4, far bool) (dist Real, foot Vector4, ex
 		cand[j] = i
 	}
 	dist = math.Inf(1)
-	var best kleinFoot
+	if known {
+		dist = math.Sqrt(g)
+	}
 	for _, i := range cand[:nc] {
 		// nothing next to this turn is lower than its distance less two slacks
 		if math.Sqrt(gs[i])-2*slack >= dist {
 			break
 		}
-		g, f := k.descend(q, phi-width+Real(i)*h, h)
-		if d := math.Sqrt(g); d < dist {
-			dist, best = d, f
+		gi, fi := k.descend(q, mid-width+Real(i)*h, h)
+		if d := math.Sqrt(gi); d < dist {
+			dist, f = d, fi
 		}
 	}
-	return dist, best.point(), true
+	if last != nil {
+		*last = f.u
+	}
+	return dist, f.point(), true
 }
 
 func intersectRayKleinSurface(O Point4, D Vector4, k *KleinSurface) (objectHit, bool) {
@@ -418,12 +465,13 @@ func intersectRayKleinSurface(O Point4, D Vector4, k *KleinSurface) (objectHit, 
 	// of the profile, they are no further from it than the point is from the
 	// surface.
 	speed := B.Len()
+	last := math.NaN()
 	dist := func(t Real) rayDist {
 		q := A.Add(B.Mul(t))
 		if far := k.aside(q) - k.tube; far > k.tube {
 			return rayDist{d: far}
 		}
-		d, foot, exact := k.nearest(q, true)
+		d, foot, exact := k.nearest(q, true, &last)
 		rd := rayDist{d: d - k.tube}
 		if exact && rd.d < 0 && d > 0 {
 			rd.rate = q.Sub(foot).Dot(B) / d
@@ -436,7 +484,7 @@ func intersectRayKleinSurface(O Point4, D Vector4, k *KleinSurface) (objectHit, 
 		return objectHit{}, false
 	}
 	q := A.Add(B.Mul(t))
-	_, foot, _ := k.nearest(q, false)
+	_, foot, _ := k.nearest(q, false, &last)
 	n := q.Sub(foot)
 	Nl := Vector4{n.X / k.Scale.X, n.Y / k.Scale.Y, n.Z / k.Scale.Z, n.W / k.Scale.W}
 	if Nl.Len() == 0 {

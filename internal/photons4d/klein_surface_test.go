@@ -72,6 +72,23 @@ func kleinGridDistance(k *KleinSurface, q Vector4) (Real, Vector4) {
 	return best, kleinPoint(k, bu, bs)
 }
 
+// kleinOffSurface tells how far a point is from being a point of the
+// surface: its part in ZW must lie along the axis of the profile at the turn
+// of its part in XY, and the two lengths must be a point of the profile.
+func kleinOffSurface(k *KleinSurface, p Vector4) Real {
+	a, b := math.Hypot(p.X, p.Y), math.Hypot(p.Z, p.W)
+	u := Real(k.Twist) / 2 * math.Atan2(p.Y, p.X)
+	off := math.Abs(p.Z*math.Sin(u) - p.W*math.Cos(u))
+	if a == 0 {
+		// the centre of the projective plane belongs to every turn
+		off = 0
+	}
+	if k.Band {
+		return math.Max(off, math.Max(math.Abs(a-k.MajorRadius), b-k.MinorRadius))
+	}
+	return math.Max(off, math.Abs(math.Hypot(a-k.MajorRadius, b)-k.MinorRadius))
+}
+
 func kleinSamples(t *testing.T) []*KleinSurface {
 	t.Helper()
 	one := Vector4{1, 1, 1, 1}
@@ -130,16 +147,26 @@ func TestKleinSurfaceNearestAgainstGridSearch(t *testing.T) {
 				q = a.Add(b.Sub(a).Mul(0.35 + 0.3*rng.Float64()))
 			}
 			want, wantFoot := kleinGridDistance(k, q)
-			d, foot, exact := k.nearest(q, false)
+			d, foot, exact := k.nearest(q, false, nil)
 			if !exact || math.Abs(d-want) > 1e-9 || math.Abs(q.Sub(foot).Len()-d) > 1e-12 {
 				t.Fatalf("%s twist %d: distance of %v is %.12g (exact=%v, foot %v at %.12g), the grid search gives %.12g at %v",
 					k.Name, k.Twist, q, d, exact, foot, q.Sub(foot).Len(), want, wantFoot)
 			}
-			if far, _ := kleinGridDistance(k, foot); far > 1e-9 {
+			if far := kleinOffSurface(k, foot); far > 1e-9 {
 				t.Fatalf("%s twist %d: the nearest point %v is off the surface by %.3g", k.Name, k.Twist, foot, far)
 			}
+			// the same from the turn of some other point, near or far, and the turn found is left in its place
+			for _, hint := range []Real{rng.Float64() * 2 * math.Pi, math.Atan2(foot.Y, foot.X) + 0.1*(rng.Float64()-0.5)} {
+				again, _, exact := k.nearest(q, false, &hint)
+				if !exact || math.Abs(again-want) > 1e-9 {
+					t.Fatalf("%s twist %d: distance of %v is %.12g, from another turn %.12g", k.Name, k.Twist, q, want, again)
+				}
+				if g, _, _, _ := k.at(q, hint); math.Abs(math.Sqrt(g)-again) > 1e-9 {
+					t.Fatalf("%s twist %d: the profile at the turn %.9g left for %v is %.12g away, not %.12g", k.Name, k.Twist, hint, q, math.Sqrt(g), again)
+				}
+			}
 			// the quick answer for a far point is a lower bound that keeps at least half of the way to the wall
-			lo, _, exact := k.nearest(q, true)
+			lo, _, exact := k.nearest(q, true, nil)
 			if exact {
 				if lo != d {
 					t.Fatalf("%s twist %d: two exact answers %.15g and %.15g for %v", k.Name, k.Twist, lo, d, q)
@@ -154,6 +181,59 @@ func TestKleinSurfaceNearestAgainstGridSearch(t *testing.T) {
 		if cheap == 0 || cheap > points*3/4 {
 			t.Errorf("%s twist %d: %d of %d points took the quick answer", k.Name, k.Twist, cheap, points)
 		}
+	}
+}
+
+// With several half-turns the distance to the profile can dip more than once
+// as the profile turns, and going down from the turn of the point itself
+// ends in the wrong dip: the search over the turns is there for such points.
+func TestKleinSurfaceNearestWhereTheOwnTurnMisleads(t *testing.T) {
+	k, err := NewKleinBottle(Point4{}, Vector4{1, 1, 1, 1}, 0.7, 0.65, 0.1, 3, Rot4{}, testWhite, testNone, testHalf, testHalf, testIOR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	misled := 0
+	for _, q := range []Vector4{
+		{0.047388, -0.309886, -0.313735, 0.242065}, {-0.167370, -0.038146, 0.401937, 0.173577}, {0.180461, 0.185044, 0.327731, -0.223021},
+		{-0.147839, -0.269145, 0.319718, -0.912326}, {0.024795, 0.048228, -0.386600, -0.133510}, {-0.235736, 0.056668, -0.533342, -0.030115},
+	} {
+		want, _ := kleinGridDistance(k, q)
+		if d, _, exact := k.nearest(q, false, nil); !exact || math.Abs(d-want) > 1e-9 {
+			t.Errorf("distance of %v is %.12g, the grid search gives %.12g", q, d, want)
+		}
+		if g, _ := k.descend(q, math.Atan2(q.Y, q.X), math.Pi); math.Sqrt(g) > want+0.01 {
+			misled++
+		}
+	}
+	if misled < 4 {
+		t.Errorf("only %d of 6 points have a dip beside the nearest one", misled)
+	}
+}
+
+// A point whose part in ZW is square to the profile at its own turn sees the
+// two sides of that turn alike: the turn is level there, and often a top
+// between two dips.
+func TestKleinSurfaceNearestFromALevelTurn(t *testing.T) {
+	tops := 0
+	for _, k := range kleinSamples(t) {
+		reach := k.MajorRadius + k.MinorRadius
+		for i := 1; i <= 16; i++ {
+			for j := 1; j <= 4; j++ {
+				q := Vector4{1.5 * reach * Real(i) / 16, 0, 0, reach * Real(j) / 4}
+				if _, g1, g2, _ := k.at(q, 0); g1 != 0 {
+					t.Fatalf("%s twist %d: the turn of %v is not level", k.Name, k.Twist, q)
+				} else if g2 < 0 {
+					tops++
+				}
+				want, _ := kleinGridDistance(k, q)
+				if d, _, _ := k.nearest(q, false, nil); math.Abs(d-want) > 1e-9 {
+					t.Fatalf("%s twist %d: distance of %v is %.12g, the grid search gives %.12g", k.Name, k.Twist, q, d, want)
+				}
+			}
+		}
+	}
+	if tops < 100 {
+		t.Errorf("only %d points on a top", tops)
 	}
 }
 

@@ -644,7 +644,7 @@ func oracleSolids(t *testing.T, rng *rand.Rand, size Real) []solidUT {
 		klein("mobius band", o, err)
 		o, err = NewMobiusBand(ctr, sc, R, M, T, 2, rot, white, none, half, half, ior)
 		klein("twisted ring", o, err)
-		// a wall so thick that little is left of the hollow of the tube and of the hole in the middle
+		// a wall so thick that little is left of the hollow of the tube
 		M = 0.45 * R
 		o, err = NewKleinBottle(ctr, sc, R, M, (1.2+0.5*rng.Float64())*M, 1, rot, white, none, half, half, ior)
 		klein("klein bottle with a thick wall", o, err)

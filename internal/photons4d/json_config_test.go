@@ -552,10 +552,10 @@ func TestKleinAndRoundKindsLoadFromJSON(t *testing.T) {
 	}
 	got = got[:0]
 	for _, q := range scene.RevolvedQuadrics {
-		got = append(got, fmt.Sprintf("%s %g/%g/%g %g..%g", q.Name, q.K0, q.K1, q.K2, q.Lower, q.Upper))
+		got = append(got, fmt.Sprintf("%s %.6g/%.6g/%.6g %g..%g", q.Name, q.K0, q.K1, q.K2, q.Lower, q.Upper))
 	}
 	if got, want := strings.Join(got, ", "), "paraboloid 0.5/0.5/0 -1..1, hyperboloid 0.25/0/0.75 -1..1, hyperboloid 0/0/1 -1..1, "+
-		"hyperboloid 0.6400000000000001/0/0.3599999999999999 -1..1, spherical segment 1/0/-1 0..1, spherical segment 1/0/-1 -0.4..0, spherical segment 1/0/-1 -1..1"; got != want {
+		"hyperboloid 0.64/0/0.36 -1..1, spherical segment 1/0/-1 0..1, spherical segment 1/0/-1 -0.4..0, spherical segment 1/0/-1 -1..1"; got != want {
 		t.Errorf("quadrics:\n got %s\nwant %s", got, want)
 	}
 	if q := scene.RevolvedQuadrics[0]; q.Scale != (Vector4{0.5, 0.5, 0.5, 0.8}) {
