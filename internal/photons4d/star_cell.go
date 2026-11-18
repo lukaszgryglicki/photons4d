@@ -10,7 +10,6 @@ const (
 	defaultStarCellCoreRadius  Real = 0.45
 	defaultStarCellSpikeLength Real = 0.55
 	defaultStarCellSharpness   Real = 6.0
-	starCellRaySamples              = 96
 )
 
 // StarCell is a non-convex, star-shaped 4D solid generated from the dual-cell
@@ -38,6 +37,7 @@ type StarCell struct {
 	R           Mat4
 	RT          Mat4
 	Dirs        []Vector4
+	slope       Real // largest change of the boundary radius per radian of direction
 
 	Color   RGB
 	Diffuse RGB
@@ -156,6 +156,46 @@ func starCellDirections(kind string) (string, []Vector4, error) {
 	}
 }
 
+// starCellHoles returns the directions that lie farthest from the family
+// directions: the vertices of the dual polytope.
+func starCellHoles(canon string, dirs []Vector4) []Vector4 {
+	switch canon {
+	case "star-cell-8":
+		return canonical16StarDirs()
+	case "star-cell-16":
+		return canonical8StarDirs()
+	case "star-cell-24":
+		seeds := dual24Dirs()
+		out := make([]Vector4, 0, len(seeds))
+		for _, v := range seeds {
+			out = append(out, v.Norm())
+		}
+		return out
+	case "star-cell-120":
+		return verts120Unit()
+	case "star-cell-600":
+		return verts600Unit()
+	default:
+		out := make([]Vector4, 0, len(dirs))
+		for _, v := range dirs {
+			out = append(out, v.Mul(-1))
+		}
+		return out
+	}
+}
+
+// starCellSlope bounds |d rho / d angle| of rho = core + spike*c^sharpness
+// over the cosines c in [minCos, 1] that the nearest family direction can have.
+func starCellSlope(spike, sharpness, minCos Real) Real {
+	c := minCos
+	if sharpness > 1 {
+		if top := math.Sqrt((sharpness - 1) / sharpness); top > c {
+			c = top
+		}
+	}
+	return spike * sharpness * math.Pow(c, sharpness-1) * math.Sqrt(1-c*c)
+}
+
 func NewStarCell(kind string, center Point4, scale Vector4, coreRadius, spikeLength, sharpness Real, angles Rot4, color, diffuse, reflectivity, refractivity, ior RGB) (*StarCell, error) {
 	if !(scale.X > 0 && scale.Y > 0 && scale.Z > 0 && scale.W > 0) {
 		return nil, fmt.Errorf("star cell scale must be > 0 on all axes, got %+v", scale)
@@ -216,6 +256,20 @@ func NewStarCell(kind string, center Point4, scale Vector4, coreRadius, spikeLen
 		Refract:     refractivity,
 		IOR:         ior,
 	}
+
+	minCos := Real(1)
+	for _, h := range starCellHoles(canon, dirs) {
+		best := Real(-1)
+		for _, d := range dirs {
+			if c := d.Dot(h); c > best {
+				best = c
+			}
+		}
+		if best < minCos {
+			minCos = best
+		}
+	}
+	s.slope = starCellSlope(spikeLength, sharpness, minCos)
 
 	// Conservative AABB from the rotated local box [-outer*scale, +outer*scale]^4.
 	abs := func(x Real) Real {
@@ -318,32 +372,31 @@ func (s *StarCell) localGradient(q Vector4, bestDir Vector4, bestCos Real) Vecto
 	return u.Sub(bestDir.Sub(u.Mul(bestCos)).Mul(coeff))
 }
 
-func bisectStarCellRoot(f func(Real) Real, a, b Real) Real {
-	fa := f(a)
-	fb := f(b)
-	if math.Abs(fa) <= 1e-12 {
-		return a
-	}
-	if math.Abs(fb) <= 1e-12 {
-		return b
-	}
-	lo, hi := a, b
-	for i := 0; i < 100; i++ {
-		m := 0.5 * (lo + hi)
-		fm := f(m)
-		if math.Abs(fm) <= 1e-12 {
-			return m
+// boundDistance returns a lower bound of the distance from q to the surface
+// in the normalized local space, negative inside. f = |q| - rho changes by at
+// most sqrt(1 + (slope/x)²) per unit of length at the radius x, and the ball
+// of the radius |q|/2 around q stays beyond the radius |q|/2.
+func (s *StarCell) boundDistance(q Vector4) Real {
+	f, _, _ := s.evalNormalizedLocal(q)
+	r := q.Len()
+	h := 0.5 * r
+	b := Real(0)
+	if h > 0 {
+		b = math.Abs(f) * h / math.Hypot(h, s.slope)
+		if b > h {
+			b = h
 		}
-		if (fa > 0 && fm <= 0) || (fa <= 0 && fm > 0) {
-			hi = m
-			fb = fm
-		} else {
-			lo = m
-			fa = fm
-		}
-		_ = fb
 	}
-	return 0.5 * (lo + hi)
+	if g := s.CoreRadius - r; g > b {
+		b = g
+	}
+	if g := r - s.OuterRadius; g > b {
+		b = g
+	}
+	if f < 0 {
+		return -b
+	}
+	return b
 }
 
 func intersectRayStarCell(O Point4, D Vector4, s *StarCell) (hit objectHit, ok bool) {
@@ -353,79 +406,33 @@ func intersectRayStarCell(O Point4, D Vector4, s *StarCell) (hit objectHit, ok b
 	Oq := Vector4{Ol.X / s.Scale.X, Ol.Y / s.Scale.Y, Ol.Z / s.Scale.Z, Ol.W / s.Scale.W}
 	Dq := Vector4{Dl.X / s.Scale.X, Dl.Y / s.Scale.Y, Dl.Z / s.Scale.Z, Dl.W / s.Scale.W}
 
-	box, ok := boxIntervalLocal(Oq, Dq, s.OuterRadius, s.OuterRadius, s.OuterRadius, s.OuterRadius)
+	// Part of the ray inside the ball of the outer radius.
+	a := Dq.Dot(Dq)
+	b := Oq.Dot(Dq)
+	c := Oq.Dot(Oq) - s.OuterRadius*s.OuterRadius
+	disc := b*b - a*c
+	if !(a > 0) || disc < 0 {
+		return objectHit{}, false
+	}
+	sq := math.Sqrt(disc)
+
+	dist := func(t Real) rayDist {
+		return rayDist{d: s.boundDistance(Oq.Add(Dq.Mul(t)))}
+	}
+	tHit, inv, ok := traceSolid(dist, math.Sqrt(a), (-b-sq)/a, (-b+sq)/a)
 	if !ok {
 		return objectHit{}, false
 	}
 
-	const eps = 1e-12
-	const tol = 1e-10
-	start := box.t0
-	if start < 0 {
-		start = 0
-	}
-	end := box.t1
-	if end <= eps || end < start {
+	qHit := Oq.Add(Dq.Mul(tHit))
+	_, bestDir, bestCos := s.evalNormalizedLocal(qHit)
+	gradQ := s.localGradient(qHit, bestDir, bestCos)
+	gradScaled := Vector4{gradQ.X / s.Scale.X, gradQ.Y / s.Scale.Y, gradQ.Z / s.Scale.Z, gradQ.W / s.Scale.W}
+	Nw := s.R.MulVec(gradScaled).Norm()
+	if Nw.Len() == 0 {
 		return objectHit{}, false
 	}
-
-	f := func(t Real) Real {
-		p := Oq.Add(Dq.Mul(t))
-		fv, _, _ := s.evalNormalizedLocal(p)
-		return fv
-	}
-
-	prevT := start
-	prevF, _, _ := s.evalNormalizedLocal(Oq.Add(Dq.Mul(prevT)))
-	inv := start == 0 && prevF <= tol
-
-	if !inv && start > eps && prevF <= tol {
-		qHit := Oq.Add(Dq.Mul(start))
-		_, bestDir, bestCos := s.evalNormalizedLocal(qHit)
-		gradQ := s.localGradient(qHit, bestDir, bestCos)
-		gradScaled := Vector4{gradQ.X / s.Scale.X, gradQ.Y / s.Scale.Y, gradQ.Z / s.Scale.Z, gradQ.W / s.Scale.W}
-		Nw := s.R.MulVec(gradScaled).Norm()
-		if Nw.Len() == 0 {
-			return objectHit{}, false
-		}
-		return objectHit{t: start, Nw: Nw, mat: s, inv: false}, true
-	}
-
-	for i := 1; i <= starCellRaySamples; i++ {
-		t := start + (end-start)*Real(i)/Real(starCellRaySamples)
-		curF, _, _ := s.evalNormalizedLocal(Oq.Add(Dq.Mul(t)))
-
-		crossed := (prevF > tol && curF <= tol) || (prevF <= tol && curF > tol)
-		if crossed || math.Abs(curF) <= tol {
-			var tHit Real
-			switch {
-			case crossed:
-				tHit = bisectStarCellRoot(f, prevT, t)
-			case t > eps:
-				tHit = t
-			default:
-				prevT, prevF = t, curF
-				continue
-			}
-			if tHit <= eps {
-				prevT, prevF = t, curF
-				continue
-			}
-			qHit := Oq.Add(Dq.Mul(tHit))
-			_, bestDir, bestCos := s.evalNormalizedLocal(qHit)
-			gradQ := s.localGradient(qHit, bestDir, bestCos)
-			gradScaled := Vector4{gradQ.X / s.Scale.X, gradQ.Y / s.Scale.Y, gradQ.Z / s.Scale.Z, gradQ.W / s.Scale.W}
-			Nw := s.R.MulVec(gradScaled).Norm()
-			if Nw.Len() == 0 {
-				return objectHit{}, false
-			}
-			return objectHit{t: tHit, Nw: Nw, mat: s, inv: inv}, true
-		}
-
-		prevT, prevF = t, curF
-	}
-
-	return objectHit{}, false
+	return objectHit{t: tHit, Nw: Nw, mat: s, inv: inv}, true
 }
 
 func (s *StarCell) PAbsCh(i int) Real   { return s.pAbs[i] }

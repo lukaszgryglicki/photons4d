@@ -194,17 +194,6 @@ func NewTorisphere(center Point4, scale Vector4, majorRadius, minorRadius Real, 
 	return t, nil
 }
 
-func torisphereImplicitLocal(p Vector4, scale Vector4, R, r Real) Real {
-	u := p.X / scale.X
-	v := p.Y / scale.Y
-	z := p.Z / scale.Z
-	s := p.W / scale.W
-
-	a := math.Sqrt(u*u + v*v + z*z)
-	da := a - R
-	return da*da + s*s - r*r
-}
-
 func intersectRayTorisphere(O Point4, D Vector4, tor *Torisphere) (hit objectHit, ok bool) {
 	Op := Vector4{O.X - tor.Center.X, O.Y - tor.Center.Y, O.Z - tor.Center.Z, O.W - tor.Center.W}
 	Ol := tor.RT.MulVec(Op)
@@ -214,128 +203,43 @@ func intersectRayTorisphere(O Point4, D Vector4, tor *Torisphere) (hit objectHit
 	r := tor.MinorRadius
 	sx, sy, sz, sw := tor.Scale.X, tor.Scale.Y, tor.Scale.Z, tor.Scale.W
 
-	// Conservative local bounding box for broad-phase.
-	hx := sx * (R + r)
-	hy := sy * (R + r)
-	hz := sz * (R + r)
-	hw := sw * r
-
-	box, ok := boxIntervalLocal(Ol, Dl, hx, hy, hz, hw)
+	box, ok := boxIntervalLocal(Ol, Dl, sx*(R+r), sy*(R+r), sz*(R+r), sw*r)
 	if !ok {
 		return objectHit{}, false
 	}
 
-	// X(t) = (x/sx)^2 + (y/sy)^2 + (z/sz)^2
-	x0 := Ol.X*Ol.X/(sx*sx) + Ol.Y*Ol.Y/(sy*sy) + Ol.Z*Ol.Z/(sz*sz)
-	x1 := 2 * (Ol.X*Dl.X/(sx*sx) + Ol.Y*Dl.Y/(sy*sy) + Ol.Z*Dl.Z/(sz*sz))
-	x2 := Dl.X*Dl.X/(sx*sx) + Dl.Y*Dl.Y/(sy*sy) + Dl.Z*Dl.Z/(sz*sz)
-	X := []Real{x0, x1, x2}
+	A := Vector4{Ol.X / sx, Ol.Y / sy, Ol.Z / sz, Ol.W / sw}
+	B := Vector4{Dl.X / sx, Dl.Y / sy, Dl.Z / sz, Dl.W / sw}
 
-	// Y(t) = (w/sw)^2
-	y0 := Ol.W * Ol.W / (sw * sw)
-	y1 := 2 * (Ol.W * Dl.W / (sw * sw))
-	y2 := Dl.W * Dl.W / (sw * sw)
-	Y := []Real{y0, y1, y2}
+	// In the scaled space the solid is the set of points within r of the core
+	// 2-sphere: the distance to that sphere minus r is an exact signed distance.
+	dist := func(tt Real) rayDist {
+		q := A.Add(B.Mul(tt))
+		a := math.Sqrt(q.X*q.X + q.Y*q.Y + q.Z*q.Z)
+		p := a - R
+		delta := math.Hypot(p, q.W)
+		rd := rayDist{d: delta - r}
+		if a > 0 && delta > 0 {
+			rd.rate = (p/a*(q.X*B.X+q.Y*B.Y+q.Z*B.Z) + q.W*B.W) / delta
+			rd.smooth = math.Min(delta, a)
+		}
+		return rd
+	}
 
-	// (X + Y + R^2 - r^2)^2 - 4 R^2 X = 0
-	C := polyAddCF(X, Y)
-	C[0] += R*R - r*r
-	Pcf := polySubCF(polyMulCF(C, C), polyScaleCF(X, 4*R*R))
-
-	coeff := make([]Real, 5)
-	copy(coeff, Pcf)
-	roots := quarticRootsInInterval(coeff[4], coeff[3], coeff[2], coeff[1], coeff[0], box.t0, box.t1)
-	if len(roots) == 0 {
+	tHit, inv, ok := traceSolid(dist, B.Len(), box.t0, box.t1)
+	if !ok {
 		return objectHit{}, false
 	}
 
-	origTol := 1e-7 * (1 + R + r)
-	validRoots := make([]Real, 0, len(roots))
-	for _, x := range roots {
-		if x < box.t0-1e-9 || x > box.t1+1e-9 {
-			continue
-		}
-		p := Ol.Add(Dl.Mul(x))
-		if math.Abs(float64(torisphereImplicitLocal(p, tor.Scale, R, r))) <= float64(origTol) {
-			validRoots = append(validRoots, x)
-		}
+	q := A.Add(B.Mul(tHit))
+	k := Real(0)
+	if a := math.Sqrt(q.X*q.X + q.Y*q.Y + q.Z*q.Z); a > 0 {
+		k = (a - R) / a
 	}
-	if len(validRoots) == 0 {
-		return objectHit{}, false
-	}
-	validRoots = uniqueSortedRoots(validRoots, 1e-8)
-
-	insideAt := func(t Real) bool {
-		p := Ol.Add(Dl.Mul(t))
-		return torisphereImplicitLocal(p, tor.Scale, R, r) <= 1e-9
-	}
-
-	points := make([]Real, 0, len(validRoots)+2)
-	points = append(points, box.t0)
-	points = append(points, validRoots...)
-	points = append(points, box.t1)
-	points = uniqueSortedRoots(points, 1e-9)
-
-	const eps = 1e-12
-	inv := false
-	var tHit Real
-	found := false
-
-	for i := 0; i+1 < len(points); i++ {
-		a, b := points[i], points[i+1]
-		if b-a <= 1e-10 {
-			continue
-		}
-		m := 0.5 * (a + b)
-		if insideAt(m) {
-			if a <= eps && b > eps {
-				inv = true
-				tHit = b
-				found = true
-				break
-			}
-			if a > eps {
-				inv = false
-				tHit = a
-				found = true
-				break
-			}
-		}
-	}
-	if !found || tHit <= eps {
-		return objectHit{}, false
-	}
-
-	Pq := Ol.Add(Dl.Mul(tHit))
-	u := Pq.X / sx
-	v := Pq.Y / sy
-	z := Pq.Z / sz
-	a := math.Sqrt(u*u + v*v + z*z)
-
-	const gEps = 1e-12
-	ga := Real(0)
-	if a > gEps {
-		ga = 2 * (a - R) / a
-	}
-
-	Nl := Vector4{
-		ga * Pq.X / (sx * sx),
-		ga * Pq.Y / (sy * sy),
-		ga * Pq.Z / (sz * sz),
-		2 * Pq.W / (sw * sw),
-	}
+	Nl := Vector4{k * q.X / sx, k * q.Y / sy, k * q.Z / sz, q.W / sw}
 	if Nl.Len() == 0 {
-		if math.Abs(Pq.W) >= math.Abs(Pq.X)+math.Abs(Pq.Y)+math.Abs(Pq.Z) {
-			if Pq.W >= 0 {
-				Nl = Vector4{0, 0, 0, 1}
-			} else {
-				Nl = Vector4{0, 0, 0, -1}
-			}
-		} else {
-			Nl = Vector4{1, 0, 0, 0}
-		}
+		return objectHit{}, false
 	}
-
 	Nw := tor.R.MulVec(Nl).Norm()
 	return objectHit{t: tHit, Nw: Nw, mat: tor, inv: inv}, true
 }

@@ -25,9 +25,8 @@ type Light struct {
 	// orthonormal basis for the 3D subspace orthogonal to Direction
 	U, V, W Vector4
 	// S^3-cap sampling caches
-	acceptProb Real   // area ratio of cap (rejection acceptance)
-	useReject  bool   // true => use rejection sampler, false => LUT inverse-CDF
-	cosLUT     []Real // LUT of cosφ in [cosθ,1] for inverse-CDF (len = lutN+1)
+	acceptProb Real // area ratio of cap (rejection acceptance)
+	useReject  bool // true => reject uniform S^3 samples, false => sample the polar angle
 }
 
 // robust 3D orthonormal basis in the subspace orthogonal to 'a' (unit)
@@ -134,35 +133,9 @@ func NewLight(origin Point4, dir Vector4, color RGB, angle, intensity Real) (*Li
 
 	Ja := jS3(L.cosAngle)
 	L.acceptProb = (math.Pi/4 - Real(Ja)) / (math.Pi / 2)
-	// Choose rejection if reasonably wide; LUT if narrow (fewer trials == faster).
-	L.useReject = L.acceptProb >= LUTRejectThreshold
-	if !L.useReject {
-		// Build small inverse-CDF LUT once.
-		L.cosLUT = make([]Real, LutN+1)
-		J1 := math.Pi / 4
-		for i := 0; i <= LutN; i++ {
-			u := Real(i) / Real(LutN)
-			target := Ja + u*(Real(J1)-Ja)
-			// Newton solve J(t)=target on [cosθ,1], good init:
-			t := L.cosAngle + u*(1-L.cosAngle)
-			for it := 0; it < 4; it++ {
-				denom := 1 - t*t
-				if denom <= 1e-18 {
-					t = 1 - 1e-9
-					break
-				}
-				Jt := 0.5 * (t*math.Sqrt(denom) + math.Asin(t))
-				t -= (Jt - target) / math.Sqrt(denom) // J'(t)=sqrt(1-t^2)
-				if t < L.cosAngle {
-					t = 0.5 * (t + L.cosAngle)
-				}
-				if t > 1-1e-12 {
-					t = 1 - 1e-12
-				}
-			}
-			L.cosLUT[i] = t
-		}
-	}
+	// Reject whole-sphere samples if the cap is reasonably wide; sample the
+	// polar angle if it is narrow (fewer trials == faster).
+	L.useReject = L.acceptProb >= CapRejectThreshold
 
 	DebugLog("Created light %+v", L)
 	return L, nil
@@ -221,23 +194,19 @@ func (l *Light) SampleDir(rng *rand.Rand) Vector4 {
 			}
 		}
 	}
-	// LUT inverse-CDF path (fast & deterministic for narrow cones).
-	n := len(l.cosLUT) - 1
-	fu := rng.Float64() * Real(n)
-	i := int(fu)
-	if i >= n {
-		i = n - 1
-		fu = Real(n - 1)
+	// Narrow cone: the polar angle φ has the density sin²φ on [0,θ]. Propose
+	// φ = θ·u^(1/3) (density φ²) and accept with (sinφ/φ)²: exact.
+	var sinPhi, cosPhi Real
+	for {
+		phi := l.Angle * math.Cbrt(rng.Float64())
+		sinPhi, cosPhi = math.Sincos(phi)
+		if phi == 0 {
+			break
+		}
+		if q := sinPhi / phi; rng.Float64() < q*q {
+			break
+		}
 	}
-	t0 := l.cosLUT[i]
-	t1 := l.cosLUT[i+1]
-	f := fu - Real(i)
-	cosPhi := t0 + (t1-t0)*Real(f)
-	s := 1 - cosPhi*cosPhi
-	if s < 0 {
-		s = 0
-	}
-	sinPhi := math.Sqrt(s)
 	// Uniform orientation in the 3D subspace orthogonal to axis
 	x, y, z := sampleS2(rng)
 	ortho := l.U.Mul(x).Add(l.V.Mul(y)).Add(l.W.Mul(z)) // unit, ⟂ axis

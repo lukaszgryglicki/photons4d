@@ -268,5 +268,75 @@ func nearestHit(scene *Scene, O Point4, D Vector4, tMax Real) (objectHit, bool) 
 		}
 	}
 
+	// cubinders
+	for _, s := range scene.Cubinders {
+		if ok, tNear := rayAABB(O, s.AABBMin, s.AABBMax, rr); !ok || tNear > bestT {
+			continue
+		}
+		if hit, ok := intersectRayCubinder(O, D, s); ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
+
+	// ditori
+	for _, s := range scene.Ditori {
+		if ok, tNear := rayAABB(O, s.AABBMin, s.AABBMax, rr); !ok || tNear > bestT {
+			continue
+		}
+		if hit, ok := intersectRayDitorus(O, D, s); ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
+
+	// duoprisms
+	for _, c := range scene.Duoprisms {
+		if ok, tNear := rayAABB(O, c.AABBMin, c.AABBMax, rr); !ok || tNear > bestT {
+			continue
+		}
+		if hit, ok := intersectRayCellPoly(O, D, &c.cellPoly); ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
+
+	// polytopes
+	for _, c := range scene.Polytopes {
+		if ok, tNear := rayAABB(O, c.AABBMin, c.AABBMax, rr); !ok || tNear > bestT {
+			continue
+		}
+		if hit, ok := intersectRayCellPoly(O, D, &c.cellPoly); ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
+
+	// regular star polychora
+	for _, s := range scene.StarPolychora {
+		if ok, tNear := rayAABB(O, s.AABBMin, s.AABBMax, rr); !ok || tNear > bestT {
+			continue
+		}
+		if hit, ok := intersectRayStarPolychoron(O, D, s); ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
+
+	// convex solids
+	for _, s := range scene.ConvexSolids {
+		if ok, tNear := rayAABB(O, s.AABBMin, s.AABBMax, rr); !ok || tNear > bestT {
+			continue
+		}
+		if hit, ok := intersectRayConvexSolid(O, D, s); ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
+
+	// torinders
+	for _, s := range scene.Torinders {
+		if ok, tNear := rayAABB(O, s.AABBMin, s.AABBMax, rr); !ok || tNear > bestT {
+			continue
+		}
+		if hit, ok := intersectRayTorinder(O, D, s); ok && hit.t > 1e-12 && hit.t < bestT {
+			bestT, best, okAny = hit.t, hit, true
+		}
+	}
+
 	return best, okAny
 }

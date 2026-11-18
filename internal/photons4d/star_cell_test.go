@@ -135,3 +135,41 @@ func TestSceneAABBWithStarCell(t *testing.T) {
 		}
 	}
 }
+
+// Rays that cut the +X spike of an axis-aligned star just below its tip: the
+// chord gets as thin as 1e-6 of the size and must still be met at its entry.
+func TestStarCellThinSpikeIsNotSkipped(t *testing.T) {
+	const core, spike, sharp = 0.45, 0.55, 6.0
+	sc, err := NewStarCell("8", Point4{0, 0, 0, 0}, Vector4{1, 1, 1, 1}, core, spike, sharp, Rot4{},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0, 0, 0}, RGB{1, 1, 1}, RGB{1.2, 1.2, 1.2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	across := Vector4{0, 0.37, 0.22, -0.13}
+	t0 := across.Len()
+	D := across.Norm()
+	for i := 0; i < 400; i++ {
+		x0 := 1 - math.Pow(10, -2-4*Real(i)/400)
+		// half-width of the spike at the height x0, from its definition
+		out := func(tau Real) Real {
+			r := math.Hypot(x0, tau)
+			return r - (core + spike*math.Pow(x0/r, sharp))
+		}
+		lo, hi := Real(0), Real(0.5)
+		for k := 0; k < 100; k++ {
+			if m := 0.5 * (lo + hi); out(m) > 0 {
+				hi = m
+			} else {
+				lo = m
+			}
+		}
+		O := Point4{x0, -across.Y, -across.Z, -across.W}
+		h, ok := intersectRayStarCell(O, D, sc)
+		if !ok || h.inv {
+			t.Fatalf("x0=%.9f: the spike (half-width %.3g) was missed: ok=%v inv=%v", x0, lo, ok, h.inv)
+		}
+		if math.Abs(h.t-(t0-lo)) > 1e-9 {
+			t.Fatalf("x0=%.9f: t=%.12g, want %.12g", x0, h.t, t0-lo)
+		}
+	}
+}

@@ -205,6 +205,9 @@ func bisectSignRoot(f func(Real) Real, a, b Real) Real {
 	lo, hi := a, b
 	for i := 0; i < 100; i++ {
 		m := 0.5 * (lo + hi)
+		if !(m > lo && m < hi) {
+			break
+		}
 		fm := f(m)
 		if fm == 0 {
 			return m
@@ -233,6 +236,9 @@ func superquadricMinimizer(Ol, Dl Vector4, scale Vector4, power, t0, t1 Real) Re
 	lo, hi := t0, t1
 	for i := 0; i < 100; i++ {
 		m := 0.5 * (lo + hi)
+		if !(m > lo && m < hi) {
+			break
+		}
 		dm := superquadricDerivAlong(Ol, Dl, scale, power, m)
 		if dm > 0 {
 			hi = m
@@ -259,46 +265,37 @@ func intersectRaySuperquadric(O Point4, D Vector4, sq *Superquadric) (hit object
 	}
 
 	const eps = 1e-12
-	const tol = 1e-10
 
+	// f is convex along the ray, so the solid is met on one interval around
+	// the minimizer: [tEnter, tExit].
 	t0, t1 := box.t0, box.t1
-	minT := superquadricMinimizer(Ol, Dl, sq.Scale, sq.Power, t0, t1)
-	fmin := f(minT)
-	if fmin > tol {
+	if t1 <= eps {
 		return objectHit{}, false
 	}
-
-	fAt0 := f(0)
-	inv := fAt0 <= tol
-	var tHit Real
-	found := false
-
-	if inv {
-		if t1 <= eps {
-			return objectHit{}, false
+	minT := superquadricMinimizer(Ol, Dl, sq.Scale, sq.Power, t0, t1)
+	if f(minT) > 0 {
+		return objectHit{}, false
+	}
+	exit := func() Real {
+		if f(t1) <= 0 {
+			return t1
 		}
-		f1 := f(t1)
-		if f1 <= tol {
-			tHit = t1
-			found = true
-		} else {
-			tHit = bisectSignRoot(f, 0, t1)
-			found = tHit > eps
-		}
-	} else {
-		f0 := f(t0)
-		if f0 <= tol {
-			if t0 > eps {
-				tHit = t0
-				found = true
-			}
-		} else if fmin <= tol {
-			tHit = bisectSignRoot(f, t0, minT)
-			found = tHit > eps
-		}
+		return bisectSignRoot(f, minT, t1)
 	}
 
-	if !found || tHit <= eps {
+	inv := true
+	var tHit Real
+	if start := rmax(t0, 0); minT > eps {
+		tHit = start
+		if f(start) > 0 {
+			tHit = bisectSignRoot(f, start, minT)
+		}
+		inv = tHit <= eps
+	}
+	if inv {
+		tHit = exit()
+	}
+	if tHit <= eps {
 		return objectHit{}, false
 	}
 

@@ -2,6 +2,7 @@ package photons4d
 
 import (
 	"math"
+	"math/rand"
 	"sync"
 	"testing"
 )
@@ -191,5 +192,143 @@ func TestRayAABB_InsideOrigin_AllowsTraversal(t *testing.T) {
 		t.Logf("rayAABB already clamps tmin>=0 (fine). Keeping or removing the tmin<0 cull is harmless.")
 	} else {
 		t.Logf("rayAABB returns tmin<0 for inside-origin (typical). You must NOT cull on tmin<0.")
+	}
+}
+
+// A scene with every kind of object: the BVH must return exactly the hit of
+// the linear scan for any ray and any limit.
+func TestBVHMatchesLinearScanWithEveryObjectKind(t *testing.T) {
+	rng := rand.New(rand.NewSource(99))
+	white, none, half, ior := RGB{1, 1, 1}, RGB{}, RGB{0.5, 0.5, 0.5}, RGB{1.5, 1.5, 1.5}
+	for trial := 0; trial < 3; trial++ {
+		s := NewScene(Point4{0, 0, 0, 0}, 2, 2, 2, 2, 2, 2, 8, false)
+		at := func() Point4 {
+			return Point4{rng.Float64()*2 - 1, rng.Float64()*2 - 1, rng.Float64()*2 - 1, rng.Float64()*2 - 1}
+		}
+		size := func() Vector4 {
+			f := func() Real { return 0.15 + 0.25*rng.Float64() }
+			return Vector4{f(), f(), f(), f()}
+		}
+		turn := func() Rot4 {
+			f := func() Real { return (rng.Float64() - 0.5) * 6 }
+			return Rot4{f(), f(), f(), f(), f(), f()}
+		}
+		must := func(err error) {
+			t.Helper()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		for i := 0; i < 2; i++ {
+			a, err := NewHyperSphere(at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddHyperSphere(a)
+			b, err := NewCell5(at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddCell5(b)
+			c, err := NewCell8(at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddCell8(c)
+			d, err := NewCell16(at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddCell16(d)
+			e, err := NewCell24(at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddCell24(e)
+			f, err := NewCell120(at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddCell120(f)
+			g, err := NewCell600(at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddCell600(g)
+			st, err := NewStarCell([]string{"5", "8", "16", "24", "120", "600"}[rng.Intn(6)], at(), size(), 0.4, 0.6, 5, turn(), white, none, half, half, ior)
+			must(err)
+			s.AddStarCell(st)
+			sp, err := NewSpherinder(at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddSpherinder(sp)
+			hc, err := NewHyperCone(at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddHyperCone(hc)
+			hp, err := NewHyperCapsule(at(), size(), 0.3, turn(), white, none, half, half, ior)
+			must(err)
+			s.AddHyperCapsule(hp)
+			t1, err := NewSpheritorus(at(), size(), 0.8, 0.3, turn(), white, none, half, half, ior)
+			must(err)
+			s.AddSpheritorus(t1)
+			t2, err := NewDuotorus(at(), size(), 0.8, 0.7, 0.25, turn(), white, none, half, half, ior)
+			must(err)
+			s.AddDuotorus(t2)
+			dc, err := NewDuocylinder(at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddDuocylinder(dc)
+			t3, err := NewTorisphere(at(), size(), 0.8, 0.3, turn(), white, none, half, half, ior)
+			must(err)
+			s.AddTorisphere(t3)
+			sq, err := NewSuperquadric(at(), size(), 3, turn(), white, none, half, half, ior)
+			must(err)
+			s.AddSuperquadric(sq)
+			hf, err := NewHyperFrustum(at(), size(), 0.5, 1, turn(), white, none, half, half, ior)
+			must(err)
+			s.AddHyperFrustum(hf)
+			cb, err := NewCubinder(at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddCubinder(cb)
+			dt, err := NewDitorus(at(), size(), 0.9, 0.35, 0.12, turn(), white, none, half, half, ior)
+			must(err)
+			s.AddDitorus(dt)
+			dp, err := NewDuoprism(at(), size(), 3+rng.Intn(6), 3+rng.Intn(6), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddDuoprism(dp)
+			pc, err := NewPolychoron([]string{"cantellated 5-cell", "snub 24-cell", "x4x3o3x"}[rng.Intn(3)], rng.Intn(2) == 0, at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddPolytope(pc)
+			pp, err := NewPolyhedralSolid([]string{"prism", "pyramid", "bipyramid"}[rng.Intn(3)], "truncated cube", at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddPolytope(pp)
+			dy, err := NewDuopyramid(at(), size(), 3+rng.Intn(6), 3+rng.Intn(6), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddPolytope(dy)
+			sy, err := NewStarPolychoron([]string{"{5/2,5,3}", "{3,5,5/2}", "{5/2,3,3}"}[rng.Intn(3)], at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddStarPolychoron(sy)
+			bk, err := NewBracketope([]string{"<(II)(II)>", "([II]II)", "<(III)I>"}[rng.Intn(3)], at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddConvexSolid(bk)
+			cn, err := []func(Point4, Vector4, Rot4, RGB, RGB, RGB, RGB, RGB) (*ConvexSolid, error){NewConinder, NewCylindrone, NewDicone}[rng.Intn(3)](at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddConvexSolid(cn)
+			py, err := NewPrismicCylinder(3+rng.Intn(6), at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddConvexSolid(py)
+			td, err := NewTorinder(at(), size(), 0.8, 0.3, turn(), white, none, half, half, ior)
+			must(err)
+			s.AddTorinder(td)
+		}
+		objs := collectSceneObjects(s)
+		if len(objs) != s.NObjects() || len(objs) != 56 {
+			t.Fatalf("%d objects in the scene, %d in the BVH, want 56", s.NObjects(), len(objs))
+		}
+		root := buildBVH(objs)
+		hits := 0
+		for i := 0; i < 6000; i++ {
+			O := at()
+			D := unitS3(rng)
+			tMax := Real(math.Inf(1))
+			if i%3 == 0 {
+				tMax = rng.Float64() * 2
+			}
+			h1, ok1 := nearestHit(s, O, D, tMax)
+			h2, ok2 := traverseNearest(root, O, D, tMax)
+			if ok1 != ok2 || (ok1 && (h1.t != h2.t || h1.Nw != h2.Nw || h1.inv != h2.inv || h1.mat != h2.mat)) {
+				t.Fatalf("ray %d (O=%+v D=%+v tMax=%g): linear scan ok=%v t=%.15g, BVH ok=%v t=%.15g", i, O, D, tMax, ok1, h1.t, ok2, h2.t)
+			}
+			if ok1 {
+				hits++
+			}
+		}
+		if hits < 600 {
+			t.Fatalf("only %d of 6000 rays hit", hits)
+		}
 	}
 }

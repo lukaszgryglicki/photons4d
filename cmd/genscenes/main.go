@@ -225,6 +225,19 @@ func ring(n int, radius, y, w, phase float64) []obj {
 
 func single(key string, o obj) obj { return obj{key: []obj{o}} }
 
+// Cone angle of the studio lights that covers the three objects of trio.
+const trioLight = 44
+
+// trio places three objects around the axis of the lights and gives them
+// rotations and coloured glass.
+func trio(a, b, c obj) []obj {
+	return []obj{
+		merge(a, obj{"center": p4(-0.36, 0.21, 0, heroW), "rotDeg": rot(12, -14, 18, 16, -10, 22)}, coloredGlass(rgb(1.0, 0.55, 0.3), 1.52, 0.06)),
+		merge(b, obj{"center": p4(0, -0.42, 0, heroW), "rotDeg": rot(20, 10, -16, -12, 18, 26)}, coloredGlass(rgb(0.4, 0.85, 1.0), 1.52, 0.06)),
+		merge(c, obj{"center": p4(0.36, 0.21, 0, heroW), "rotDeg": rot(8, 22, 12, 18, 26, 14)}, coloredGlass(rgb(0.7, 1.0, 0.55), 1.52, 0.06)),
+	}
+}
+
 // ---------- main -------------------------------------------------------------
 
 func main() {
@@ -343,6 +356,104 @@ func main() {
 			"lowerRadius": 0.34, "upperRadius": 0.78, "rotDeg": heroRot(3),
 		}, glassDefault(rgb(1.0, 0.93, 0.88), 1.52, 0.06)))})
 
+	add(sceneOpts{name: "showcase_cubinder", lights: studioLights(1.0, 34),
+		objects: single("cubinders", merge(obj{
+			"center": p4(0, 0, 0, heroW), "scale": v4(0.46, 0.46, 0.4, 0.34), "rotDeg": heroRot(1),
+		}, glassDefault(rgb(0.94, 0.97, 1.0), 1.5, 0.05)))})
+
+	add(sceneOpts{name: "showcase_ditorus", lights: studioLights(1.0, 34), baseSpp: 150,
+		objects: single("ditori", merge(obj{
+			"center": p4(0, 0, 0, heroW), "scale": v4(1, 1, 1, 1),
+			"majorRadius": 0.44, "middleRadius": 0.17, "minorRadius": 0.07, "rotDeg": heroRot(2),
+		}, glassDefault(rgb(0.92, 1.0, 0.96), 1.53, 0.065)))})
+
+	add(sceneOpts{name: "showcase_duoprism", lights: studioLights(1.0, 34),
+		objects: single("duoprisms", merge(obj{
+			"center": p4(0, 0, 0, heroW), "scale": v4(0.5, 0.5, 0.44, 0.44), "p": 5, "q": 3, "rotDeg": heroRot(3),
+		}, glassDefault(rgb(1.0, 0.95, 0.88), 1.51, 0.055)))})
+
+	// === Polytopes, star polychora and further solids ========================
+
+	add(sceneOpts{name: "showcase_polychoron_snub24cell", lights: studioLights(1.0, 34), baseSpp: 150,
+		objects: single("polychora", merge(obj{
+			"kind": "snub 24-cell", "center": p4(0, 0, 0, heroW), "scale": v4(0.62, 0.62, 0.62, 0.62), "rotDeg": heroRot(0),
+		}, glassDefault(rgb(0.93, 1.0, 0.95), 1.53, 0.065)))})
+
+	add(sceneOpts{name: "showcase_polychoron_grand_antiprism", lights: studioLights(1.0, 34), baseSpp: 150,
+		objects: single("polychora", merge(obj{
+			"kind": "grand antiprism", "center": p4(0, 0, 0, heroW), "scale": v4(0.62, 0.62, 0.62, 0.62), "rotDeg": heroRot(1),
+		}, glassDefault(rgb(1.0, 0.96, 0.9), 1.53, 0.065)))})
+
+	add(sceneOpts{name: "showcase_polychoron_truncated120cell", lights: studioLights(1.0, 34), baseSpp: 160,
+		objects: single("polychora", merge(obj{
+			"kind": "truncated 120-cell", "center": p4(0, 0, 0, heroW), "scale": v4(0.62, 0.62, 0.62, 0.62), "rotDeg": heroRot(2),
+		}, glassDefault(rgb(0.95, 0.93, 1.0), 1.54, 0.07)))})
+
+	add(sceneOpts{name: "showcase_uniform_polychora", lights: studioLights(1.0, trioLight), baseSpp: 150, width: 2.6,
+		objects: obj{"polychora": trio(
+			obj{"kind": "omnitruncated 5-cell", "scale": v4(0.28, 0.28, 0.28, 0.28)},
+			obj{"kind": "cantellated tesseract", "scale": v4(0.28, 0.28, 0.28, 0.28)},
+			obj{"kind": "bitruncated 24-cell", "scale": v4(0.28, 0.28, 0.28, 0.28)})}})
+
+	add(sceneOpts{name: "showcase_dual_polychora", lights: studioLights(1.0, trioLight), baseSpp: 150, width: 2.6,
+		objects: obj{"polychora": trio(
+			obj{"kind": "runcinated 5-cell", "dual": true, "scale": v4(0.28, 0.28, 0.28, 0.28)},
+			obj{"kind": "rectified tesseract", "dual": true, "scale": v4(0.28, 0.28, 0.28, 0.28)},
+			obj{"kind": "truncated 24-cell", "dual": true, "scale": v4(0.28, 0.28, 0.28, 0.28)})}})
+
+	add(sceneOpts{name: "showcase_star_small_stellated_120cell", lights: studioLights(1.0, 34), baseSpp: 150,
+		objects: single("starPolychora", merge(obj{
+			"kind": "small stellated 120-cell", "center": p4(0, 0, 0, heroW), "scale": v4(0.7, 0.7, 0.7, 0.7), "rotDeg": heroRot(0),
+		}, glassDefault(rgb(1.0, 0.94, 0.9), 1.53, 0.065)))})
+
+	// The spikes of this one keep the light for many bounces: a little smaller.
+	add(sceneOpts{name: "showcase_star_great_grand_stellated_120cell", lights: studioLights(1.0, 34), baseSpp: 150,
+		objects: single("starPolychora", merge(obj{
+			"kind": "great grand stellated 120-cell", "center": p4(0, 0, 0, heroW), "scale": v4(0.62, 0.62, 0.62, 0.62), "rotDeg": heroRot(1),
+		}, glassDefault(rgb(0.9, 0.97, 1.0), 1.53, 0.065)))})
+
+	add(sceneOpts{name: "showcase_star_polychora", lights: studioLights(1.0, trioLight), baseSpp: 150, width: 2.6,
+		objects: obj{"starPolychora": trio(
+			obj{"kind": "icosahedral 120-cell", "scale": v4(0.32, 0.32, 0.32, 0.32)},
+			obj{"kind": "great 120-cell", "scale": v4(0.32, 0.32, 0.32, 0.32)},
+			obj{"kind": "great stellated 120-cell", "scale": v4(0.32, 0.32, 0.32, 0.32)})}})
+
+	polyhedral := trio(
+		obj{"base": "truncated icosahedron", "scale": v4(0.3, 0.3, 0.3, 0.3)},
+		obj{"base": "dodecahedron", "scale": v4(0.28, 0.28, 0.28, 0.24)},
+		obj{"base": "snub cube", "scale": v4(0.28, 0.28, 0.28, 0.24)})
+	add(sceneOpts{name: "showcase_polyhedral_solids", lights: studioLights(1.0, trioLight), baseSpp: 150, width: 2.6,
+		objects: obj{"polyhedralPrisms": polyhedral[:1], "polyhedralPyramids": polyhedral[1:2], "polyhedralBipyramids": polyhedral[2:]}})
+
+	add(sceneOpts{name: "showcase_duopyramid", lights: studioLights(1.0, 34),
+		objects: single("duopyramids", merge(obj{
+			"center": p4(0, 0, 0, heroW), "scale": v4(0.56, 0.56, 0.5, 0.5), "p": 5, "q": 3, "rotDeg": heroRot(2),
+		}, glassDefault(rgb(0.96, 1.0, 0.9), 1.51, 0.055)))})
+
+	add(sceneOpts{name: "showcase_bracketopes", lights: studioLights(1.0, trioLight), width: 2.6,
+		objects: obj{"bracketopes": trio(
+			obj{"shape": "<(II)(II)>", "scale": v4(0.32, 0.32, 0.32, 0.32)},
+			obj{"shape": "<(III)I>", "scale": v4(0.32, 0.32, 0.32, 0.32)},
+			obj{"shape": "([II]II)", "scale": v4(0.28, 0.28, 0.28, 0.28)})}})
+
+	cones := trio(
+		obj{"scale": v4(0.28, 0.28, 0.28, 0.2)},
+		obj{"scale": v4(0.28, 0.28, 0.22, 0.28)},
+		obj{"scale": v4(0.28, 0.28, 0.28, 0.28)})
+	add(sceneOpts{name: "showcase_cone_solids", lights: studioLights(1.0, trioLight), width: 2.6,
+		objects: obj{"coninders": cones[:1], "cylindrones": cones[1:2], "dicones": cones[2:]}})
+
+	add(sceneOpts{name: "showcase_prismic_cylinder", lights: studioLights(1.0, 34),
+		objects: single("prismicCylinders", merge(obj{
+			"center": p4(0, 0, 0, heroW), "scale": v4(0.46, 0.46, 0.5, 0.5), "sides": 3, "rotDeg": heroRot(3),
+		}, glassDefault(rgb(0.94, 0.97, 1.0), 1.5, 0.05)))})
+
+	add(sceneOpts{name: "showcase_torinder", lights: studioLights(1.0, 34), baseSpp: 150,
+		objects: single("torinders", merge(obj{
+			"center": p4(0, 0, 0, heroW), "scale": v4(1, 1, 1, 0.3),
+			"majorRadius": 0.44, "minorRadius": 0.16, "rotDeg": heroRot(0),
+		}, glassDefault(rgb(0.92, 1.0, 0.96), 1.53, 0.065)))})
+
 	// === Mixed scenes ========================================================
 
 	add(sceneOpts{name: "showcase_mixed_glass_garden", lights: studioLights(1.0, 28),
@@ -363,6 +474,10 @@ func main() {
 	add(sceneOpts{name: "showcase_escape_environment", lights: escapeLights(), escape: true,
 		gamma: 0.72, bounces: 48, baseSpp: 160, width: 2.0, height: 2.0, depth: 2.0,
 		objects: escapeObjs()})
+
+	add(sceneOpts{name: "showcase_mixed_menagerie", lights: studioLights(1.0, 50),
+		gamma: 0.72, bounces: 48, baseSpp: 128, width: 2.4, height: 2.4, depth: 2.4,
+		objects: menagerie()})
 
 	for _, s := range scenes {
 		if err := writeScene(*outdir, s); err != nil {
@@ -415,6 +530,44 @@ func glassGarden() obj {
 	push("starCells", merge(obj{"kind": "star-cell-24", "center": inner[7], "scale": v4(0.12, 0.12, 0.12, 0.12),
 		"coreRadius": 0.42, "spikeLength": 0.58, "sharpness": 6.4, "rotDeg": heroRot(0)}, gm(0)))
 	return objs
+}
+
+// menagerie: the newer kinds of objects in two rings, as in glassGarden.
+func menagerie() obj {
+	outer := ring(9, 0.74, 0.2, heroW, 0.1)
+	inner := ring(7, 0.36, -0.22, heroW, 0.5)
+	tints := []obj{
+		rgb(1.0, 0.55, 0.4), rgb(0.4, 0.8, 1.0), rgb(0.6, 1.0, 0.55), rgb(1.0, 0.85, 0.4),
+		rgb(0.85, 0.5, 1.0), rgb(0.4, 1.0, 0.85), rgb(1.0, 0.45, 0.65), rgb(0.5, 0.7, 1.0),
+		rgb(0.95, 0.97, 1.0),
+	}
+	gm := func(i int) obj { return coloredGlass(tints[i%len(tints)], 1.5+0.02*float64(i%4), 0.06) }
+	at := func(key string, c obj, i int, more obj) obj {
+		return obj{key: []obj{merge(obj{"center": c, "rotDeg": heroRot(i)}, more, gm(i))}}
+	}
+	same := func(s float64) obj { return v4(s, s, s, s) }
+	return merge(
+		obj{"polychora": []obj{
+			merge(obj{"kind": "snub 24-cell", "center": outer[0], "scale": same(0.26), "rotDeg": heroRot(0)}, gm(0)),
+			merge(obj{"kind": "rectified 600-cell", "center": outer[1], "scale": same(0.26), "rotDeg": heroRot(1)}, gm(1)),
+			merge(obj{"kind": "cantellated 24-cell", "dual": true, "center": outer[2], "scale": same(0.26), "rotDeg": heroRot(2)}, gm(2)),
+		}},
+		obj{"starPolychora": []obj{
+			merge(obj{"kind": "small stellated 120-cell", "center": outer[3], "scale": same(0.3), "rotDeg": heroRot(3)}, gm(3)),
+			merge(obj{"kind": "great stellated 120-cell", "center": outer[4], "scale": same(0.3), "rotDeg": heroRot(0)}, gm(4)),
+		}},
+		at("polyhedralPrisms", outer[5], 1, obj{"base": "icosahedron", "scale": same(0.26)}),
+		at("polyhedralBipyramids", outer[6], 2, obj{"base": "cuboctahedron", "scale": v4(0.26, 0.26, 0.26, 0.22)}),
+		at("duopyramids", outer[7], 3, obj{"p": 6, "q": 4, "scale": same(0.28)}),
+		at("torinders", outer[8], 0, obj{"scale": v4(1, 1, 1, 0.14), "majorRadius": 0.22, "minorRadius": 0.08}),
+		at("cubinders", inner[0], 1, obj{"scale": v4(0.2, 0.2, 0.18, 0.16)}),
+		at("ditori", inner[1], 2, obj{"scale": same(1), "majorRadius": 0.2, "middleRadius": 0.08, "minorRadius": 0.035}),
+		at("duoprisms", inner[2], 3, obj{"p": 7, "q": 3, "scale": same(0.2)}),
+		at("bracketopes", inner[3], 0, obj{"shape": "<(II)(II)>", "scale": same(0.22)}),
+		at("coninders", inner[4], 1, obj{"scale": v4(0.2, 0.2, 0.2, 0.16)}),
+		at("dicones", inner[5], 2, obj{"scale": same(0.2)}),
+		at("prismicCylinders", inner[6], 3, obj{"sides": 5, "scale": same(0.2)}),
+	)
 }
 
 func prismChamber() obj {

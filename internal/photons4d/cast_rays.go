@@ -214,8 +214,13 @@ func castSingleRay(light *Light, scene *Scene, rng *rand.Rand, locks *shardLocks
 			continue
 		}
 		if u < pAbs+pReflDyn+pRefrDyn+pDiffDyn {
-			// Diffuse scatter (Lambertian-style on S^3 hemisphere around N)
-			D = sampleDiffuseDir(N, rng)
+			// Diffuse scatter (Lambertian-style on the S^3 hemisphere of the
+			// side the photon came from: around N outside, around -N inside)
+			Nd := N
+			if D.Dot(N) > 0 {
+				Nd = N.Mul(-1)
+			}
+			D = sampleDiffuseDir(Nd, rng)
 			O = Point4{P.X + D.X*bumpShift, P.Y + D.Y*bumpShift, P.Z + D.Z*bumpShift, P.W + D.W*bumpShift}
 			if Debug && deposit {
 				logRay("diffuse", Diffuse, O, D, P, bounce, totalDist)

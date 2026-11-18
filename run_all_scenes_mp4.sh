@@ -23,13 +23,12 @@ do
   prefix=$(basename "${gif_out%.gif}")
   scene_name=$(basename "${f%.json}")
   ./photons4d "$f"
-  ./pngs2mp4.sh "$prefix" </dev/null
   if compgen -G "pngs/${prefix}_*.png" >/dev/null; then
     ./pngs2mp4.sh "$prefix" </dev/null
+    mv -f "${prefix}.mp4" "mp4/${scene_name}.mp4"
   else
     echo "No PNGs for ${prefix}, skipping MP4"
   fi
-  mv -f "${prefix}.mp4" "mp4/${scene_name}.mp4"
   if [ -z "${KEEP_PNGS:-}" ]; then
     rm -f "pngs/${prefix}"_*.png
   fi

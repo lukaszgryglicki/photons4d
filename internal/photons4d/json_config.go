@@ -55,6 +55,22 @@ type Config struct {
 	Torispheres   []TorisphereCfg   `json:"torispheres,omitempty"`
 	Superquadrics []SuperquadricCfg `json:"superquadrics,omitempty"`
 	HyperFrustums []HyperFrustumCfg `json:"hyperfrustums,omitempty"`
+	Cubinders     []CubinderCfg     `json:"cubinders,omitempty"`
+	Ditori        []DitorusCfg      `json:"ditori,omitempty"`
+	Duoprisms     []DuoprismCfg     `json:"duoprisms,omitempty"`
+
+	Polychora            []PolychoronCfg      `json:"polychora,omitempty"`
+	StarPolychora        []StarPolychoronCfg  `json:"starPolychora,omitempty"`
+	PolyhedralPrisms     []PolyhedralCfg      `json:"polyhedralPrisms,omitempty"`
+	PolyhedralPyramids   []PolyhedralCfg      `json:"polyhedralPyramids,omitempty"`
+	PolyhedralBipyramids []PolyhedralCfg      `json:"polyhedralBipyramids,omitempty"`
+	Duopyramids          []DuopyramidCfg      `json:"duopyramids,omitempty"`
+	Bracketopes          []BracketopeCfg      `json:"bracketopes,omitempty"`
+	Coninders            []ConeSolidCfg       `json:"coninders,omitempty"`
+	Cylindrones          []ConeSolidCfg       `json:"cylindrones,omitempty"`
+	Dicones              []ConeSolidCfg       `json:"dicones,omitempty"`
+	PrismicCylinders     []PrismicCylinderCfg `json:"prismicCylinders,omitempty"`
+	Torinders            []TorinderCfg        `json:"torinders,omitempty"`
 }
 
 // Rotation in degrees for JSON (friendlier than radians).
@@ -277,6 +293,150 @@ type HyperFrustumCfg struct {
 	Scale       Vector4 `json:"scale,omitempty"`
 	LowerRadius Real    `json:"lowerRadius,omitempty"`
 	UpperRadius Real    `json:"upperRadius,omitempty"`
+	RotDeg      Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type CubinderCfg struct {
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type DitorusCfg struct {
+	Center       Point4  `json:"center"`
+	Scale        Vector4 `json:"scale,omitempty"`
+	MajorRadius  Real    `json:"majorRadius,omitempty"`
+	MiddleRadius Real    `json:"middleRadius,omitempty"`
+	MinorRadius  Real    `json:"minorRadius,omitempty"`
+	RotDeg       Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type DuoprismCfg struct {
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	P      int     `json:"p,omitempty"`
+	Q      int     `json:"q,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+// PolychoronCfg: a convex uniform polychoron by name ("truncated 120-cell",
+// "snub 24-cell", "grand antiprism", ...) or by Coxeter diagram ("x5o3o3x"),
+// or its dual.
+type PolychoronCfg struct {
+	Kind   string  `json:"kind"`
+	Dual   bool    `json:"dual,omitempty"`
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+// StarPolychoronCfg: a regular star polychoron by name ("grand 600-cell")
+// or by Schläfli symbol ("{3,3,5/2}").
+type StarPolychoronCfg struct {
+	Kind   string  `json:"kind"`
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+// PolyhedralCfg: the prism, pyramid or bipyramid over a uniform polyhedron
+// ("truncated icosahedron", "snub cube", "7-gonal antiprism", "x5x3o", ...).
+type PolyhedralCfg struct {
+	Base   string  `json:"base"`
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type DuopyramidCfg DuoprismCfg
+
+// BracketopeCfg: a shape in the bracket notation, such as "<(II)(II)>".
+type BracketopeCfg struct {
+	Shape  string  `json:"shape"`
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+// ConeSolidCfg serves the coninders, cylindrones and dicones.
+type ConeSolidCfg struct {
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type PrismicCylinderCfg struct {
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	Sides  int     `json:"sides,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type TorinderCfg struct {
+	Center      Point4  `json:"center"`
+	Scale       Vector4 `json:"scale,omitempty"`
+	MajorRadius Real    `json:"majorRadius,omitempty"`
+	MinorRadius Real    `json:"minorRadius,omitempty"`
 	RotDeg      Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
@@ -650,6 +810,155 @@ func (c HyperFrustumCfg) Build() (*HyperFrustum, error) {
 		u = 1.0
 	}
 	return NewHyperFrustum(c.Center, sc, l, u, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c CubinderCfg) Build() (*Cubinder, error) {
+	sc := c.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	return NewCubinder(c.Center, sc, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c DitorusCfg) Build() (*Ditorus, error) {
+	sc := c.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	R := c.MajorRadius
+	if R == 0 {
+		R = 1
+	}
+	m := c.MiddleRadius
+	if m == 0 {
+		m = 0.4
+	}
+	r := c.MinorRadius
+	if r == 0 {
+		r = 0.15
+	}
+	return NewDitorus(c.Center, sc, R, m, r, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c DuoprismCfg) Build() (*Duoprism, error) {
+	sc := c.Scale
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	p := c.P
+	if p == 0 {
+		p = 3
+	}
+	q := c.Q
+	if q == 0 {
+		q = 3
+	}
+	return NewDuoprism(c.Center, sc, p, q, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+// scaleOrOne replaces the missing (zero) parts of a scale by 1.
+func scaleOrOne(sc Vector4) Vector4 {
+	if sc.X == 0 {
+		sc.X = 1
+	}
+	if sc.Y == 0 {
+		sc.Y = 1
+	}
+	if sc.Z == 0 {
+		sc.Z = 1
+	}
+	if sc.W == 0 {
+		sc.W = 1
+	}
+	return sc
+}
+
+func (c PolychoronCfg) Build() (*Polytope, error) {
+	return NewPolychoron(c.Kind, c.Dual, c.Center, scaleOrOne(c.Scale), c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c StarPolychoronCfg) Build() (*StarPolychoron, error) {
+	return NewStarPolychoron(c.Kind, c.Center, scaleOrOne(c.Scale), c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+// Build makes the prism, the pyramid or the bipyramid (shape) over the base.
+func (c PolyhedralCfg) Build(shape string) (*Polytope, error) {
+	return NewPolyhedralSolid(shape, c.Base, c.Center, scaleOrOne(c.Scale), c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c DuopyramidCfg) Build() (*Polytope, error) {
+	p := c.P
+	if p == 0 {
+		p = 3
+	}
+	q := c.Q
+	if q == 0 {
+		q = 3
+	}
+	return NewDuopyramid(c.Center, scaleOrOne(c.Scale), p, q, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c BracketopeCfg) Build() (*ConvexSolid, error) {
+	return NewBracketope(c.Shape, c.Center, scaleOrOne(c.Scale), c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+// Build makes the coninder, the cylindrone or the dicone (kind).
+func (c ConeSolidCfg) Build(kind string) (*ConvexSolid, error) {
+	build := NewConinder
+	switch kind {
+	case "cylindrone":
+		build = NewCylindrone
+	case "dicone":
+		build = NewDicone
+	}
+	return build(c.Center, scaleOrOne(c.Scale), c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c PrismicCylinderCfg) Build() (*ConvexSolid, error) {
+	n := c.Sides
+	if n == 0 {
+		n = 3
+	}
+	return NewPrismicCylinder(n, c.Center, scaleOrOne(c.Scale), c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c TorinderCfg) Build() (*Torinder, error) {
+	R := c.MajorRadius
+	if R == 0 {
+		R = 1
+	}
+	r := c.MinorRadius
+	if r == 0 {
+		r = 0.25
+	}
+	return NewTorinder(c.Center, scaleOrOne(c.Scale), R, r, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
 }
 
 func loadConfig(path string) (*Config, error) {

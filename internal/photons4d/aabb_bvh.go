@@ -39,7 +39,7 @@ func getOrBuildBVH(s *Scene) *AABBNode {
 
 func collectSceneObjects(s *Scene) []bvhLeaf {
 	out := make([]bvhLeaf, 0,
-		len(s.Cells8)+len(s.Hyperspheres)+len(s.Cells5)+len(s.Cells16)+len(s.Cells24)+len(s.Cells120)+len(s.Cells600)+len(s.StarCells)+len(s.Spherinders)+len(s.HyperCones)+len(s.HyperCapsules)+len(s.Spheritori)+len(s.Duotori)+len(s.Duocylinders)+len(s.Torispheres)+len(s.Superquadrics)+len(s.HyperFrustums))
+		len(s.Cells8)+len(s.Hyperspheres)+len(s.Cells5)+len(s.Cells16)+len(s.Cells24)+len(s.Cells120)+len(s.Cells600)+len(s.StarCells)+len(s.Spherinders)+len(s.HyperCones)+len(s.HyperCapsules)+len(s.Spheritori)+len(s.Duotori)+len(s.Duocylinders)+len(s.Torispheres)+len(s.Superquadrics)+len(s.HyperFrustums)+len(s.Cubinders)+len(s.Ditori)+len(s.Duoprisms)+len(s.Polytopes)+len(s.StarPolychora)+len(s.ConvexSolids)+len(s.Torinders))
 
 	for _, o := range s.Cells8 {
 		if o == nil {
@@ -211,6 +211,76 @@ func collectSceneObjects(s *Scene) []bvhLeaf {
 			intersect: func(O Point4, D Vector4) (objectHit, bool) { return intersectRayHyperFrustum(O, D, obj) },
 		})
 	}
+	for _, o := range s.Cubinders {
+		if o == nil {
+			continue
+		}
+		obj := o
+		out = append(out, bvhLeaf{
+			min: obj.AABBMin, max: obj.AABBMax,
+			intersect: func(O Point4, D Vector4) (objectHit, bool) { return intersectRayCubinder(O, D, obj) },
+		})
+	}
+	for _, o := range s.Ditori {
+		if o == nil {
+			continue
+		}
+		obj := o
+		out = append(out, bvhLeaf{
+			min: obj.AABBMin, max: obj.AABBMax,
+			intersect: func(O Point4, D Vector4) (objectHit, bool) { return intersectRayDitorus(O, D, obj) },
+		})
+	}
+	for _, o := range s.Duoprisms {
+		if o == nil {
+			continue
+		}
+		obj := o
+		out = append(out, bvhLeaf{
+			min: obj.AABBMin, max: obj.AABBMax,
+			intersect: func(O Point4, D Vector4) (objectHit, bool) { return intersectRayCellPoly(O, D, &obj.cellPoly) },
+		})
+	}
+	for _, o := range s.Polytopes {
+		if o == nil {
+			continue
+		}
+		obj := o
+		out = append(out, bvhLeaf{
+			min: obj.AABBMin, max: obj.AABBMax,
+			intersect: func(O Point4, D Vector4) (objectHit, bool) { return intersectRayCellPoly(O, D, &obj.cellPoly) },
+		})
+	}
+	for _, o := range s.StarPolychora {
+		if o == nil {
+			continue
+		}
+		obj := o
+		out = append(out, bvhLeaf{
+			min: obj.AABBMin, max: obj.AABBMax,
+			intersect: func(O Point4, D Vector4) (objectHit, bool) { return intersectRayStarPolychoron(O, D, obj) },
+		})
+	}
+	for _, o := range s.ConvexSolids {
+		if o == nil {
+			continue
+		}
+		obj := o
+		out = append(out, bvhLeaf{
+			min: obj.AABBMin, max: obj.AABBMax,
+			intersect: func(O Point4, D Vector4) (objectHit, bool) { return intersectRayConvexSolid(O, D, obj) },
+		})
+	}
+	for _, o := range s.Torinders {
+		if o == nil {
+			continue
+		}
+		obj := o
+		out = append(out, bvhLeaf{
+			min: obj.AABBMin, max: obj.AABBMax,
+			intersect: func(O Point4, D Vector4) (objectHit, bool) { return intersectRayTorinder(O, D, obj) },
+		})
+	}
 	return out
 }
 
@@ -321,17 +391,9 @@ func buildBVHRec(objs []bvhLeaf, depth int) *AABBNode {
 }
 
 func aabbUnion(aMin, aMax, bMin, bMax Point4) (Point4, Point4) {
-	return Point4{
-			rmin(aMin.X, bMin.X),
-			rmin(aMin.Y, bMin.Y),
-			rmin(aMin.Z, bMin.Z),
-			rmin(aMin.W, bMin.W),
-		}, Point4{
-			rmax(aMax.X, bMax.X),
-			rmax(aMax.Y, bMax.Y),
-			rmax(aMax.Z, bMax.Z),
-			rmax(aMax.W, bMax.W),
-		}
+	lo := Point4{rmin(aMin.X, bMin.X), rmin(aMin.Y, bMin.Y), rmin(aMin.Z, bMin.Z), rmin(aMin.W, bMin.W)}
+	hi := Point4{rmax(aMax.X, bMax.X), rmax(aMax.Y, bMax.Y), rmax(aMax.Z, bMax.Z), rmax(aMax.W, bMax.W)}
+	return lo, hi
 }
 
 func centroid(a, b Real) Real { return (a + b) * 0.5 }

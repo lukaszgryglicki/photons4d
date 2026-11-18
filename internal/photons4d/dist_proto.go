@@ -182,15 +182,13 @@ func extractSparseAndZero(buf []Real) ([]int64, []float64) {
 	return idxDeltas, values
 }
 
-// applySparse adds one delta-encoded batch into buf, validating bounds,
-// monotonicity and value sanity (finite, non-negative — photon deposits can
-// never be negative). Any violation aborts the merge with an error before
-// buf is touched.
-func applySparse(buf []Real, idxDeltas []int64, values []float64) error {
+// checkSparse validates one delta-encoded batch for a buffer of bufLen
+// entries: bounds, monotonicity and value sanity (finite, non-negative —
+// photon deposits can never be negative).
+func checkSparse(bufLen int, idxDeltas []int64, values []float64) error {
 	if len(idxDeltas) != len(values) {
 		return fmt.Errorf("sparse update: %d indices vs %d values", len(idxDeltas), len(values))
 	}
-	// Validate first (don't partially apply a corrupt batch).
 	idx := int64(-1)
 	for n, d := range idxDeltas {
 		if n == 0 {
@@ -201,15 +199,20 @@ func applySparse(buf []Real, idxDeltas []int64, values []float64) error {
 			}
 			idx += d
 		}
-		if idx < 0 || idx >= int64(len(buf)) {
-			return fmt.Errorf("sparse update: index %d out of range [0,%d)", idx, len(buf))
+		if idx < 0 || idx >= int64(bufLen) {
+			return fmt.Errorf("sparse update: index %d out of range [0,%d)", idx, bufLen)
 		}
 		v := values[n]
 		if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
 			return fmt.Errorf("sparse update: invalid value %v at %d", v, n)
 		}
 	}
-	idx = -1
+	return nil
+}
+
+// addSparse adds one batch that passed checkSparse into buf.
+func addSparse(buf []Real, idxDeltas []int64, values []float64) {
+	idx := int64(-1)
 	for n, d := range idxDeltas {
 		if n == 0 {
 			idx = d
@@ -218,5 +221,14 @@ func applySparse(buf []Real, idxDeltas []int64, values []float64) error {
 		}
 		buf[idx] += Real(values[n])
 	}
+}
+
+// applySparse adds one delta-encoded batch into buf. Any violation found by
+// checkSparse aborts the merge with an error before buf is touched.
+func applySparse(buf []Real, idxDeltas []int64, values []float64) error {
+	if err := checkSparse(len(buf), idxDeltas, values); err != nil {
+		return err
+	}
+	addSparse(buf, idxDeltas, values)
 	return nil
 }

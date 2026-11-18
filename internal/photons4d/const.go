@@ -17,8 +17,7 @@ const (
 	// NumShards           = 1024
 	NumShards           = 65536
 	AttenuateD2         = false // if true, attenuate light by 1/d^2 (distance squared) for each bounce (not needed in radiance model)
-	LUTRejectThreshold  = 0.1   // threshold for using rejection sampling vs. LUT inverse-CDF sampling for cone light S^3 cap sampling
-	LutN                = 256
+	CapRejectThreshold  = 0.1   // cone lights covering at least this part of S^3 reject whole-sphere samples, narrower ones sample the polar angle
 	AABBBVHMaxLeafSize  = 6
 	AABBBVHFromNObjects = 14 // minimum number of objects to use BVH of AABBs, otherwise just iterate all objects on the scene
 	EscapeSppFactor     = 4  // factor to increase spp for escape rays to avoid noise

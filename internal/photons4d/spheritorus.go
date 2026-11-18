@@ -3,7 +3,6 @@ package photons4d
 import (
 	"fmt"
 	"math"
-	"sort"
 )
 
 const SpheritorusConservativeAABB = false
@@ -199,12 +198,6 @@ func NewSpheritorus(center Point4, scale Vector4, majorRadius, minorRadius Real,
 	return t, nil
 }
 
-func torusImplicitScaled(sx, sy, sz, sw, R, r Real) Real {
-	sumsq := sx*sx + sy*sy + sz*sz + sw*sw
-	a := sumsq + R*R - r*r
-	return a*a - 4*R*R*(sx*sx+sw*sw)
-}
-
 func boxIntervalLocal(Ol, Dl Vector4, hx, hy, hz, hw Real) (tInterval, bool) {
 	const eps = 1e-12
 	tmin, tmax := Real(math.Inf(-1)), Real(math.Inf(1))
@@ -242,186 +235,6 @@ func boxIntervalLocal(Ol, Dl Vector4, hx, hy, hz, hw Real) (tInterval, bool) {
 	return tInterval{tmin, tmax}, true
 }
 
-func polyEvalQuartic(c4, c3, c2, c1, c0, x Real) Real {
-	return ((((c4*x)+c3)*x+c2)*x+c1)*x + c0
-}
-
-func polyEvalCubic(c3, c2, c1, c0, x Real) Real {
-	return (((c3*x)+c2)*x+c1)*x + c0
-}
-
-func uniqueSortedRoots(xs []Real, tol Real) []Real {
-	if len(xs) == 0 {
-		return nil
-	}
-	sort.Slice(xs, func(i, j int) bool { return xs[i] < xs[j] })
-	out := make([]Real, 0, len(xs))
-	for _, x := range xs {
-		if len(out) == 0 || math.Abs(float64(x-out[len(out)-1])) > float64(tol) {
-			out = append(out, x)
-		}
-	}
-	return out
-}
-
-func solveQuadraticReal(a, b, c Real) []Real {
-	const eps = 1e-12
-	if math.Abs(float64(a)) < eps {
-		if math.Abs(float64(b)) < eps {
-			return nil
-		}
-		return []Real{-c / b}
-	}
-	disc := b*b - 4*a*c
-	if disc < 0 {
-		return nil
-	}
-	if disc == 0 {
-		return []Real{-b / (2 * a)}
-	}
-	sqrtD := math.Sqrt(disc)
-	r0 := (-b - sqrtD) / (2 * a)
-	r1 := (-b + sqrtD) / (2 * a)
-	return uniqueSortedRoots([]Real{r0, r1}, 1e-10)
-}
-
-func realRootsCubic(a, b, c, d Real) []Real {
-	const eps = 1e-12
-
-	if math.Abs(float64(a)) < eps {
-		return solveQuadraticReal(b, c, d)
-	}
-
-	// Normalize to x^3 + A x^2 + B x + C = 0
-	A := b / a
-	B := c / a
-	C := d / a
-
-	// Depressed cubic y^3 + p y + q = 0, x = y - A/3
-	p := B - A*A/3
-	q := 2*A*A*A/27 - A*B/3 + C
-
-	disc := q*q/4 + p*p*p/27
-	shift := A / 3
-
-	if disc > eps {
-		sqrtD := math.Sqrt(disc)
-		u := math.Cbrt(-q/2 + sqrtD)
-		v := math.Cbrt(-q/2 - sqrtD)
-		return []Real{u + v - shift}
-	}
-
-	if math.Abs(float64(disc)) <= eps {
-		if math.Abs(float64(q)) <= eps {
-			return []Real{-shift}
-		}
-		u := math.Cbrt(-q / 2)
-		return uniqueSortedRoots([]Real{2*u - shift, -u - shift}, 1e-10)
-	}
-
-	// disc < 0: three real roots
-	m := 2 * math.Sqrt(-p/3)
-	arg := -q / (2 * math.Sqrt(-(p*p*p)/27))
-	if arg < -1 {
-		arg = -1
-	}
-	if arg > 1 {
-		arg = 1
-	}
-	phi := math.Acos(arg)
-
-	r0 := m*math.Cos(phi/3) - shift
-	r1 := m*math.Cos((phi+2*math.Pi)/3) - shift
-	r2 := m*math.Cos((phi+4*math.Pi)/3) - shift
-	return uniqueSortedRoots([]Real{r0, r1, r2}, 1e-10)
-}
-
-func quarticTol(c4, c3, c2, c1, c0 Real) Real {
-	m := math.Abs(c4)
-	for _, v := range []Real{c3, c2, c1, c0} {
-		av := math.Abs(v)
-		if av > m {
-			m = av
-		}
-	}
-	if m < 1 {
-		m = 1
-	}
-	return 1e-10 * m
-}
-
-func bisectQuarticRoot(c4, c3, c2, c1, c0, a, b Real) Real {
-	fa := polyEvalQuartic(c4, c3, c2, c1, c0, a)
-	fb := polyEvalQuartic(c4, c3, c2, c1, c0, b)
-	if fa == 0 {
-		return a
-	}
-	if fb == 0 {
-		return b
-	}
-	lo, hi := a, b
-	for i := 0; i < 80; i++ {
-		m := 0.5 * (lo + hi)
-		fm := polyEvalQuartic(c4, c3, c2, c1, c0, m)
-		if fm == 0 {
-			return m
-		}
-		if (fa < 0 && fm > 0) || (fa > 0 && fm < 0) {
-			hi = m
-			fb = fm
-		} else {
-			lo = m
-			fa = fm
-		}
-		_ = fb
-	}
-	return 0.5 * (lo + hi)
-}
-
-func quarticRootsInInterval(c4, c3, c2, c1, c0, tmin, tmax Real) []Real {
-	tol := quarticTol(c4, c3, c2, c1, c0)
-
-	crit := realRootsCubic(4*c4, 3*c3, 2*c2, c1)
-	points := make([]Real, 0, len(crit)+2)
-	points = append(points, tmin)
-	for _, x := range crit {
-		if x > tmin+1e-12 && x < tmax-1e-12 {
-			points = append(points, x)
-		}
-	}
-	points = append(points, tmax)
-	points = uniqueSortedRoots(points, 1e-12)
-
-	roots := make([]Real, 0, 4)
-
-	for _, p := range points {
-		if math.Abs(float64(polyEvalQuartic(c4, c3, c2, c1, c0, p))) <= float64(tol) {
-			roots = append(roots, p)
-		}
-	}
-
-	for i := 0; i+1 < len(points); i++ {
-		a, b := points[i], points[i+1]
-		if b-a <= 1e-12 {
-			continue
-		}
-		fa := polyEvalQuartic(c4, c3, c2, c1, c0, a)
-		fb := polyEvalQuartic(c4, c3, c2, c1, c0, b)
-		if (fa < 0 && fb > 0) || (fa > 0 && fb < 0) {
-			roots = append(roots, bisectQuarticRoot(c4, c3, c2, c1, c0, a, b))
-		}
-	}
-
-	roots = uniqueSortedRoots(roots, 1e-9)
-	out := make([]Real, 0, len(roots))
-	for _, x := range roots {
-		if x >= tmin-1e-10 && x <= tmax+1e-10 {
-			out = append(out, x)
-		}
-	}
-	return out
-}
-
 func intersectRaySpheritorus(O Point4, D Vector4, t *Spheritorus) (hit objectHit, ok bool) {
 	Op := Vector4{O.X - t.Center.X, O.Y - t.Center.Y, O.Z - t.Center.Z, O.W - t.Center.W}
 	Ol := t.RT.MulVec(Op)
@@ -431,13 +244,7 @@ func intersectRaySpheritorus(O Point4, D Vector4, t *Spheritorus) (hit objectHit
 	r := t.MinorRadius
 	sx, sy, sz, sw := t.Scale.X, t.Scale.Y, t.Scale.Z, t.Scale.W
 
-	// Conservative local bounding box for the torus, used to restrict the quartic solve.
-	hx := sx * (R + r)
-	hy := sy * r
-	hz := sz * r
-	hw := sw * (R + r)
-
-	box, ok := boxIntervalLocal(Ol, Dl, hx, hy, hz, hw)
+	box, ok := boxIntervalLocal(Ol, Dl, sx*(R+r), sy*r, sz*r, sw*(R+r))
 	if !ok {
 		return objectHit{}, false
 	}
@@ -445,86 +252,32 @@ func intersectRaySpheritorus(O Point4, D Vector4, t *Spheritorus) (hit objectHit
 	A := Vector4{Ol.X / sx, Ol.Y / sy, Ol.Z / sz, Ol.W / sw}
 	B := Vector4{Dl.X / sx, Dl.Y / sy, Dl.Z / sz, Dl.W / sw}
 
-	M := A.Dot(A) + R*R - r*r
-	N := 2 * A.Dot(B)
-	P := B.Dot(B)
+	// In the scaled space the solid is the set of points within r of the core
+	// circle: the distance to that circle minus r is an exact signed distance.
+	dist := func(tt Real) rayDist {
+		q := A.Add(B.Mul(tt))
+		rho := math.Hypot(q.X, q.W)
+		p := rho - R
+		delta := math.Sqrt(p*p + q.Y*q.Y + q.Z*q.Z)
+		rd := rayDist{d: delta - r}
+		if rho > 0 && delta > 0 {
+			rd.rate = (p/rho*(q.X*B.X+q.W*B.W) + q.Y*B.Y + q.Z*B.Z) / delta
+			rd.smooth = math.Min(delta, rho)
+		}
+		return rd
+	}
 
-	Q := A.X*A.X + A.W*A.W
-	Tw := 2 * (A.X*B.X + A.W*B.W)
-	U := B.X*B.X + B.W*B.W
-
-	c4 := P * P
-	c3 := 2 * P * N
-	c2 := N*N + 2*P*M - 4*R*R*U
-	c1 := 2*N*M - 4*R*R*Tw
-	c0 := M*M - 4*R*R*Q
-
-	roots := quarticRootsInInterval(c4, c3, c2, c1, c0, box.t0, box.t1)
-	if len(roots) == 0 {
+	tHit, inv, ok := traceSolid(dist, B.Len(), box.t0, box.t1)
+	if !ok {
 		return objectHit{}, false
 	}
 
-	points := make([]Real, 0, len(roots)+2)
-	points = append(points, box.t0)
-	points = append(points, roots...)
-	points = append(points, box.t1)
-	points = uniqueSortedRoots(points, 1e-9)
-
-	const eps = 1e-12
-	inv := false
-	var tHit Real
-	found := false
-
-	for i := 0; i+1 < len(points); i++ {
-		a, b := points[i], points[i+1]
-		if b-a <= 1e-10 {
-			continue
-		}
-		m := 0.5 * (a + b)
-		if polyEvalQuartic(c4, c3, c2, c1, c0, m) <= 0 {
-			// Ray starts inside this interval -> exiting hit.
-			if a <= eps && b > eps {
-				inv = true
-				tHit = b
-				found = true
-				break
-			}
-			// First interior interval ahead of the ray -> entering hit.
-			if a > eps {
-				inv = false
-				tHit = a
-				found = true
-				break
-			}
-		}
+	q := A.Add(B.Mul(tHit))
+	k := Real(0)
+	if rho := math.Hypot(q.X, q.W); rho > 0 {
+		k = (rho - R) / rho
 	}
-
-	if !found || tHit <= eps {
-		return objectHit{}, false
-	}
-
-	Pq := Ol.Add(Dl.Mul(tHit))
-	Sx := Pq.X / sx
-	Sy := Pq.Y / sy
-	Sz := Pq.Z / sz
-	Sw := Pq.W / sw
-
-	sum := Sx*Sx + Sy*Sy + Sz*Sz + Sw*Sw
-	Aval := sum + R*R - r*r
-	Bval := sum - R*R - r*r
-
-	gradS := Vector4{
-		4 * Sx * Bval,
-		4 * Sy * Aval,
-		4 * Sz * Aval,
-		4 * Sw * Bval,
-	}
-	gradL := Vector4{
-		gradS.X / sx,
-		gradS.Y / sy,
-		gradS.Z / sz,
-		gradS.W / sw,
-	}
+	gradL := Vector4{k * q.X / sx, q.Y / sy, q.Z / sz, k * q.W / sw}
 	if gradL.Len() == 0 {
 		return objectHit{}, false
 	}

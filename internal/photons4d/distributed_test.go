@@ -575,3 +575,74 @@ func TestSingleLightManyClients(t *testing.T) {
 		t.Fatalf("per-client rays sum %d != total %d", sumRays, srv.raysTotal)
 	}
 }
+
+// A round with one invalid batch must leave the master buffer untouched, even
+// if valid batches of the same round came before it.
+func TestCompleteRoundMergesNothingFromAnInvalidRound(t *testing.T) {
+	scene := NewScene(Point4{0, 0, 0, 0}, 2, 2, 2, 4, 4, 4, 8, false)
+	srv := newDistServer(nil, scene, "x", []int{1000}, 1, 0)
+	a := srv.assignWork(0)
+	if a.RoundID == 0 {
+		t.Fatalf("no round assigned")
+	}
+	batches := []UpdateMsg{
+		{IdxDeltas: []int64{1, 2}, Values: []float64{1.5, 2.5}},
+		{IdxDeltas: []int64{int64(len(scene.Buf)) + 5}, Values: []float64{1}},
+	}
+	if err := srv.completeRound(1, a.RoundID, batches); err == nil {
+		t.Fatalf("invalid round accepted")
+	}
+	for i, v := range scene.Buf {
+		if v != 0 {
+			t.Fatalf("rejected round changed the buffer at %d: %v", i, v)
+		}
+	}
+	if _, ok := srv.outstanding[a.RoundID]; !ok {
+		t.Fatalf("rejected round is no longer outstanding")
+	}
+	if err := srv.completeRound(1, a.RoundID, batches[:1]); err != nil {
+		t.Fatalf("valid round rejected: %v", err)
+	}
+	if scene.Buf[1] != 1.5 || scene.Buf[3] != 2.5 {
+		t.Fatalf("valid round not merged: %v %v", scene.Buf[1], scene.Buf[3])
+	}
+}
+
+// The count of connected clients goes down again when a client leaves.
+func TestServerCountsOnlyConnectedClients(t *testing.T) {
+	scene := NewScene(Point4{0, 0, 0, 0}, 2, 2, 2, 4, 4, 4, 8, false)
+	srv := newDistServer(nil, scene, "x", []int{1000}, 1, 0)
+	connected := func() int {
+		srv.mu.Lock()
+		defer srv.mu.Unlock()
+		return srv.clients
+	}
+	for round := 0; round < 3; round++ {
+		server, client := net.Pipe()
+		done := make(chan struct{})
+		go func() {
+			srv.handleConn(server)
+			close(done)
+		}()
+		w := newWire(client)
+		if err := w.send(HelloMsg{Version: DistProtocolVersion, SceneHash: "x", BufLen: len(scene.Buf), NLights: 1, Host: "test"}); err != nil {
+			t.Fatal(err)
+		}
+		var ack HelloAck
+		if err := w.recv(&ack); err != nil || !ack.OK {
+			t.Fatalf("handshake failed: %v %+v", err, ack)
+		}
+		if n := connected(); n != 1 {
+			t.Fatalf("connected clients = %d, want 1", n)
+		}
+		_ = w.Close()
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+			t.Fatalf("server did not notice the lost client")
+		}
+		if n := connected(); n != 0 {
+			t.Fatalf("connected clients after disconnect = %d, want 0", n)
+		}
+	}
+}

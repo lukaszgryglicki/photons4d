@@ -235,6 +235,101 @@ func buildScene(cfg *Config) (*Scene, []*Light, error) {
 		}
 		scene.AddHyperFrustum(h)
 	}
+	for i, ccfg := range cfg.Cubinders {
+		h, err := ccfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("cubinders[%d]: %w", i, err)
+		}
+		scene.AddCubinder(h)
+	}
+	for i, tcfg := range cfg.Ditori {
+		h, err := tcfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("ditori[%d]: %w", i, err)
+		}
+		scene.AddDitorus(h)
+	}
+	for i, dcfg := range cfg.Duoprisms {
+		h, err := dcfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("duoprisms[%d]: %w", i, err)
+		}
+		scene.AddDuoprism(h)
+	}
+	for i, pcfg := range cfg.Polychora {
+		h, err := pcfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("polychora[%d]: %w", i, err)
+		}
+		scene.AddPolytope(h)
+	}
+	for i, scfg := range cfg.StarPolychora {
+		h, err := scfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("starPolychora[%d]: %w", i, err)
+		}
+		scene.AddStarPolychoron(h)
+	}
+	for _, group := range []struct {
+		key, shape string
+		cfgs       []PolyhedralCfg
+	}{
+		{"polyhedralPrisms", "prism", cfg.PolyhedralPrisms},
+		{"polyhedralPyramids", "pyramid", cfg.PolyhedralPyramids},
+		{"polyhedralBipyramids", "bipyramid", cfg.PolyhedralBipyramids},
+	} {
+		for i, pcfg := range group.cfgs {
+			h, err := pcfg.Build(group.shape)
+			if err != nil {
+				return nil, nil, fmt.Errorf("%s[%d]: %w", group.key, i, err)
+			}
+			scene.AddPolytope(h)
+		}
+	}
+	for i, dcfg := range cfg.Duopyramids {
+		h, err := dcfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("duopyramids[%d]: %w", i, err)
+		}
+		scene.AddPolytope(h)
+	}
+	for i, bcfg := range cfg.Bracketopes {
+		h, err := bcfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("bracketopes[%d]: %w", i, err)
+		}
+		scene.AddConvexSolid(h)
+	}
+	for _, group := range []struct {
+		key, kind string
+		cfgs      []ConeSolidCfg
+	}{
+		{"coninders", "coninder", cfg.Coninders},
+		{"cylindrones", "cylindrone", cfg.Cylindrones},
+		{"dicones", "dicone", cfg.Dicones},
+	} {
+		for i, ccfg := range group.cfgs {
+			h, err := ccfg.Build(group.kind)
+			if err != nil {
+				return nil, nil, fmt.Errorf("%s[%d]: %w", group.key, i, err)
+			}
+			scene.AddConvexSolid(h)
+		}
+	}
+	for i, pcfg := range cfg.PrismicCylinders {
+		h, err := pcfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("prismicCylinders[%d]: %w", i, err)
+		}
+		scene.AddConvexSolid(h)
+	}
+	for i, tcfg := range cfg.Torinders {
+		h, err := tcfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("torinders[%d]: %w", i, err)
+		}
+		scene.AddTorinder(h)
+	}
 	nObjects := scene.NObjects()
 	DebugLog("Scene created with %d objects", nObjects)
 	if AlwaysBVH && NeverBVH {

@@ -108,6 +108,18 @@ func buildAllPrimitives(t *testing.T, rng *rand.Rand) []primUT {
 	check("hyperfrustum", err)
 	add("hyperfrustum", hf.AABBMin, hf.AABBMax, func(O Point4, D Vector4) (objectHit, bool) { return intersectRayHyperFrustum(O, D, hf) })
 
+	cb, err := NewCubinder(ctr, sc, rot, white, half, half, half, ior)
+	check("cubinder", err)
+	add("cubinder", cb.AABBMin, cb.AABBMax, func(O Point4, D Vector4) (objectHit, bool) { return intersectRayCubinder(O, D, cb) })
+
+	di, err := NewDitorus(ctr, sc, 0.9, 0.35, 0.12, rot, white, half, half, half, ior)
+	check("ditorus", err)
+	add("ditorus", di.AABBMin, di.AABBMax, func(O Point4, D Vector4) (objectHit, bool) { return intersectRayDitorus(O, D, di) })
+
+	dp, err := NewDuoprism(ctr, sc, 5, 3, rot, white, half, half, half, ior)
+	check("duoprism", err)
+	add("duoprism", dp.AABBMin, dp.AABBMax, func(O Point4, D Vector4) (objectHit, bool) { return intersectRayCellPoly(O, D, &dp.cellPoly) })
+
 	return out
 }
 

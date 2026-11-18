@@ -92,3 +92,32 @@ func TestSceneAABBWithSuperquadric(t *testing.T) {
 		}
 	}
 }
+
+// A ray that starts on the surface (within rounding of it) and leaves must not
+// hit anything: the bounding box of the shape is not a part of it.
+func TestSuperquadricNoHitWhenLeavingFromTheSurface(t *testing.T) {
+	sq, err := NewSuperquadric(Point4{0.1, -0.2, 0.3, 0.5}, Vector4{0.5, 0.4, 0.6, 0.3}, 4, Rot4{XY: 0.3, XW: -0.4, ZW: 0.7},
+		RGB{1, 1, 1}, RGB{0, 0, 0}, RGB{0.5, 0.5, 0.5}, RGB{0.5, 0.5, 0.5}, RGB{1.5, 1.5, 1.5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	O := Point4{2, 1.5, -1, 2.5}
+	D := Vector4{sq.Center.X - O.X + 0.05, sq.Center.Y - O.Y - 0.03, sq.Center.Z - O.Z + 0.02, sq.Center.W - O.W + 0.04}.Norm()
+	h, ok := intersectRaySuperquadric(O, D, sq)
+	if !ok || h.inv {
+		t.Fatalf("expected entering hit, ok=%v inv=%v", ok, h.inv)
+	}
+	P := O.Add(D.Mul(h.t))
+	for _, off := range []Real{1e-9, 1e-10, 1e-11, 3e-12, 1e-12, 1e-13, 0} {
+		for _, dir := range []Vector4{h.Nw, reflect4(D, h.Nw).Norm()} {
+			if h2, ok2 := intersectRaySuperquadric(P.Add(h.Nw.Mul(off)), dir, sq); ok2 {
+				t.Fatalf("offset %g: ray leaving the surface hit at t=%.12g (inv=%v)", off, h2.t, h2.inv)
+			}
+		}
+	}
+	// the same point, going in: the exit on the far side
+	h3, ok3 := intersectRaySuperquadric(P.Add(h.Nw.Mul(1e-13)), D, sq)
+	if !ok3 || !h3.inv || h3.t < 0.1 {
+		t.Fatalf("expected the far exit, ok=%v inv=%v t=%.12g", ok3, h3.inv, h3.t)
+	}
+}

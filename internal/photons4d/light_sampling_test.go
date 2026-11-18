@@ -91,6 +91,46 @@ func TestLightSampleDir_UniformS3Cap_Wide(t *testing.T) {
 }
 
 func TestLightSampleDir_UniformS3Cap_Narrow(t *testing.T) {
-	// Narrow cone → exercises LUT inverse-CDF path
+	// Narrow cone → exercises the polar-angle sampler
 	runOneKSTest(t, 0.05, 50000, 67890)
+}
+
+// The middle of a narrow cone must be as bright as the rest of it: the number
+// of samples within a fraction x of the half-angle follows the exact cap
+// measure (about x³ of them).
+func TestLightSampleDir_NarrowConeIsUniformNearTheAxis(t *testing.T) {
+	for _, deg := range []float64{34, 9} {
+		theta := deg * math.Pi / 180
+		L, err := NewLight(Point4{}, testAxis(), RGB{1, 1, 1}, theta, 1.0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if L.useReject {
+			t.Fatalf("%g° cone is expected to use the polar-angle sampler", deg)
+		}
+		rng := rand.New(rand.NewSource(424242))
+		const n = 2_000_000
+		fractions := []float64{0.05, 0.1, 0.15, 0.25}
+		counts := make([]int, len(fractions))
+		for i := 0; i < n; i++ {
+			c := float64(L.SampleDir(rng).Dot(L.Direction))
+			if c > 1 {
+				c = 1
+			}
+			phi := math.Acos(c)
+			for k, x := range fractions {
+				if phi < x*theta {
+					counts[k]++
+				}
+			}
+		}
+		capMeasure := func(a float64) float64 { return a/2 - math.Sin(2*a)/4 }
+		for k, x := range fractions {
+			p := capMeasure(x*theta) / capMeasure(theta)
+			want := p * n
+			if dev := math.Abs(float64(counts[k]) - want); dev > 6*math.Sqrt(want*(1-p))+1 {
+				t.Errorf("%g° cone: %d samples within %.2f of the half-angle, want %.0f", deg, counts[k], x, want)
+			}
+		}
+	}
 }

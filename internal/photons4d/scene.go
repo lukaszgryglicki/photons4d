@@ -27,6 +27,13 @@ type Scene struct {
 	Torispheres          []*Torisphere
 	Superquadrics        []*Superquadric
 	HyperFrustums        []*HyperFrustum
+	Cubinders            []*Cubinder
+	Ditori               []*Ditorus
+	Duoprisms            []*Duoprism
+	Polytopes            []*Polytope
+	StarPolychora        []*StarPolychoron
+	ConvexSolids         []*ConvexSolid
+	Torinders            []*Torinder
 
 	// cached bounds & mapping
 	MinX, MaxX Real
@@ -168,7 +175,7 @@ func (s *Scene) AngleIndexOf(d Vector4) (i, j, k int, alpha, beta, gamma Real) {
 }
 
 func (s *Scene) NObjects() int {
-	return len(s.Cells8) + len(s.Hyperspheres) + len(s.Cells5) + len(s.Cells16) + len(s.Cells24) + len(s.Cells120) + len(s.Cells600) + len(s.StarCells) + len(s.Spherinders) + len(s.HyperCones) + len(s.HyperCapsules) + len(s.Spheritori) + len(s.Duotori) + len(s.Duocylinders) + len(s.Torispheres) + len(s.Superquadrics) + len(s.HyperFrustums)
+	return len(s.Cells8) + len(s.Hyperspheres) + len(s.Cells5) + len(s.Cells16) + len(s.Cells24) + len(s.Cells120) + len(s.Cells600) + len(s.StarCells) + len(s.Spherinders) + len(s.HyperCones) + len(s.HyperCapsules) + len(s.Spheritori) + len(s.Duotori) + len(s.Duocylinders) + len(s.Torispheres) + len(s.Superquadrics) + len(s.HyperFrustums) + len(s.Cubinders) + len(s.Ditori) + len(s.Duoprisms) + len(s.Polytopes) + len(s.StarPolychora) + len(s.ConvexSolids) + len(s.Torinders)
 
 }
 
@@ -241,4 +248,32 @@ func (s *Scene) AddHyperFrustum(h *HyperFrustum) {
 
 func (s *Scene) AddStarCell(c *StarCell) {
 	s.StarCells = append(s.StarCells, c)
+}
+
+func (s *Scene) AddCubinder(h *Cubinder) {
+	s.Cubinders = append(s.Cubinders, h)
+}
+
+func (s *Scene) AddDitorus(h *Ditorus) {
+	s.Ditori = append(s.Ditori, h)
+}
+
+func (s *Scene) AddDuoprism(h *Duoprism) {
+	s.Duoprisms = append(s.Duoprisms, h)
+}
+
+func (s *Scene) AddPolytope(h *Polytope) {
+	s.Polytopes = append(s.Polytopes, h)
+}
+
+func (s *Scene) AddStarPolychoron(h *StarPolychoron) {
+	s.StarPolychora = append(s.StarPolychora, h)
+}
+
+func (s *Scene) AddConvexSolid(h *ConvexSolid) {
+	s.ConvexSolids = append(s.ConvexSolids, h)
+}
+
+func (s *Scene) AddTorinder(h *Torinder) {
+	s.Torinders = append(s.Torinders, h)
 }

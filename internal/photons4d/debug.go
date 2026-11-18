@@ -3,10 +3,7 @@
 
 package photons4d
 
-import (
-	"fmt"
-	"sync"
-)
+import "sync"
 
 func DebugLog(format string, args ...interface{}) {
 	logf("[DEBUG] "+format+"\n", args...)

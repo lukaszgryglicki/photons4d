@@ -330,9 +330,12 @@ func (s *distServer) completeRound(clientID, roundID int, batches []UpdateMsg) e
 		return fmt.Errorf("unknown or already-completed round %d", roundID)
 	}
 	for _, b := range batches {
-		if err := applySparse(s.scene.Buf, b.IdxDeltas, b.Values); err != nil {
+		if err := checkSparse(len(s.scene.Buf), b.IdxDeltas, b.Values); err != nil {
 			return err
 		}
+	}
+	for _, b := range batches {
+		addSparse(s.scene.Buf, b.IdxDeltas, b.Values)
 		s.entriesIn += int64(len(b.Values))
 	}
 	delete(s.outstanding, roundID)
@@ -405,6 +408,11 @@ func (s *distServer) handleConn(conn net.Conn) {
 	s.clients++
 	s.perClient[clientID] = &clientStat{host: hello.Host}
 	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.clients--
+		s.mu.Unlock()
+	}()
 	if err := w.send(HelloAck{OK: true, ClientID: clientID}); err != nil {
 		return
 	}
