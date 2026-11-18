@@ -71,6 +71,15 @@ type Config struct {
 	Dicones              []ConeSolidCfg       `json:"dicones,omitempty"`
 	PrismicCylinders     []PrismicCylinderCfg `json:"prismicCylinders,omitempty"`
 	Torinders            []TorinderCfg        `json:"torinders,omitempty"`
+
+	KleinBottles      []KleinBottleCfg      `json:"kleinBottles,omitempty"`
+	ProjectivePlanes  []ProjectivePlaneCfg  `json:"projectivePlanes,omitempty"`
+	MobiusBands       []MobiusBandCfg       `json:"mobiusBands,omitempty"`
+	Paraboloids       []ParaboloidCfg       `json:"paraboloids,omitempty"`
+	Hyperboloids      []HyperboloidCfg      `json:"hyperboloids,omitempty"`
+	SphericalSegments []SphericalSegmentCfg `json:"sphericalSegments,omitempty"`
+	Lenses            []LensCfg             `json:"lenses,omitempty"`
+	ReuleauxSolids    []ReuleauxSolidCfg    `json:"reuleauxSolids,omitempty"`
 }
 
 // Rotation in degrees for JSON (friendlier than radians).
@@ -438,6 +447,124 @@ type TorinderCfg struct {
 	MajorRadius Real    `json:"majorRadius,omitempty"`
 	MinorRadius Real    `json:"minorRadius,omitempty"`
 	RotDeg      Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+// KleinBottleCfg: the wall of the given thickness around a Klein bottle. An
+// even twist (the number of half-turns, 1 if left out) gives a twisted torus.
+type KleinBottleCfg struct {
+	Center      Point4  `json:"center"`
+	Scale       Vector4 `json:"scale,omitempty"`
+	MajorRadius Real    `json:"majorRadius,omitempty"`
+	MinorRadius Real    `json:"minorRadius,omitempty"`
+	Thickness   Real    `json:"thickness,omitempty"`
+	Twist       int     `json:"twist,omitempty"`
+	RotDeg      Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type ProjectivePlaneCfg struct {
+	Center    Point4  `json:"center"`
+	Scale     Vector4 `json:"scale,omitempty"`
+	Radius    Real    `json:"radius,omitempty"`
+	Thickness Real    `json:"thickness,omitempty"`
+	RotDeg    Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type MobiusBandCfg struct {
+	Center      Point4  `json:"center"`
+	Scale       Vector4 `json:"scale,omitempty"`
+	MajorRadius Real    `json:"majorRadius,omitempty"`
+	HalfWidth   Real    `json:"halfWidth,omitempty"`
+	Thickness   Real    `json:"thickness,omitempty"`
+	Twist       int     `json:"twist,omitempty"`
+	RotDeg      Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type ParaboloidCfg struct {
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+// HyperboloidCfg: waist is the radius in the middle (0.5 if left out, 0 for
+// two cones tip to tip); the radius at both ends is 1 before the scale.
+type HyperboloidCfg struct {
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	Waist  *Real   `json:"waist,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+// SphericalSegmentCfg: the part of the ball between w = lower and w = upper
+// (0 and 1 if left out: a half of the ball).
+type SphericalSegmentCfg struct {
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	Lower  *Real   `json:"lower,omitempty"`
+	Upper  *Real   `json:"upper,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+type LensCfg struct {
+	Center    Point4  `json:"center"`
+	Scale     Vector4 `json:"scale,omitempty"`
+	Thickness Real    `json:"thickness,omitempty"`
+	RotDeg    Rot4Deg `json:"rotDeg"`
+
+	Color   RGB `json:"color"`
+	Diffuse RGB `json:"diffuse"`
+	Reflect RGB `json:"reflect"`
+	Refract RGB `json:"refract"`
+	IOR     RGB `json:"ior"`
+}
+
+// ReuleauxSolidCfg: kind is "rotor" (if left out) or "simplex".
+type ReuleauxSolidCfg struct {
+	Kind   string  `json:"kind,omitempty"`
+	Center Point4  `json:"center"`
+	Scale  Vector4 `json:"scale,omitempty"`
+	RotDeg Rot4Deg `json:"rotDeg"`
 
 	Color   RGB `json:"color"`
 	Diffuse RGB `json:"diffuse"`
@@ -959,6 +1086,68 @@ func (c TorinderCfg) Build() (*Torinder, error) {
 		r = 0.25
 	}
 	return NewTorinder(c.Center, scaleOrOne(c.Scale), R, r, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+// orDefault replaces a missing (zero) value by its default.
+func orDefault(v, def Real) Real {
+	if v == 0 {
+		return def
+	}
+	return v
+}
+
+func (c KleinBottleCfg) Build() (*KleinSurface, error) {
+	twist := c.Twist
+	if twist == 0 {
+		twist = 1
+	}
+	return NewKleinBottle(c.Center, scaleOrOne(c.Scale), orDefault(c.MajorRadius, 1), orDefault(c.MinorRadius, 0.4), orDefault(c.Thickness, 0.1), twist,
+		c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c ProjectivePlaneCfg) Build() (*KleinSurface, error) {
+	return NewProjectivePlane(c.Center, scaleOrOne(c.Scale), orDefault(c.Radius, 0.5), orDefault(c.Thickness, 0.1),
+		c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c MobiusBandCfg) Build() (*KleinSurface, error) {
+	twist := c.Twist
+	if twist == 0 {
+		twist = 1
+	}
+	return NewMobiusBand(c.Center, scaleOrOne(c.Scale), orDefault(c.MajorRadius, 1), orDefault(c.HalfWidth, 0.4), orDefault(c.Thickness, 0.1), twist,
+		c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c ParaboloidCfg) Build() (*RevolvedQuadric, error) {
+	return NewParaboloid(c.Center, scaleOrOne(c.Scale), c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c HyperboloidCfg) Build() (*RevolvedQuadric, error) {
+	waist := Real(0.5)
+	if c.Waist != nil {
+		waist = *c.Waist
+	}
+	return NewHyperboloid(c.Center, scaleOrOne(c.Scale), waist, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c SphericalSegmentCfg) Build() (*RevolvedQuadric, error) {
+	lower, upper := Real(0), Real(1)
+	if c.Lower != nil {
+		lower = *c.Lower
+	}
+	if c.Upper != nil {
+		upper = *c.Upper
+	}
+	return NewSphericalSegment(c.Center, scaleOrOne(c.Scale), lower, upper, c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c LensCfg) Build() (*ConvexSolid, error) {
+	return NewLens(c.Center, scaleOrOne(c.Scale), orDefault(c.Thickness, 0.6), c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
+}
+
+func (c ReuleauxSolidCfg) Build() (*ConvexSolid, error) {
+	return NewReuleauxSolid(c.Kind, c.Center, scaleOrOne(c.Scale), c.RotDeg.Radians(), c.Color, c.Diffuse, c.Reflect, c.Refract, c.IOR)
 }
 
 func loadConfig(path string) (*Config, error) {

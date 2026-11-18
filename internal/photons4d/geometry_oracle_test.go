@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sort"
 	"testing"
 )
 
@@ -604,6 +605,128 @@ func oracleSolids(t *testing.T, rng *rand.Rand, size Real) []solidUT {
 			q := scaled(o.R, x)
 			return math.Max(sq(math.Hypot(q.X, q.Y)-R)+sq(q.Z)-r*r, math.Abs(q.W)-1)
 		}, func(O Point4, D Vector4) (objectHit, bool) { return intersectRayTorinder(O, D, o) })
+	}
+	{
+		// The walls around surfaces: the distance to the surface less half of
+		// the thickness. Far from the wall a bound is enough: the lengths in
+		// XY and in ZW of a point of the surface are a point of the profile.
+		klein := func(name string, o *KleinSurface, err error) {
+			t.Helper()
+			if err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+			R, M, T, twist, band := o.MajorRadius, o.MinorRadius, o.Thickness, o.Twist, o.Band
+			add(name, nil, o.AABBMin, o.AABBMax, 400, func(x Point4) Real {
+				q := scaled(o.R, x)
+				rho, sigma := math.Hypot(q.X, q.Y), math.Hypot(q.Z, q.W)
+				far := math.Abs(math.Hypot(rho-R, sigma) - M)
+				if band {
+					far = math.Hypot(rho-R, math.Max(0, sigma-M))
+				}
+				if far > 0.75*T {
+					return far - T/2
+				}
+				return oracleSweptDistance(q, R, M, twist, band) - T/2
+			}, func(O Point4, D Vector4) (objectHit, bool) { return intersectRayKleinSurface(O, D, o) })
+		}
+		R := 0.8 + 0.4*rng.Float64()
+		M := R * (0.3 + 0.3*rng.Float64())
+		T := M * (0.2 + 0.5*rng.Float64())
+		o, err := NewKleinBottle(ctr, sc, R, M, T, 1, rot, white, none, half, half, ior)
+		klein("klein bottle", o, err)
+		o, err = NewKleinBottle(ctr, sc, R, M, T, 2, rot, white, none, half, half, ior)
+		klein("twisted torus", o, err)
+		o, err = NewKleinBottle(ctr, sc, R, M, T, 3, rot, white, none, half, half, ior)
+		klein("klein bottle of 3 half-turns", o, err)
+		o, err = NewProjectivePlane(ctr, sc, M, T, rot, white, none, half, half, ior)
+		klein("projective plane", o, err)
+		o, err = NewMobiusBand(ctr, sc, R, M, T, 1, rot, white, none, half, half, ior)
+		klein("mobius band", o, err)
+		o, err = NewMobiusBand(ctr, sc, R, M, T, 2, rot, white, none, half, half, ior)
+		klein("twisted ring", o, err)
+		// a wall so thick that little is left of the hollow of the tube and of the hole in the middle
+		M = 0.45 * R
+		o, err = NewKleinBottle(ctr, sc, R, M, (1.2+0.5*rng.Float64())*M, 1, rot, white, none, half, half, ior)
+		klein("klein bottle with a thick wall", o, err)
+	}
+	{
+		lat := func(q Vector4) Real { return sq(q.X) + sq(q.Y) + sq(q.Z) }
+		quadric := func(name string, o *RevolvedQuadric, err error, g func(Vector4) Real) {
+			t.Helper()
+			add(name, err, o.AABBMin, o.AABBMax, cheap, func(x Point4) Real { return g(scaled(o.R, x)) },
+				func(O Point4, D Vector4) (objectHit, bool) { return intersectRayRevolvedQuadric(O, D, o) })
+		}
+		o, err := NewParaboloid(ctr, sc, rot, white, none, half, half, ior)
+		quadric("paraboloid", o, err, func(q Vector4) Real { return math.Max(lat(q)-(q.W+1)/2, q.W-1) })
+		waist := 0.1 + 0.8*rng.Float64()
+		o, err = NewHyperboloid(ctr, sc, waist, rot, white, none, half, half, ior)
+		quadric("hyperboloid", o, err, func(q Vector4) Real {
+			return math.Max(lat(q)-(waist*waist+(1-waist*waist)*sq(q.W)), math.Abs(q.W)-1)
+		})
+		o, err = NewHyperboloid(ctr, sc, 0, rot, white, none, half, half, ior)
+		quadric("double cone", o, err, func(q Vector4) Real { return math.Max(math.Sqrt(lat(q))-math.Abs(q.W), math.Abs(q.W)-1) })
+		lower := -0.9 + 0.9*rng.Float64()
+		upper := lower + 0.2 + (0.8-lower)*rng.Float64()
+		o, err = NewSphericalSegment(ctr, sc, lower, upper, rot, white, none, half, half, ior)
+		quadric("spherical segment", o, err, func(q Vector4) Real {
+			return math.Max(q.Dot(q)-1, math.Max(lower-q.W, q.W-upper))
+		})
+	}
+	{
+		// the lens by its two balls: they reach thick/2 on the axis and meet in the rim of the radius 1
+		thick := 0.15 + 1.5*rng.Float64()
+		rho := (1 + sq(thick/2)) / thick
+		o, err := NewLens(ctr, sc, thick, rot, white, none, half, half, ior)
+		convex("lens", o, err, func(q Vector4) Real {
+			up, down := q, q
+			up.W -= rho - thick/2
+			down.W += rho - thick/2
+			return math.Max(up.Len(), down.Len()) - rho
+		})
+		// the Reuleaux triangle of the side 2 by its three corners, in the half-plane of the point
+		top, base := 2/math.Sqrt(3), -1/math.Sqrt(3)
+		o, err = NewReuleauxSolid("rotor", ctr, sc, rot, white, none, half, half, ior)
+		convex("reuleaux rotor", o, err, func(q Vector4) Real {
+			lat := math.Sqrt(sq(q.X) + sq(q.Y) + sq(q.Z))
+			return math.Max(math.Hypot(lat, q.W-top), math.Max(math.Hypot(lat-1, q.W-base), math.Hypot(lat+1, q.W-base))) - 2
+		})
+		// the corners of the 5-cell primitive, which has the same local frame
+		c5, err5 := NewCell5(ctr, sc, rot, white, none, half, half, ior)
+		if err5 != nil {
+			t.Fatal(err5)
+		}
+		var corners []Vector4
+		for _, v := range c5.Verts {
+			corners = append(corners, scaled(c5.R, v).Norm())
+		}
+		o, err = NewReuleauxSolid("simplex", ctr, sc, rot, white, none, half, half, ior)
+		convex("reuleaux simplex", o, err, func(q Vector4) Real {
+			far := Real(0)
+			for _, c := range corners {
+				far = math.Max(far, q.Sub(c).Len())
+			}
+			return far - corners[0].Sub(corners[1]).Len()
+		})
+	}
+	for _, c := range []struct {
+		shape string
+		g     func(q Vector4) Real
+	}{
+		{"[(xw)(yz)]", func(q Vector4) Real { return math.Max(math.Hypot(q.X, q.W), math.Hypot(q.Y, q.Z)) }},
+		{"[(xyz)(xyw)]", func(q Vector4) Real { return math.Sqrt(sq(q.X) + sq(q.Y) + sq(math.Max(math.Abs(q.Z), math.Abs(q.W)))) }},
+		{"[(xy)(xz)(xw)(yz)(yw)(zw)]", func(q Vector4) Real {
+			a := []Real{math.Abs(q.X), math.Abs(q.Y), math.Abs(q.Z), math.Abs(q.W)}
+			sort.Float64s(a)
+			return math.Hypot(a[2], a[3])
+		}},
+		{"<(xy)(yz)(zw)>", func(q Vector4) Real { return math.Hypot(q.X, q.Y) + math.Hypot(q.Y, q.Z) + math.Hypot(q.Z, q.W) }},
+		{"([xy](yzw))", func(q Vector4) Real {
+			return math.Sqrt(sq(math.Max(math.Abs(q.X), math.Abs(q.Y))) + sq(q.Y) + sq(q.Z) + sq(q.W))
+		}},
+	} {
+		g := c.g
+		o, err := NewBracketope(c.shape, ctr, sc, rot, white, none, half, half, ior)
+		convex("bracketope "+c.shape, o, err, func(q Vector4) Real { return g(q) - 1 })
 	}
 	return out
 }

@@ -31,4 +31,6 @@ var (
 	_ material = (*StarPolychoron)(nil)
 	_ material = (*ConvexSolid)(nil)
 	_ material = (*Torinder)(nil)
+	_ material = (*KleinSurface)(nil)
+	_ material = (*RevolvedQuadric)(nil)
 )

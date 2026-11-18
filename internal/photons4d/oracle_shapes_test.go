@@ -292,3 +292,52 @@ func (o *oracleFlags) count(q Vector4) int {
 	}
 	return n
 }
+
+// oracleSweptDistance is the distance from a point to the surface that a
+// flat curve sweeps while its plane turns once around XY and by twist
+// half-turns in ZW: a circle of the radius m around a point at the distance
+// r from the centre, or the segment of the half-length m through that point
+// that is square to the radius. Every position of the curve is measured with
+// vectors of 4D; the best turns of a grid are narrowed by a golden section.
+func oracleSweptDistance(q Vector4, r, m Real, twist int, band bool) Real {
+	at := func(u Real) Real {
+		e := Vector4{math.Cos(u), math.Sin(u), 0, 0}
+		n := Vector4{0, 0, math.Cos(u * Real(twist) / 2), math.Sin(u * Real(twist) / 2)}
+		d := q.Sub(e.Mul(r))
+		x, z := d.Dot(e), d.Dot(n)
+		off := d.Sub(e.Mul(x)).Sub(n.Mul(z)).Len()
+		if band {
+			return math.Hypot(off, math.Hypot(x, math.Max(0, math.Abs(z)-m)))
+		}
+		return math.Hypot(off, math.Hypot(x, z)-m)
+	}
+	var grid [48 * 9]Real
+	steps := 48 * (1 + (twist+1)/2)
+	h := 2 * math.Pi / Real(steps)
+	for i := 0; i < steps; i++ {
+		grid[i] = at(Real(i) * h)
+	}
+	const golden = 0.6180339887498949
+	best := math.Inf(1)
+	for i := 0; i < steps; i++ {
+		if grid[i] > grid[(i+steps-1)%steps] || grid[i] > grid[(i+1)%steps] {
+			continue
+		}
+		lo, hi := Real(i-1)*h, Real(i+1)*h
+		a, b := hi-golden*(hi-lo), lo+golden*(hi-lo)
+		fa, fb := at(a), at(b)
+		for k := 0; k < 34; k++ {
+			if fa < fb {
+				hi, b, fb = b, a, fa
+				a = hi - golden*(hi-lo)
+				fa = at(a)
+			} else {
+				lo, a, fa = a, b, fb
+				b = lo + golden*(hi-lo)
+				fb = at(b)
+			}
+		}
+		best = math.Min(best, math.Min(math.Min(fa, fb), grid[i]))
+	}
+	return best
+}

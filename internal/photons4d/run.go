@@ -330,6 +330,62 @@ func buildScene(cfg *Config) (*Scene, []*Light, error) {
 		}
 		scene.AddTorinder(h)
 	}
+	for i, kcfg := range cfg.KleinBottles {
+		h, err := kcfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("kleinBottles[%d]: %w", i, err)
+		}
+		scene.AddKleinSurface(h)
+	}
+	for i, pcfg := range cfg.ProjectivePlanes {
+		h, err := pcfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("projectivePlanes[%d]: %w", i, err)
+		}
+		scene.AddKleinSurface(h)
+	}
+	for i, mcfg := range cfg.MobiusBands {
+		h, err := mcfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("mobiusBands[%d]: %w", i, err)
+		}
+		scene.AddKleinSurface(h)
+	}
+	for i, pcfg := range cfg.Paraboloids {
+		h, err := pcfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("paraboloids[%d]: %w", i, err)
+		}
+		scene.AddRevolvedQuadric(h)
+	}
+	for i, hcfg := range cfg.Hyperboloids {
+		h, err := hcfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("hyperboloids[%d]: %w", i, err)
+		}
+		scene.AddRevolvedQuadric(h)
+	}
+	for i, scfg := range cfg.SphericalSegments {
+		h, err := scfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("sphericalSegments[%d]: %w", i, err)
+		}
+		scene.AddRevolvedQuadric(h)
+	}
+	for i, lcfg := range cfg.Lenses {
+		h, err := lcfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("lenses[%d]: %w", i, err)
+		}
+		scene.AddConvexSolid(h)
+	}
+	for i, rcfg := range cfg.ReuleauxSolids {
+		h, err := rcfg.Build()
+		if err != nil {
+			return nil, nil, fmt.Errorf("reuleauxSolids[%d]: %w", i, err)
+		}
+		scene.AddConvexSolid(h)
+	}
 	nObjects := scene.NObjects()
 	DebugLog("Scene created with %d objects", nObjects)
 	if AlwaysBVH && NeverBVH {

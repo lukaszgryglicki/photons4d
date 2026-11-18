@@ -304,10 +304,41 @@ func TestBVHMatchesLinearScanWithEveryObjectKind(t *testing.T) {
 			td, err := NewTorinder(at(), size(), 0.8, 0.3, turn(), white, none, half, half, ior)
 			must(err)
 			s.AddTorinder(td)
+			var ks *KleinSurface
+			switch rng.Intn(3) {
+			case 0:
+				ks, err = NewKleinBottle(at(), size(), 1, 0.4, 0.2, 1+rng.Intn(3), turn(), white, none, half, half, ior)
+			case 1:
+				ks, err = NewProjectivePlane(at(), size(), 0.6, 0.2, turn(), white, none, half, half, ior)
+			default:
+				ks, err = NewMobiusBand(at(), size(), 1, 0.5, 0.25, 1+rng.Intn(3), turn(), white, none, half, half, ior)
+			}
+			must(err)
+			s.AddKleinSurface(ks)
+			var rq *RevolvedQuadric
+			switch rng.Intn(3) {
+			case 0:
+				rq, err = NewParaboloid(at(), size(), turn(), white, none, half, half, ior)
+			case 1:
+				rq, err = NewHyperboloid(at(), size(), rng.Float64(), turn(), white, none, half, half, ior)
+			default:
+				rq, err = NewSphericalSegment(at(), size(), -0.5*rng.Float64(), 0.2+0.8*rng.Float64(), turn(), white, none, half, half, ior)
+			}
+			must(err)
+			s.AddRevolvedQuadric(rq)
+			ln, err := NewLens(at(), size(), 0.3+rng.Float64(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddConvexSolid(ln)
+			rx, err := NewReuleauxSolid([]string{"rotor", "simplex"}[rng.Intn(2)], at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddConvexSolid(rx)
+			cr, err := NewBracketope([]string{"[(xyz)(xyw)]", "[(xy)(xz)(xw)(yz)(yw)(zw)]", "[(xy)(xz)w]"}[rng.Intn(3)], at(), size(), turn(), white, none, half, half, ior)
+			must(err)
+			s.AddConvexSolid(cr)
 		}
 		objs := collectSceneObjects(s)
-		if len(objs) != s.NObjects() || len(objs) != 56 {
-			t.Fatalf("%d objects in the scene, %d in the BVH, want 56", s.NObjects(), len(objs))
+		if len(objs) != s.NObjects() || len(objs) != 66 {
+			t.Fatalf("%d objects in the scene, %d in the BVH, want 66", s.NObjects(), len(objs))
 		}
 		root := buildBVH(objs)
 		hits := 0

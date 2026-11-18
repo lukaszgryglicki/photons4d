@@ -3,6 +3,7 @@ package photons4d
 import (
 	"fmt"
 	"math"
+	"strings"
 )
 
 // ConvexSolid is a convex body given by a convex function of the local
@@ -181,6 +182,7 @@ type gaugeNode struct {
 	op   byte
 	axis int
 	kids []*gaugeNode
+	axes [4]bool // the axes under the node
 }
 
 // Names of some bracketopes.
@@ -199,10 +201,13 @@ var bracketopeNames = map[string]string{
 // parseBracketope reads the bracket notation of a 4D shape: I stands for an
 // axis (X, Y, Z, W in this order), ( ) for a round join, [ ] for a square one
 // and < > for a diamond one. "[(II)(II)]" is the duocylinder, "<(II)(II)>"
-// its dual, "(IIII)" the ball.
-func parseBracketope(s string) (*gaugeNode, error) {
+// its dual, "(IIII)" the ball. The axes may be named instead (x, y, z, w),
+// and then groups may share them: "[(xyz)(xyw)]" is the part common to two
+// spherinders. shared tells that some axis is named more than once.
+func parseBracketope(s string) (root *gaugeNode, shared bool, err error) {
 	closing := map[byte]byte{'(': ')', '[': ']', '<': '>'}
 	axes := 0
+	var named [4]int
 	pos := 0
 	var parse func() (*gaugeNode, error)
 	parse = func() (*gaugeNode, error) {
@@ -214,6 +219,10 @@ func parseBracketope(s string) (*gaugeNode, error) {
 		if c == 'I' {
 			axes++
 			return &gaugeNode{op: 'I', axis: axes - 1}, nil
+		}
+		if i := strings.IndexByte("xyzw", c|0x20); i >= 0 {
+			named[i]++
+			return &gaugeNode{op: 'I', axis: i}, nil
 		}
 		end, ok := closing[c]
 		if !ok {
@@ -236,17 +245,38 @@ func parseBracketope(s string) (*gaugeNode, error) {
 		}
 		return n, nil
 	}
-	root, err := parse()
+	root, err = parse()
 	if err == nil && pos != len(s) {
 		err = fmt.Errorf("more than one group")
 	}
-	if err == nil && (axes != 4 || root.op == 'I') {
+	if names := named[0] + named[1] + named[2] + named[3]; err == nil && names > 0 {
+		shared = names > 4
+		if axes > 0 {
+			err = fmt.Errorf("I cannot stand next to named axes")
+		} else if named[0] == 0 || named[1] == 0 || named[2] == 0 || named[3] == 0 || root.op == 'I' {
+			err = fmt.Errorf("a 4D shape needs brackets around all of x, y, z and w")
+		}
+	} else if err == nil && (axes != 4 || root.op == 'I') {
 		err = fmt.Errorf("a 4D shape needs brackets around 4 axes, got %d", axes)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("bracketope %q: %w", s, err)
+		return nil, false, fmt.Errorf("bracketope %q: %w", s, err)
 	}
-	return root, nil
+	root.mark()
+	return root, shared, nil
+}
+
+// mark notes the axes under every node.
+func (n *gaugeNode) mark() {
+	if n.op == 'I' {
+		n.axes[n.axis] = true
+	}
+	for _, k := range n.kids {
+		k.mark()
+		for i, on := range k.axes {
+			n.axes[i] = n.axes[i] || on
+		}
+	}
 }
 
 // eval returns the gauge of the point and its gradient.
@@ -319,6 +349,45 @@ func (n *gaugeNode) dual(a Vector4) Real {
 	return math.Sqrt(sq)
 }
 
+// cover returns a bound of the largest a·q over the body of the gauge that
+// also holds when groups share axes: a is dealt out evenly to the members
+// that have its axis, a part p of it is at most its own bound times the
+// value of its member, and these values are joined as the polar gauge joins
+// them. Without shared axes it is the polar gauge.
+func (n *gaugeNode) cover(a Vector4) Real {
+	if n.op == 'I' {
+		return math.Abs(vecAt(a, n.axis))
+	}
+	var count [4]Real
+	for _, k := range n.kids {
+		for i, on := range k.axes {
+			if on {
+				count[i]++
+			}
+		}
+	}
+	sum, best, sq := Real(0), Real(0), Real(0)
+	for _, k := range n.kids {
+		var part Vector4
+		for i, on := range k.axes {
+			if on {
+				part = vecWith(part, i, vecAt(a, i)/count[i])
+			}
+		}
+		v := k.cover(part)
+		sum += v
+		best = math.Max(best, v)
+		sq += v * v
+	}
+	switch n.op {
+	case '[':
+		return sum
+	case '<':
+		return best
+	}
+	return math.Sqrt(sq)
+}
+
 // NewBracketope builds the body of a bracket notation (see parseBracketope)
 // or of one of the names in bracketopeNames: all points whose nested norm is
 // at most 1 after the division of the local coordinates by Scale.
@@ -327,7 +396,7 @@ func NewBracketope(shape string, center Point4, scale Vector4, angles Rot4, colo
 	if v, ok := bracketopeNames[shapeKey(shape)]; ok {
 		notation = v
 	}
-	root, err := parseBracketope(notation)
+	root, shared, err := parseBracketope(notation)
 	if err != nil {
 		return nil, err
 	}
@@ -335,8 +404,12 @@ func NewBracketope(shape string, center Point4, scale Vector4, angles Rot4, colo
 		v, g := root.eval(q)
 		return v - 1, g
 	}
+	support := root.dual
+	if shared {
+		support = root.cover
+	}
 	// no coordinate of a point of the body is above 1
-	return newConvexSolid("bracketope "+notation, f, root.dual, 2, center, scale, angles, color, diffuse, reflectivity, refractivity, ior)
+	return newConvexSolid("bracketope "+notation, f, support, 2, center, scale, angles, color, diffuse, reflectivity, refractivity, ior)
 }
 
 // ---- cone-like solids ----

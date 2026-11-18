@@ -39,7 +39,7 @@ func getOrBuildBVH(s *Scene) *AABBNode {
 
 func collectSceneObjects(s *Scene) []bvhLeaf {
 	out := make([]bvhLeaf, 0,
-		len(s.Cells8)+len(s.Hyperspheres)+len(s.Cells5)+len(s.Cells16)+len(s.Cells24)+len(s.Cells120)+len(s.Cells600)+len(s.StarCells)+len(s.Spherinders)+len(s.HyperCones)+len(s.HyperCapsules)+len(s.Spheritori)+len(s.Duotori)+len(s.Duocylinders)+len(s.Torispheres)+len(s.Superquadrics)+len(s.HyperFrustums)+len(s.Cubinders)+len(s.Ditori)+len(s.Duoprisms)+len(s.Polytopes)+len(s.StarPolychora)+len(s.ConvexSolids)+len(s.Torinders))
+		len(s.Cells8)+len(s.Hyperspheres)+len(s.Cells5)+len(s.Cells16)+len(s.Cells24)+len(s.Cells120)+len(s.Cells600)+len(s.StarCells)+len(s.Spherinders)+len(s.HyperCones)+len(s.HyperCapsules)+len(s.Spheritori)+len(s.Duotori)+len(s.Duocylinders)+len(s.Torispheres)+len(s.Superquadrics)+len(s.HyperFrustums)+len(s.Cubinders)+len(s.Ditori)+len(s.Duoprisms)+len(s.Polytopes)+len(s.StarPolychora)+len(s.ConvexSolids)+len(s.Torinders)+len(s.KleinSurfaces)+len(s.RevolvedQuadrics))
 
 	for _, o := range s.Cells8 {
 		if o == nil {
@@ -279,6 +279,26 @@ func collectSceneObjects(s *Scene) []bvhLeaf {
 		out = append(out, bvhLeaf{
 			min: obj.AABBMin, max: obj.AABBMax,
 			intersect: func(O Point4, D Vector4) (objectHit, bool) { return intersectRayTorinder(O, D, obj) },
+		})
+	}
+	for _, o := range s.KleinSurfaces {
+		if o == nil {
+			continue
+		}
+		obj := o
+		out = append(out, bvhLeaf{
+			min: obj.AABBMin, max: obj.AABBMax,
+			intersect: func(O Point4, D Vector4) (objectHit, bool) { return intersectRayKleinSurface(O, D, obj) },
+		})
+	}
+	for _, o := range s.RevolvedQuadrics {
+		if o == nil {
+			continue
+		}
+		obj := o
+		out = append(out, bvhLeaf{
+			min: obj.AABBMin, max: obj.AABBMax,
+			intersect: func(O Point4, D Vector4) (objectHit, bool) { return intersectRayRevolvedQuadric(O, D, obj) },
 		})
 	}
 	return out

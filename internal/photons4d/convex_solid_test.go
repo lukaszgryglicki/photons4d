@@ -9,7 +9,7 @@ import (
 
 func TestBracketopeNotation(t *testing.T) {
 	for _, bad := range []string{"", "IIII", "(III)", "(IIIII)", "(II)(II)", "((II)(II)", "(II]II)", "[()IIII]", "(IIxI)", "I", "<(II)(II)>>"} {
-		if _, err := parseBracketope(bad); err == nil {
+		if _, _, err := parseBracketope(bad); err == nil {
 			t.Errorf("%q must not parse", bad)
 		}
 	}
@@ -28,7 +28,7 @@ func TestBracketopeNotation(t *testing.T) {
 		{"([II]<II>)", math.Hypot(0.4, 1.7), math.Hypot(0.7, 1.2)},
 		{"<[I(II)]I>", math.Hypot(0.4, 1.2) + 0.5, math.Max(0.3+math.Hypot(0.4, 1.2), 0.5)},
 	} {
-		n, err := parseBracketope(c.shape)
+		n, _, err := parseBracketope(c.shape)
 		if err != nil {
 			t.Fatalf("%s: %v", c.shape, err)
 		}
@@ -228,6 +228,20 @@ func TestConvexSolidAABBIsTight(t *testing.T) {
 		t.Fatal(err)
 	}
 	solids = append(solids, s)
+	for _, thick := range []Real{0.2, 1.3} {
+		s, err = NewLens(ctr, sc, thick, rot, testWhite, testNone, testHalf, testHalf, testIOR)
+		if err != nil {
+			t.Fatal(err)
+		}
+		solids = append(solids, s)
+	}
+	for _, kind := range []string{"rotor", "simplex"} {
+		s, err = NewReuleauxSolid(kind, ctr, sc, rot, testWhite, testNone, testHalf, testHalf, testIOR)
+		if err != nil {
+			t.Fatal(err)
+		}
+		solids = append(solids, s)
+	}
 	for _, s := range solids {
 		lo, hi := [4]Real{}, [4]Real{}
 		// A coordinate has no other top on a convex surface than the highest

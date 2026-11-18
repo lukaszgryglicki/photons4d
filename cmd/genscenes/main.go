@@ -454,6 +454,61 @@ func main() {
 			"majorRadius": 0.44, "minorRadius": 0.16, "rotDeg": heroRot(0),
 		}, glassDefault(rgb(0.92, 1.0, 0.96), 1.53, 0.065)))})
 
+	// === Walls around surfaces without an inside, and round solids ===========
+
+	add(sceneOpts{name: "showcase_klein_bottle", lights: studioLights(1.0, 34), baseSpp: 150,
+		objects: single("kleinBottles", merge(obj{
+			"center": p4(0, 0, 0, heroW), "scale": v4(1, 1, 1, 1),
+			"majorRadius": 0.36, "minorRadius": 0.16, "thickness": 0.07, "rotDeg": heroRot(1),
+		}, glassDefault(rgb(0.9, 0.97, 1.0), 1.53, 0.065)))})
+
+	add(sceneOpts{name: "showcase_projective_plane", lights: studioLights(1.0, 34), baseSpp: 150,
+		objects: single("projectivePlanes", merge(obj{
+			"center": p4(0, 0, 0, heroW), "scale": v4(1, 1, 1, 1),
+			"radius": 0.27, "thickness": 0.07, "rotDeg": heroRot(2),
+		}, glassDefault(rgb(1.0, 0.94, 0.9), 1.53, 0.065)))})
+
+	add(sceneOpts{name: "showcase_mobius_band", lights: studioLights(1.0, 34), baseSpp: 150,
+		objects: single("mobiusBands", merge(obj{
+			"center": p4(0, 0, 0, heroW), "scale": v4(1, 1, 1, 1),
+			"majorRadius": 0.42, "halfWidth": 0.17, "thickness": 0.08, "rotDeg": heroRot(3),
+		}, glassDefault(rgb(0.93, 1.0, 0.95), 1.53, 0.065)))})
+
+	surfaces := trio(
+		obj{"majorRadius": 0.2, "minorRadius": 0.09, "thickness": 0.045},
+		obj{"radius": 0.15, "thickness": 0.045},
+		obj{"majorRadius": 0.22, "halfWidth": 0.1, "thickness": 0.05})
+	add(sceneOpts{name: "showcase_klein_surfaces", lights: studioLights(1.0, trioLight), baseSpp: 150, width: 2.6,
+		objects: obj{"kleinBottles": surfaces[:1], "projectivePlanes": surfaces[1:2], "mobiusBands": surfaces[2:]}})
+
+	// one, two and three half-turns: a Klein bottle, a torus twisted in 4D and a Klein bottle again
+	add(sceneOpts{name: "showcase_twisted_tori", lights: studioLights(1.0, trioLight), baseSpp: 150, width: 2.6,
+		objects: obj{"kleinBottles": trio(
+			obj{"majorRadius": 0.2, "minorRadius": 0.09, "thickness": 0.045, "twist": 1},
+			obj{"majorRadius": 0.2, "minorRadius": 0.09, "thickness": 0.045, "twist": 2},
+			obj{"majorRadius": 0.2, "minorRadius": 0.09, "thickness": 0.045, "twist": 3})}})
+
+	quadrics := trio(
+		obj{"scale": v4(0.28, 0.28, 0.28, 0.28)},
+		obj{"scale": v4(0.26, 0.26, 0.26, 0.3), "waist": 0.4},
+		obj{"scale": v4(0.3, 0.3, 0.3, 0.3), "lower": -0.25, "upper": 1})
+	add(sceneOpts{name: "showcase_quadrics", lights: studioLights(1.0, trioLight), width: 2.6,
+		objects: obj{"paraboloids": quadrics[:1], "hyperboloids": quadrics[1:2], "sphericalSegments": quadrics[2:]}})
+
+	// its axis is turned a little off the lights, so that the bright spot behind it is drawn out
+	add(sceneOpts{name: "showcase_lens", lights: studioLights(1.0, 34),
+		objects: single("lenses", merge(obj{
+			"center": p4(0, 0, 0, heroW), "scale": v4(0.46, 0.46, 0.46, 0.46), "thickness": 1.1,
+			"rotDeg": rot(0, 0, 14, 0, -9, 0),
+		}, glassDefault(rgb(0.96, 0.99, 1.0), 1.52, 0.06)))})
+
+	rollers := trio(
+		obj{"kind": "rotor", "scale": v4(0.26, 0.26, 0.26, 0.26)},
+		obj{"kind": "simplex", "scale": v4(0.33, 0.33, 0.33, 0.33)},
+		obj{"shape": "[(xyz)(xyw)]", "scale": v4(0.28, 0.28, 0.28, 0.28)})
+	add(sceneOpts{name: "showcase_rollers", lights: studioLights(1.0, trioLight), width: 2.6,
+		objects: obj{"reuleauxSolids": rollers[:2], "bracketopes": rollers[2:]}})
+
 	// === Mixed scenes ========================================================
 
 	add(sceneOpts{name: "showcase_mixed_glass_garden", lights: studioLights(1.0, 28),

@@ -47,6 +47,13 @@ last column names what else it takes.
 | `duotori` | tube around a flat torus (tiger) | `majorRadiusXY`, `majorRadiusZW`, `minorRadius` |
 | `ditori` | tube around a torus | `majorRadius`, `middleRadius`, `minorRadius` |
 | `torinders` | torus × segment | `majorRadius`, `minorRadius` |
+| `kleinBottles` | wall around a Klein bottle | `majorRadius`, `minorRadius`, `thickness`, `twist` |
+| `projectivePlanes` | wall around the real projective plane | `radius`, `thickness` |
+| `mobiusBands` | wall around a Möbius band | `majorRadius`, `halfWidth`, `thickness`, `twist` |
+| `paraboloids` `hyperboloids` | paraboloid, hyperboloid of one sheet over a ball | `waist` (hyperboloid) |
+| `sphericalSegments` | ball between two parallel hyperplanes | `lower`, `upper` |
+| `lenses` | part common to two balls | `thickness` |
+| `reuleauxSolids` | body of constant width, Reuleaux simplex | `kind` |
 | `superquadrics` | `\|x\|^p + \|y\|^p + \|z\|^p + \|w\|^p <= 1` | `power` |
 | `bracketopes` | body of a bracket notation | `shape` |
 
@@ -84,7 +91,32 @@ at `w = +1` to the segment along Z at `w = -1`. The polygons of `duoprisms`,
 of the sum of the squares), square brackets (the largest) and angle brackets
 (the sum): `(IIII)` is the ball, `[IIII]` the tesseract, `<IIII>` the 16-cell,
 `[(II)(II)]` the duocylinder, `<(II)(II)>` its dual and `<(III)I>` the
-bipyramid over a ball.
+bipyramid over a ball. The axes may be named instead (`x`, `y`, `z`, `w`), and
+then groups may share them: `[(xyz)(xyw)]` is the part common to two
+spherinders, `[(xy)(xz)(xw)(yz)(yw)(zw)]` the part common to six cubinders.
+
+`kleinBottles`, `projectivePlanes`, `mobiusBands`: surfaces without an inside.
+A ray would miss a surface, so each is the wall of all points within
+`thickness`/2 of it. A circle (of `minorRadius`, around a point at
+`majorRadius` from the centre) or, for the band, a segment (`halfWidth` to both
+sides of such a point) sweeps the surface: its plane goes once around XY and
+makes `twist` half-turns in ZW on the way,
+`(a cos u, a sin u, b cos(twist·u/2), b sin(twist·u/2))`. One half-turn (when
+`twist` is left out) gives the Klein bottle and the Möbius band, which do not
+cross themselves in 4D; an even `twist` gives a torus or a ring twisted in 4D.
+The projective plane is the Klein bottle whose circles (of `radius`) all pass
+through the centre.
+
+The paraboloid has its tip at `w = -1` and the radius 1 at `w = +1`. The
+hyperboloid has the radius 1 at `w = ±1` and `waist` in the middle (0.5 when
+left out; 0 gives two cones tip to tip). `sphericalSegments` keep the part of
+the unit ball between `w = lower` and `w = upper` (0 and 1 when left out: a
+half of the ball). The rim of a lens is the sphere of the radius 1 in `w = 0`
+and `thickness` is its size along W (0.6 when left out; 2 gives the ball).
+`reuleauxSolids`: the `rotor` (when `kind` is left out) is the Reuleaux
+triangle of the width 2 turned around W, a body of the same width in every
+direction that rolls between two hyperplanes as a ball does; the `simplex` is
+the part common to five balls around the corners of a 5-cell.
 
 ## Showcase scenes
 
@@ -93,7 +125,9 @@ supported 4D primitive (hypersphere, 5/8/16/24/120/600-cell, star cells,
 spherinder, hypercone, hypercapsule, spheritorus, duotorus, duocylinder,
 torisphere, superquadric, hyperfrustum, cubinder, ditorus, duoprism), scenes
 with uniform and star polychora, polyhedral solids, a duopyramid, bracketopes,
-cone solids, a prismic cylinder and a torinder, plus five "mixed" scenes
+cone solids, a prismic cylinder and a torinder, a Klein bottle, a projective
+plane and a Möbius band (alone, together and with one to three half-turns),
+quadrics, a lens and rolling bodies, plus five "mixed" scenes
 (`glass_garden`, `prism_chamber`, `grand`, `menagerie`, and an
 `escape_environment` scene
 that uses the environment-hypersphere mode). Each frames its object(s) in

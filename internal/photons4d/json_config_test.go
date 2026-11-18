@@ -496,3 +496,105 @@ func TestPolytopeAndSolidKindsLoadFromJSON(t *testing.T) {
 		}
 	}
 }
+
+// The walls around surfaces and the round solids are read from JSON under
+// their keys, with their defaults, and built into the scene.
+func TestKleinAndRoundKindsLoadFromJSON(t *testing.T) {
+	const mat = `"color": {"R":1,"G":1,"B":1}, "diffuse": {"R":0,"G":0,"B":0}, "reflect": {"R":0.1,"G":0.1,"B":0.1},
+		"refract": {"R":0.8,"G":0.8,"B":0.8}, "ior": {"R":1.4,"G":1.5,"B":1.6}`
+	const at = `"center": {"X":0.1,"Y":0.2,"Z":0.3,"W":0.4}, `
+	path := filepath.Join(t.TempDir(), "scene.json")
+	data := `{
+		"sceneResX": 4, "sceneResY": 4, "sceneResZ": 2, "probeRays": 100, "spp": 1, "gifOut": "x.gif",
+		"scene": {"center": {"X":0,"Y":0,"Z":0,"W":0}, "width": 2, "height": 2, "depth": 2},
+		"lights": [{"origin": {"X":0,"Y":0,"Z":0,"W":1}, "direction": {"X":0,"Y":0,"Z":0,"W":-1},
+			"color": {"R":1,"G":1,"B":1}, "angleDeg": 30, "intensity": 1}],
+		"kleinBottles": [{` + at + mat + `},
+			{"majorRadius": 0.6, "minorRadius": 0.25, "thickness": 0.06, "twist": 3, "scale": {"W":2}, "rotDeg": {"xw":30}, ` + at + mat + `},
+			{"twist": 2, ` + at + mat + `}],
+		"projectivePlanes": [{` + at + mat + `}, {"radius": 0.3, "thickness": 0.04, ` + at + mat + `}],
+		"mobiusBands": [{` + at + mat + `}, {"majorRadius": 0.7, "halfWidth": 0.2, "thickness": 0.05, "twist": 4, ` + at + mat + `}],
+		"paraboloids": [{"scale": {"X":0.5,"Y":0.5,"Z":0.5,"W":0.8}, ` + at + mat + `}],
+		"hyperboloids": [{` + at + mat + `}, {"waist": 0, ` + at + mat + `}, {"waist": 0.8, ` + at + mat + `}],
+		"sphericalSegments": [{` + at + mat + `}, {"lower": -0.4, "upper": 0, ` + at + mat + `}, {"lower": -1, ` + at + mat + `}],
+		"lenses": [{` + at + mat + `}, {"thickness": 0.2, ` + at + mat + `}],
+		"reuleauxSolids": [{` + at + mat + `}, {"kind": "simplex", ` + at + mat + `}],
+		"bracketopes": [{"shape": "[(xyz)(xyw)]", ` + at + mat + `}]
+	}`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := loadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scene, _, err := buildScene(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scene.KleinSurfaces) != 7 || len(scene.RevolvedQuadrics) != 7 || len(scene.ConvexSolids) != 5 || scene.NObjects() != 19 {
+		t.Fatalf("objects: klein=%d quadrics=%d convex=%d total=%d", len(scene.KleinSurfaces), len(scene.RevolvedQuadrics), len(scene.ConvexSolids), scene.NObjects())
+	}
+	var got []string
+	for _, k := range scene.KleinSurfaces {
+		got = append(got, fmt.Sprintf("%s %g/%g/%g/%d", k.Name, k.MajorRadius, k.MinorRadius, k.Thickness, k.Twist))
+		if k.Center != (Point4{0.1, 0.2, 0.3, 0.4}) {
+			t.Errorf("%s: center %v", k.Name, k.Center)
+		}
+	}
+	// name, radii, thickness and twist in the order of the keys
+	if got, want := strings.Join(got, ", "), "klein bottle 1/0.4/0.1/1, klein bottle 0.6/0.25/0.06/3, twisted torus 1/0.4/0.1/2, "+
+		"projective plane 0.5/0.5/0.1/1, projective plane 0.3/0.3/0.04/1, mobius band 1/0.4/0.1/1, twisted ring 0.7/0.2/0.05/4"; got != want {
+		t.Errorf("walls around surfaces:\n got %s\nwant %s", got, want)
+	}
+	if k := scene.KleinSurfaces[1]; k.Scale != (Vector4{1, 1, 1, 2}) || k.R == I4() || !scene.KleinSurfaces[5].Band || k.Band {
+		t.Errorf("klein bottle: scale %v, rotation %v", k.Scale, k.R)
+	}
+	got = got[:0]
+	for _, q := range scene.RevolvedQuadrics {
+		got = append(got, fmt.Sprintf("%s %g/%g/%g %g..%g", q.Name, q.K0, q.K1, q.K2, q.Lower, q.Upper))
+	}
+	if got, want := strings.Join(got, ", "), "paraboloid 0.5/0.5/0 -1..1, hyperboloid 0.25/0/0.75 -1..1, hyperboloid 0/0/1 -1..1, "+
+		"hyperboloid 0.6400000000000001/0/0.3599999999999999 -1..1, spherical segment 1/0/-1 0..1, spherical segment 1/0/-1 -0.4..0, spherical segment 1/0/-1 -1..1"; got != want {
+		t.Errorf("quadrics:\n got %s\nwant %s", got, want)
+	}
+	if q := scene.RevolvedQuadrics[0]; q.Scale != (Vector4{0.5, 0.5, 0.5, 0.8}) {
+		t.Errorf("paraboloid scale %v", q.Scale)
+	}
+	got = got[:0]
+	for _, c := range scene.ConvexSolids {
+		got = append(got, fmt.Sprintf("%s %.3f", c.Name, c.AABBMax.W-c.AABBMin.W))
+	}
+	// name and size along W: the lenses are as thick as told, the rotor is 2 wide
+	if got, want := strings.Join(got, ", "), "bracketope [(xyz)(xyw)] 2.000, lens 0.600, lens 0.200, reuleaux rotor 2.000, reuleaux simplex 1.581"; got != want {
+		t.Errorf("convex solids:\n got %s\nwant %s", got, want)
+	}
+
+	// a wrong entry is reported with its key and place
+	for _, c := range []struct{ old, new, where string }{
+		{`"majorRadius": 0.6, "minorRadius": 0.25`, `"majorRadius": 0.2, "minorRadius": 0.25`, "kleinBottles[1]"},
+		{`"twist": 2`, `"twist": 99`, "kleinBottles[2]"},
+		{`"radius": 0.3`, `"radius": -0.3`, "projectivePlanes[1]"},
+		{`"halfWidth": 0.2`, `"halfWidth": -0.2`, "mobiusBands[1]"},
+		{`"scale": {"X":0.5,"Y":0.5,"Z":0.5,"W":0.8}`, `"scale": {"X":0.5,"Y":-0.5,"Z":0.5,"W":0.8}`, "paraboloids[0]"},
+		{`"waist": 0.8`, `"waist": 1.8`, "hyperboloids[2]"},
+		{`"lower": -0.4, "upper": 0`, `"lower": 0.4, "upper": 0`, "sphericalSegments[1]"},
+		{`"thickness": 0.2`, `"thickness": 2.5`, "lenses[1]"},
+		{`"kind": "simplex"`, `"kind": "cube"`, "reuleauxSolids[1]"},
+		{`"shape": "[(xyz)(xyw)]"`, `"shape": "[(xyz)(xy)]"`, "bracketopes[0]"},
+	} {
+		if !strings.Contains(data, c.old) {
+			t.Fatalf("%q is not in the scene", c.old)
+		}
+		if err := os.WriteFile(path, []byte(strings.Replace(data, c.old, c.new, 1)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := loadConfig(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err = buildScene(cfg); err == nil || !strings.Contains(err.Error(), c.where) {
+			t.Errorf("%s must be rejected with its place, got %v", c.new, err)
+		}
+	}
+}
